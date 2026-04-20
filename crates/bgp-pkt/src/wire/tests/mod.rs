@@ -18,12 +18,11 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 
 use ipnet::{Ipv4Net, Ipv6Net};
-use nom::error::ErrorKind;
 
 use netgauze_iana::address_family::{AddressFamily, AddressType};
-use netgauze_parse_utils::Span;
 use netgauze_parse_utils::test_helpers::{
-    combine, test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
+    combine, test_parse_error_with_one_input_bytes_reader,
+    test_parsed_completely_with_one_input_bytes_reader, test_write,
 };
 
 use crate::capabilities::{
@@ -34,10 +33,7 @@ use crate::capabilities::{
 use crate::community::{
     ExtendedCommunity, TransitiveFourOctetExtendedCommunity, TransitiveTwoOctetExtendedCommunity,
 };
-use crate::iana::{
-    BgpRoleValue, RouteRefreshSubcode, UndefinedBgpErrorNotificationCode, UndefinedBgpMessageType,
-    UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
-};
+use crate::iana::{BgpRoleValue, RouteRefreshSubcode};
 use crate::nlri::*;
 use crate::notification::CeaseError;
 use crate::open::{BGP_VERSION, BgpOpenMessageParameter};
@@ -51,9 +47,7 @@ use crate::wire::deserializer::path_attribute::{
     NextHopParsingError, OriginParsingError, PathAttributeParsingError,
 };
 use crate::wire::deserializer::route_refresh::BgpRouteRefreshMessageParsingError;
-use crate::wire::deserializer::{
-    BgpMessageParsingError, BgpParsingContext, LocatedBgpMessageParsingError,
-};
+use crate::wire::deserializer::{BgpMessageParsingError, BgpParsingContext};
 use crate::wire::serializer::BgpMessageWritingError;
 use crate::{BgpMessage, BgpNotificationMessage, BgpOpenMessage, BgpRouteRefreshMessage};
 
@@ -80,14 +74,15 @@ fn test_bgp_message_not_synchronized_marker() {
     let bad_marker = [0x00; 16];
     let invalid_wire = combine(vec![&bad_marker, &[0x00, 0x13, 0x04]]);
 
-    let invalid = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(0, &invalid_wire[0..]) },
-        BgpMessageParsingError::ConnectionNotSynchronized(0u128),
-    );
-    test_parse_error_with_one_input::<
+    let invalid = BgpMessageParsingError::ConnectionNotSynchronized {
+        offset: 0,
+        header: 0u128,
+    };
+
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &invalid_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -122,122 +117,126 @@ fn test_bgp_message_length_bounds() {
         combine(vec![BGP_MARKER, &[0x10, 0x01, 0x01], &[0x00; 0x0fee]]);
 
     let good = BgpMessage::KeepAlive;
-    let open_underflow = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(16, &open_underflow_wire[16..]) },
-        BgpMessageParsingError::BadMessageLength(20),
-    );
-    let open_less_than_min = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(16, &open_less_than_min_wire[16..]) },
-        BgpMessageParsingError::BadMessageLength(18),
-    );
-    let update_less_than_min = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(16, &update_less_than_min_wire[16..]) },
-        BgpMessageParsingError::BadMessageLength(18),
-    );
-    let notification_less_than_min = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(16, &notification_less_than_min_wire[16..]) },
-        BgpMessageParsingError::BadMessageLength(18),
-    );
-    let keepalive_less_than_min = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(16, &keepalive_less_than_min_wire[16..]) },
-        BgpMessageParsingError::BadMessageLength(18),
-    );
-    let route_refresh_less_than_min = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(16, &route_refresh_less_than_min_wire[16..]) },
-        BgpMessageParsingError::BadMessageLength(18),
-    );
+    let open_underflow = BgpMessageParsingError::BadMessageLength {
+        offset: 16,
+        length: 20,
+    };
+    let open_less_than_min = BgpMessageParsingError::BadMessageLength {
+        offset: 16,
+        length: 18,
+    };
+    let update_less_than_min = BgpMessageParsingError::BadMessageLength {
+        offset: 16,
+        length: 18,
+    };
+    let notification_less_than_min = BgpMessageParsingError::BadMessageLength {
+        offset: 16,
+        length: 18,
+    };
+    let keepalive_less_than_min = BgpMessageParsingError::BadMessageLength {
+        offset: 16,
+        length: 18,
+    };
+    let route_refresh_less_than_min = BgpMessageParsingError::BadMessageLength {
+        offset: 16,
+        length: 18,
+    };
 
-    let overflow = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(19, &overflow_wire[19..]) },
-        BgpMessageParsingError::NomError(ErrorKind::NonEmpty),
-    );
-    let keepalive_overflow_extended = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(16, &keepalive_overflow_extended_wire[16..]) },
-        BgpMessageParsingError::BadMessageLength(4097),
-    );
+    let overflow = BgpMessageParsingError::UnparseableBytes {
+        offset: 19,
+        length: 20,
+        unparsed_bytes: 1,
+    };
+    let keepalive_overflow_extended = BgpMessageParsingError::BadMessageLength {
+        offset: 16,
+        length: 4097,
+    };
+    let open_overflow_extended = BgpMessageParsingError::BadMessageLength {
+        offset: 16,
+        length: 4097,
+    };
 
-    let open_overflow_extended = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(16, &open_overflow_extended_wire[16..]) },
-        BgpMessageParsingError::BadMessageLength(4097),
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire[..],
+        &mut BgpParsingContext::default(),
+        &good,
     );
-
-    test_parsed_completely_with_one_input(&good_wire[..], &mut BgpParsingContext::default(), &good);
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &open_underflow_wire,
         &mut BgpParsingContext::asn2_default(),
         &open_underflow,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &open_less_than_min_wire,
         &mut BgpParsingContext::asn2_default(),
         &open_less_than_min,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &update_less_than_min_wire,
         &mut BgpParsingContext::asn2_default(),
         &update_less_than_min,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &notification_less_than_min_wire,
         &mut BgpParsingContext::asn2_default(),
         &notification_less_than_min,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &keepalive_less_than_min_wire,
         &mut BgpParsingContext::asn2_default(),
         &keepalive_less_than_min,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &route_refresh_less_than_min_wire,
         &mut BgpParsingContext::asn2_default(),
         &route_refresh_less_than_min,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &overflow_wire,
         &mut BgpParsingContext::asn2_default(),
         &overflow,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &keepalive_overflow_extended_wire,
         &mut BgpParsingContext::asn2_default(),
         &keepalive_overflow_extended,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &open_overflow_extended_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -248,14 +247,14 @@ fn test_bgp_message_length_bounds() {
 #[test]
 fn test_bgp_message_undefined_message_type() {
     let invalid_wire = combine(vec![BGP_MARKER, &[0x00, 0x13, 0xff]]);
-    let invalid = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(18, &invalid_wire[18..]) },
-        BgpMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(0xff)),
-    );
-    test_parse_error_with_one_input::<
+    let invalid = BgpMessageParsingError::UndefinedBgpMessageType {
+        offset: 18,
+        code: 0xff,
+    };
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(&invalid_wire, &mut BgpParsingContext::default(), &invalid);
 }
 
@@ -263,7 +262,7 @@ fn test_bgp_message_undefined_message_type() {
 fn test_bgp_message_open_no_params() -> Result<(), BgpMessageWritingError> {
     let good_no_params_wire = combine(vec![&[BGP_VERSION], MY_AS, HOLD_TIME, BGP_ID, &[0x00u8]]);
     let good_no_params_msg = BgpOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), vec![]);
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_no_params_wire,
         &mut BgpParsingContext::default(),
         &good_no_params_msg,
@@ -291,40 +290,37 @@ fn test_bgp_message_notification() -> Result<(), BgpMessageWritingError> {
         BgpMessage::Notification(BgpNotificationMessage::CeaseError(CeaseError::HardReset {
             value: vec![6, 3],
         }));
-    let bad_undefined_notif = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(19, &bad_undefined_notif_wire[19..]) },
-        BgpMessageParsingError::BgpNotificationMessageParsingError(
-            BgpNotificationMessageParsingError::UndefinedBgpErrorNotificationCode(
-                UndefinedBgpErrorNotificationCode(0xff),
-            ),
-        ),
+    let bad_undefined_notif = BgpMessageParsingError::BgpNotificationMessageParsingError(
+        BgpNotificationMessageParsingError::UndefinedBgpErrorNotificationCode {
+            offset: 19,
+            code: 0xff,
+        },
     );
-    let bad_undefined_cease = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(20, &bad_undefined_cease_wire[20..]) },
-        BgpMessageParsingError::BgpNotificationMessageParsingError(
-            BgpNotificationMessageParsingError::CeaseError(CeaseErrorParsingError::Undefined(
-                UndefinedCeaseErrorSubCode(0xff),
-            )),
-        ),
+    let bad_undefined_cease = BgpMessageParsingError::BgpNotificationMessageParsingError(
+        BgpNotificationMessageParsingError::CeaseError(CeaseErrorParsingError::Undefined {
+            offset: 20,
+            code: 0xff,
+        }),
     );
-    test_parsed_completely_with_one_input(
+
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_cease_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_cease,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &bad_undefined_notif_wire,
         &mut BgpParsingContext::asn2_default(),
         &bad_undefined_notif,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &bad_undefined_cease_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -347,24 +343,22 @@ fn test_bgp_message_route_refresh() -> Result<(), BgpMessageWritingError> {
         RouteRefreshSubcode::NormalRequest,
     ));
 
-    let bad = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(21, &bad_wire[21..]) },
-        BgpMessageParsingError::BgpRouteRefreshMessageParsingError(
-            BgpRouteRefreshMessageParsingError::UndefinedOperation(UndefinedRouteRefreshSubcode(
-                255,
-            )),
-        ),
+    let bad = BgpMessageParsingError::BgpRouteRefreshMessageParsingError(
+        BgpRouteRefreshMessageParsingError::UndefinedOperation {
+            offset: 21,
+            code: 0xff,
+        },
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_normal_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_normal,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(&bad_wire, &mut BgpParsingContext::asn2_default(), &bad);
     test_write(&good_normal, &good_normal_wire)?;
 
@@ -411,7 +405,7 @@ fn test_bgp_message_open1() -> Result<(), BgpMessageWritingError> {
         ],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -471,7 +465,7 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
         ],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -514,7 +508,7 @@ fn test_rd_withdraw() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -630,7 +624,7 @@ fn test_rd_announce() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -729,7 +723,7 @@ fn test_bgp_add_path() -> Result<(), BgpMessageWritingError> {
         ],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::new(
             true,
@@ -763,7 +757,7 @@ fn test_bgp_add_path_withdraw() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::new(
             true,
@@ -834,7 +828,7 @@ fn test_bgp_add_path_mp_ipv6_unicast() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::new(
             true,
@@ -969,7 +963,7 @@ fn test_evpn_mp_reach() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::new(
             true,
@@ -1083,7 +1077,7 @@ fn test_evpn_withdraw() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::new(
             true,
@@ -1141,7 +1135,7 @@ fn test_bgp_role_otc_open() -> Result<(), BgpMessageWritingError> {
             )]),
         ],
     ));
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::new(
             true,
@@ -1219,18 +1213,22 @@ fn test_bgp_rfc7606_attr() -> Result<(), BgpMessageWritingError> {
         true,
         false,
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut ctx, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut ctx, &good);
     let parsing_errors = ctx.reset_parsing_errors();
     assert!(!parsing_errors.path_attr_errors().is_empty());
     assert_eq!(
         Some(&PathAttributeParsingError::OriginError(
-            OriginParsingError::UndefinedOrigin(UndefinedOrigin(0xff))
+            OriginParsingError::UndefinedOrigin {
+                offset: 26,
+                code: 0xff
+            }
         )),
         parsing_errors.path_attr_errors().first()
     );
     assert_eq!(
         Some(&PathAttributeParsingError::AsPathError(
             AsPathParsingError::InvalidAsPathLength {
+                offset: 31,
                 expecting: 1020,
                 found: 4
             }
@@ -1239,19 +1237,28 @@ fn test_bgp_rfc7606_attr() -> Result<(), BgpMessageWritingError> {
     );
     assert_eq!(
         Some(&PathAttributeParsingError::NextHopError(
-            NextHopParsingError::InvalidNextHopLength(PathAttributeLength::U8(0xff))
+            NextHopParsingError::InvalidNextHopLength {
+                offset: 38,
+                length: PathAttributeLength::U8(0xff)
+            }
         )),
         parsing_errors.path_attr_errors().get(2)
     );
     assert_eq!(
         Some(&PathAttributeParsingError::MultiExitDiscriminatorError(
-            MultiExitDiscriminatorParsingError::InvalidLength(PathAttributeLength::U8(0xff))
+            MultiExitDiscriminatorParsingError::InvalidLength {
+                offset: 45,
+                length: PathAttributeLength::U8(0xff)
+            }
         )),
         parsing_errors.path_attr_errors().get(3)
     );
     assert_eq!(
         Some(&PathAttributeParsingError::LocalPreferenceError(
-            LocalPreferenceParsingError::InvalidLength(PathAttributeLength::U8(0xff))
+            LocalPreferenceParsingError::InvalidLength {
+                offset: 52,
+                length: PathAttributeLength::U8(0xff)
+            }
         )),
         parsing_errors.path_attr_errors().get(4)
     );

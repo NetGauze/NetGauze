@@ -230,6 +230,12 @@ pub struct InvalidIpv4UnicastNetwork(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] pub Ipv4Net,
 );
 
+impl std::fmt::Display for InvalidIpv4UnicastNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl Ipv4Unicast {
     pub fn from_net(net: Ipv4Net) -> Result<Self, InvalidIpv4UnicastNetwork> {
         if net.addr().is_broadcast() || net.addr().is_multicast() {
@@ -371,6 +377,12 @@ pub struct InvalidIpv4MulticastNetwork(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] pub Ipv4Net,
 );
 
+impl std::fmt::Display for InvalidIpv4MulticastNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl Ipv4Multicast {
     pub fn from_net(net: Ipv4Net) -> Result<Self, InvalidIpv4MulticastNetwork> {
         if !net.addr().is_multicast() {
@@ -446,6 +458,12 @@ impl std::fmt::Display for Ipv6Unicast {
 pub struct InvalidIpv6UnicastNetwork(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] pub Ipv6Net,
 );
+
+impl std::fmt::Display for InvalidIpv6UnicastNetwork {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Ipv6Unicast {
     pub fn from_net(net: Ipv6Net) -> Result<Self, InvalidIpv6UnicastNetwork> {
@@ -1163,11 +1181,12 @@ impl NlriAddressType for RouteTargetMembershipAddress {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, thiserror::Error, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InvalidIpv4NlriMplsLabelsAddress {
     /// Total length should not exceed 255, each MPLS Label is 24 bit and
     /// account for up to 32 bit IPv4 prefix length
+    #[error("Invalid IPv4 NLRI MPLS Labels length {0}")]
     InvalidLabelsLength(usize),
 }
 
@@ -1258,11 +1277,12 @@ impl NlriAddressType for Ipv4NlriMplsLabelsAddress {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, thiserror::Error, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InvalidIpv6NlriMplsLabelsAddress {
     /// Total length should not exceed 255, each MPLS Label is 24 bit and
     /// account for up to 128 bit IPv6 prefix length
+    #[error("Invalid IPv6 NLRI MPLS Labels length {0}")]
     InvalidLabelsLength(usize),
 }
 

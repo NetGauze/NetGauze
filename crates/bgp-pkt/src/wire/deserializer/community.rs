@@ -13,164 +13,158 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use nom::IResult;
-use nom::error::ErrorKind;
-use nom::number::complete::{be_u8, be_u16, be_u32, be_u128};
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-use netgauze_parse_utils::{
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
-    parse_into_located_one_input,
-};
-use netgauze_serde_macros::LocatedError;
-
 use crate::community::*;
 use crate::iana::*;
+use crate::nlri::MacAddress;
 use crate::wire::deserializer::nlri::MacAddressParsingError;
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum CommunityParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedCommunityParsingError<'a>> for Community {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedCommunityParsingError<'a>> {
-        let (buf, value) = be_u32(buf)?;
-        Ok((buf, Community::new(value)))
+impl<'a> ParseFrom<'a> for Community {
+    type Error = CommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let value = cur.read_u32_be()?;
+        Ok(Community::new(value))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Extended Community error: {0}")]
     TransitiveTwoOctetExtendedCommunityError(
-        #[from_located(module = "self")] TransitiveTwoOctetExtendedCommunityParsingError,
+        #[from] TransitiveTwoOctetExtendedCommunityParsingError,
     ),
+    #[error("Extended Community error: {0}")]
     NonTransitiveTwoOctetExtendedCommunityError(
-        #[from_located(module = "self")] NonTransitiveTwoOctetExtendedCommunityParsingError,
+        #[from] NonTransitiveTwoOctetExtendedCommunityParsingError,
     ),
-    TransitiveIpv4ExtendedCommunityError(
-        #[from_located(module = "self")] TransitiveIpv4ExtendedCommunityParsingError,
-    ),
-    NonTransitiveIpv4ExtendedCommunityError(
-        #[from_located(module = "self")] NonTransitiveIpv4ExtendedCommunityParsingError,
-    ),
+    #[error("Extended Community error: {0}")]
+    TransitiveIpv4ExtendedCommunityError(#[from] TransitiveIpv4ExtendedCommunityParsingError),
+    #[error("Extended Community error: {0}")]
+    NonTransitiveIpv4ExtendedCommunityError(#[from] NonTransitiveIpv4ExtendedCommunityParsingError),
+    #[error("Extended Community error: {0}")]
     TransitiveFourOctetExtendedCommunityError(
-        #[from_located(module = "self")] TransitiveFourOctetExtendedCommunityParsingError,
+        #[from] TransitiveFourOctetExtendedCommunityParsingError,
     ),
+    #[error("Extended Community error: {0}")]
     NonTransitiveFourOctetExtendedCommunityError(
-        #[from_located(module = "self")] NonTransitiveFourOctetExtendedCommunityParsingError,
+        #[from] NonTransitiveFourOctetExtendedCommunityParsingError,
     ),
-    TransitiveOpaqueExtendedCommunityError(
-        #[from_located(module = "self")] TransitiveOpaqueExtendedCommunityParsingError,
-    ),
+    #[error("Extended Community error: {0}")]
+    TransitiveOpaqueExtendedCommunityError(#[from] TransitiveOpaqueExtendedCommunityParsingError),
+    #[error("Extended Community error: {0}")]
     NonTransitiveOpaqueExtendedCommunityError(
-        #[from_located(module = "self")] NonTransitiveOpaqueExtendedCommunityParsingError,
+        #[from] NonTransitiveOpaqueExtendedCommunityParsingError,
     ),
-    EvpnExtendedCommunityError(#[from_located(module = "self")] EvpnExtendedCommunityParsingError),
-    ExperimentalExtendedCommunityError(
-        #[from_located(module = "self")] ExperimentalExtendedCommunityParsingError,
-    ),
-    UnknownExtendedCommunityError(
-        #[from_located(module = "self")] UnknownExtendedCommunityParsingError,
-    ),
+    #[error("Extended Community error: {0}")]
+    EvpnExtendedCommunityError(#[from] EvpnExtendedCommunityParsingError),
+    #[error("Extended Community error: {0}")]
+    ExperimentalExtendedCommunityError(#[from] ExperimentalExtendedCommunityParsingError),
+    #[error("Extended Community error: {0}")]
+    UnknownExtendedCommunityError(#[from] UnknownExtendedCommunityParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedCommunity {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedExtendedCommunityParsingError<'a>> {
-        let (buf, code) = be_u8(buf)?;
+impl<'a> ParseFrom<'a> for ExtendedCommunity {
+    type Error = ExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let code = cur.read_u8()?;
         let comm_type = BgpExtendedCommunityType::try_from(code);
-        let (buf, ret) = match comm_type {
+        let ret = match comm_type {
             Ok(BgpExtendedCommunityType::TransitiveTwoOctet) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunity::TransitiveTwoOctet(value))
+                let value = TransitiveTwoOctetExtendedCommunity::parse(cur)?;
+                ExtendedCommunity::TransitiveTwoOctet(value)
             }
             Ok(BgpExtendedCommunityType::NonTransitiveTwoOctet) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunity::NonTransitiveTwoOctet(value))
+                let value = NonTransitiveTwoOctetExtendedCommunity::parse(cur)?;
+                ExtendedCommunity::NonTransitiveTwoOctet(value)
             }
             Ok(BgpExtendedCommunityType::TransitiveIpv4) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunity::TransitiveIpv4(value))
+                let value = TransitiveIpv4ExtendedCommunity::parse(cur)?;
+                ExtendedCommunity::TransitiveIpv4(value)
             }
             Ok(BgpExtendedCommunityType::NonTransitiveIpv4) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunity::NonTransitiveIpv4(value))
+                let value = NonTransitiveIpv4ExtendedCommunity::parse(cur)?;
+                ExtendedCommunity::NonTransitiveIpv4(value)
             }
             Ok(BgpExtendedCommunityType::TransitiveFourOctet) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunity::TransitiveFourOctet(value))
+                let value = TransitiveFourOctetExtendedCommunity::parse(cur)?;
+                ExtendedCommunity::TransitiveFourOctet(value)
             }
             Ok(BgpExtendedCommunityType::NonTransitiveFourOctet) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunity::NonTransitiveFourOctet(value))
+                let value = NonTransitiveFourOctetExtendedCommunity::parse(cur)?;
+                ExtendedCommunity::NonTransitiveFourOctet(value)
             }
             Ok(BgpExtendedCommunityType::TransitiveOpaque) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunity::TransitiveOpaque(value))
+                let value = TransitiveOpaqueExtendedCommunity::parse(cur)?;
+                ExtendedCommunity::TransitiveOpaque(value)
             }
             Ok(BgpExtendedCommunityType::NonTransitiveOpaque) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunity::NonTransitiveOpaque(value))
+                let value = NonTransitiveOpaqueExtendedCommunity::parse(cur)?;
+                ExtendedCommunity::NonTransitiveOpaque(value)
             }
             Ok(BgpExtendedCommunityType::TransitiveQosMarking) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::NonTransitiveQosMarking) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::CosCapability) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::Evpn) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunity::Evpn(value))
+                let value = EvpnExtendedCommunity::parse(cur)?;
+                ExtendedCommunity::Evpn(value)
             }
             Ok(BgpExtendedCommunityType::FlowSpecNextHop) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::FlowSpecIndirectionId) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::TransitiveTransportClass) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::NonTransitiveTransportClass) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::ServiceFunctionChain) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::Srv6MobileUserPlane) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::GenericPart1) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::GenericPart2) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::GenericPart3) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Unknown(value)
             }
             Ok(BgpExtendedCommunityType::Experimental83)
             | Ok(BgpExtendedCommunityType::Experimental84)
@@ -201,51 +195,47 @@ impl<'a> ReadablePdu<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedC
             | Ok(BgpExtendedCommunityType::ExperimentalCd)
             | Ok(BgpExtendedCommunityType::ExperimentalCe)
             | Ok(BgpExtendedCommunityType::ExperimentalCf) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Experimental(value))
+                let value = ExperimentalExtendedCommunity::parse(cur, code)?;
+                ExtendedCommunity::Experimental(value)
             }
             Err(err) => {
-                let (buf, value) = parse_into_located_one_input(buf, err.0)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let value = UnknownExtendedCommunity::parse(cur, err.0)?;
+                ExtendedCommunity::Unknown(value)
             }
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum LargeCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Large Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedLargeCommunityParsingError<'a>> for LargeCommunity {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedLargeCommunityParsingError<'a>> {
-        let (buf, global_admin) = be_u32(buf)?;
-        let (buf, local_data1) = be_u32(buf)?;
-        let (buf, local_data2) = be_u32(buf)?;
-        Ok((
-            buf,
-            LargeCommunity::new(global_admin, local_data1, local_data2),
-        ))
+impl<'a> ParseFrom<'a> for LargeCommunity {
+    type Error = LargeCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let global_admin = cur.read_u32_be()?;
+        let local_data1 = cur.read_u32_be()?;
+        let local_data2 = cur.read_u32_be()?;
+        Ok(LargeCommunity::new(global_admin, local_data1, local_data2))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum TransitiveTwoOctetExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Transitive Two Octet Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedTransitiveTwoOctetExtendedCommunityParsingError<'a>>
-    for TransitiveTwoOctetExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedTransitiveTwoOctetExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, global_admin) = be_u16(buf)?;
-        let (buf, local_admin) = be_u32(buf)?;
+impl<'a> ParseFrom<'a> for TransitiveTwoOctetExtendedCommunity {
+    type Error = TransitiveTwoOctetExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let global_admin = cur.read_u16_be()?;
+        let local_admin = cur.read_u32_be()?;
+
         let ret = match TransitiveTwoOctetExtendedCommunitySubType::try_from(sub_type) {
             Ok(TransitiveTwoOctetExtendedCommunitySubType::RouteTarget) => {
                 TransitiveTwoOctetExtendedCommunity::RouteTarget {
@@ -313,65 +303,57 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveTwoOctetExtendedCommunityParsingError<
                 local_admin,
             },
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ExtendedCommunityIpv6ParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    TransitiveIpv6ExtendedCommunityError(
-        #[from_located(module = "self")] TransitiveIpv6ExtendedCommunityParsingError,
-    ),
-    NonTransitiveIpv6ExtendedCommunityError(
-        #[from_located(module = "self")] NonTransitiveIpv6ExtendedCommunityParsingError,
-    ),
-    UnknownExtendedCommunityIpv6Error(
-        #[from_located(module = "self")] UnknownExtendedCommunityIpv6ParsingError,
-    ),
+    #[error("Extended Community IPv6 parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Extended Community IPv6 error: {0}")]
+    TransitiveIpv6ExtendedCommunityError(#[from] TransitiveIpv6ExtendedCommunityParsingError),
+    #[error("Extended Community IPv6 error: {0}")]
+    NonTransitiveIpv6ExtendedCommunityError(#[from] NonTransitiveIpv6ExtendedCommunityParsingError),
+    #[error("Extended Community IPv6 error: {0}")]
+    UnknownExtendedCommunityIpv6Error(#[from] UnknownExtendedCommunityIpv6ParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedExtendedCommunityIpv6ParsingError<'a>> for ExtendedCommunityIpv6 {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedExtendedCommunityIpv6ParsingError<'a>> {
-        let (buf, code) = be_u8(buf)?;
+impl<'a> ParseFrom<'a> for ExtendedCommunityIpv6 {
+    type Error = ExtendedCommunityIpv6ParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let code = cur.read_u8()?;
         let comm_type = BgpExtendedCommunityIpv6Type::try_from(code);
-        let (buf, ret) = match comm_type {
+        let ret = match comm_type {
             Ok(BgpExtendedCommunityIpv6Type::TransitiveIpv6) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunityIpv6::TransitiveIpv6(value))
+                let value = TransitiveIpv6ExtendedCommunity::parse(cur)?;
+                ExtendedCommunityIpv6::TransitiveIpv6(value)
             }
             Ok(BgpExtendedCommunityIpv6Type::NonTransitiveIpv6) => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, ExtendedCommunityIpv6::NonTransitiveIpv6(value))
+                let value = NonTransitiveIpv6ExtendedCommunity::parse(cur)?;
+                ExtendedCommunityIpv6::NonTransitiveIpv6(value)
             }
             Err(err) => {
-                let (buf, value) = parse_into_located_one_input(buf, err.0)?;
-                (buf, ExtendedCommunityIpv6::Unknown(value))
+                let value = UnknownExtendedCommunityIpv6::parse(cur, err.0)?;
+                ExtendedCommunityIpv6::Unknown(value)
             }
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum NonTransitiveTwoOctetExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Non Transitive Two Octet Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedNonTransitiveTwoOctetExtendedCommunityParsingError<'a>>
-    for NonTransitiveTwoOctetExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedNonTransitiveTwoOctetExtendedCommunityParsingError<'a>>
-    {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, global_admin) = be_u16(buf)?;
-        let (buf, local_admin) = be_u32(buf)?;
+impl<'a> ParseFrom<'a> for NonTransitiveTwoOctetExtendedCommunity {
+    type Error = NonTransitiveTwoOctetExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let global_admin = cur.read_u16_be()?;
+        let local_admin = cur.read_u32_be()?;
         let ret = match NonTransitiveTwoOctetExtendedCommunitySubType::try_from(sub_type) {
             Ok(NonTransitiveTwoOctetExtendedCommunitySubType::LinkBandwidth) => {
                 NonTransitiveTwoOctetExtendedCommunity::LinkBandwidth {
@@ -391,26 +373,23 @@ impl<'a> ReadablePdu<'a, LocatedNonTransitiveTwoOctetExtendedCommunityParsingErr
                 local_admin,
             },
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum TransitiveIpv4ExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Transitive IPv4 Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>>
-    for TransitiveIpv4ExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, global_admin) = be_u32(buf)?;
+impl<'a> ParseFrom<'a> for TransitiveIpv4ExtendedCommunity {
+    type Error = TransitiveIpv4ExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let global_admin = cur.read_u32_be()?;
         let global_admin = Ipv4Addr::from(global_admin);
-        let (buf, local_admin) = be_u16(buf)?;
+        let local_admin = cur.read_u16_be()?;
         let ret = match TransitiveIpv4ExtendedCommunitySubType::try_from(sub_type) {
             Ok(TransitiveIpv4ExtendedCommunitySubType::RouteTarget) => {
                 TransitiveIpv4ExtendedCommunity::RouteTarget {
@@ -508,50 +487,44 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>>
                 local_admin,
             },
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum NonTransitiveIpv4ExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Non Transitive IPv4 Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedNonTransitiveIpv4ExtendedCommunityParsingError<'a>>
-    for NonTransitiveIpv4ExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedNonTransitiveIpv4ExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, global_admin) = be_u32(buf)?;
+impl<'a> ParseFrom<'a> for NonTransitiveIpv4ExtendedCommunity {
+    type Error = NonTransitiveIpv4ExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let global_admin = cur.read_u32_be()?;
         let global_admin = Ipv4Addr::from(global_admin);
-        let (buf, local_admin) = be_u16(buf)?;
+        let local_admin = cur.read_u16_be()?;
         let ret = NonTransitiveIpv4ExtendedCommunity::Unassigned {
             sub_type,
             global_admin,
             local_admin,
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum TransitiveFourOctetExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Transitive Four Octet Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedTransitiveFourOctetExtendedCommunityParsingError<'a>>
-    for TransitiveFourOctetExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedTransitiveFourOctetExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, global_admin) = be_u32(buf)?;
-        let (buf, local_admin) = be_u16(buf)?;
+impl<'a> ParseFrom<'a> for TransitiveFourOctetExtendedCommunity {
+    type Error = TransitiveFourOctetExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let global_admin = cur.read_u32_be()?;
+        let local_admin = cur.read_u16_be()?;
         let ret = match TransitiveFourOctetExtendedCommunitySubType::try_from(sub_type) {
             Ok(TransitiveFourOctetExtendedCommunitySubType::RouteTarget) => {
                 TransitiveFourOctetExtendedCommunity::RouteTarget {
@@ -607,248 +580,165 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveFourOctetExtendedCommunityParsingError
                 local_admin,
             },
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum NonTransitiveFourOctetExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Non Transitive Four Octet Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedNonTransitiveFourOctetExtendedCommunityParsingError<'a>>
-    for NonTransitiveFourOctetExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedNonTransitiveFourOctetExtendedCommunityParsingError<'a>>
-    {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, global_admin) = be_u32(buf)?;
-        let (buf, local_admin) = be_u16(buf)?;
+impl<'a> ParseFrom<'a> for NonTransitiveFourOctetExtendedCommunity {
+    type Error = NonTransitiveFourOctetExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let global_admin = cur.read_u32_be()?;
+        let local_admin = cur.read_u16_be()?;
         let ret = NonTransitiveFourOctetExtendedCommunity::Unassigned {
             sub_type,
             global_admin,
             local_admin,
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum TransitiveOpaqueExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Transitive Opaque Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a>>
-    for TransitiveOpaqueExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, community) = match TransitiveOpaqueExtendedCommunitySubType::try_from(sub_type) {
+impl<'a> ParseFrom<'a> for TransitiveOpaqueExtendedCommunity {
+    type Error = TransitiveOpaqueExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let community = match TransitiveOpaqueExtendedCommunitySubType::try_from(sub_type) {
             Ok(TransitiveOpaqueExtendedCommunitySubType::DefaultGateway) => {
-                let (buf, _) = be_u16(buf)?;
-                let (buf, _) = be_u32(buf)?;
-                (buf, TransitiveOpaqueExtendedCommunity::DefaultGateway)
+                let _ = cur.read_bytes(6)?;
+                TransitiveOpaqueExtendedCommunity::DefaultGateway
             }
             Err(_) => {
-                let (buf, p1) = be_u16(buf)?;
-                let (buf, p2) = be_u32(buf)?;
-                let p1 = p1.to_be_bytes();
-                let p2 = p2.to_be_bytes();
-                let value: [u8; 6] = [p1[0], p1[1], p2[0], p2[1], p2[2], p2[3]];
-                (
-                    buf,
-                    TransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value },
-                )
+                let value = cur.read_array()?;
+                TransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value }
             }
         };
-        Ok((buf, community))
+        Ok(community)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum NonTransitiveOpaqueExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidValueLength(usize),
+    #[error("Non Transitive Opaque Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedNonTransitiveOpaqueExtendedCommunityParsingError<'a>>
-    for NonTransitiveOpaqueExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedNonTransitiveOpaqueExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let input = buf;
-        let (buf, value) = nom::multi::count(be_u8, 6)(buf)?;
-        let len = value.len();
-        let value: [u8; 6] = value.try_into().map_err(|_| {
-            nom::Err::Error(
-                LocatedNonTransitiveOpaqueExtendedCommunityParsingError::new(
-                    input,
-                    NonTransitiveOpaqueExtendedCommunityParsingError::InvalidValueLength(len),
-                ),
-            )
-        })?;
-        Ok((
-            buf,
-            NonTransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value },
-        ))
+impl<'a> ParseFrom<'a> for NonTransitiveOpaqueExtendedCommunity {
+    type Error = NonTransitiveOpaqueExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let value = cur.read_array()?;
+        Ok(NonTransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value })
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum EvpnExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    MacAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] MacAddressParsingError,
-    ),
+    #[error("EVPN Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("EVPN Extended Community error: {0}")]
+    MacAddressError(#[from] MacAddressParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedEvpnExtendedCommunityParsingError<'a>> for EvpnExtendedCommunity {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedEvpnExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, community) = match EvpnExtendedCommunitySubType::try_from(sub_type) {
+impl<'a> ParseFrom<'a> for EvpnExtendedCommunity {
+    type Error = EvpnExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let community = match EvpnExtendedCommunitySubType::try_from(sub_type) {
             Ok(EvpnExtendedCommunitySubType::MacMobility) => {
-                let (buf, flags) = be_u8(buf)?;
-                let (buf, _reserved) = be_u8(buf)?;
-                let (buf, seq_no) = be_u32(buf)?;
-                (buf, EvpnExtendedCommunity::MacMobility { flags, seq_no })
+                let flags = cur.read_u8()?;
+                let _reserved = cur.read_u8()?;
+                let seq_no = cur.read_u32_be()?;
+                EvpnExtendedCommunity::MacMobility { flags, seq_no }
             }
             Ok(EvpnExtendedCommunitySubType::EsiLabel) => {
-                let (buf, flags) = be_u8(buf)?;
-                let (buf, _reserved) = be_u16(buf)?;
-                let (buf, p1) = be_u16(buf)?;
-                let (buf, p2) = be_u8(buf)?;
-                let p1 = p1.to_be_bytes();
-                let esi_label: [u8; 3] = [p1[0], p1[1], p2];
-                (buf, EvpnExtendedCommunity::EsiLabel { flags, esi_label })
+                let flags = cur.read_u8()?;
+                let _reserved = cur.read_u16_be()?;
+                let esi_label: [u8; 3] = cur.read_array()?;
+                EvpnExtendedCommunity::EsiLabel { flags, esi_label }
             }
             Ok(EvpnExtendedCommunitySubType::EsImportRouteTarget) => {
-                let (buf, p1) = be_u32(buf)?;
-                let (buf, p2) = be_u16(buf)?;
-                let p1 = p1.to_be_bytes();
-                let p2 = p2.to_be_bytes();
-                let route_target: [u8; 6] = [p1[0], p1[1], p1[2], p1[2], p2[0], p2[1]];
-                (
-                    buf,
-                    EvpnExtendedCommunity::EsImportRouteTarget { route_target },
-                )
+                let route_target: [u8; 6] = cur.read_array()?;
+                EvpnExtendedCommunity::EsImportRouteTarget { route_target }
             }
             Ok(EvpnExtendedCommunitySubType::EvpnRoutersMac) => {
-                let (buf, mac) = parse_into_located(buf)?;
-                (buf, EvpnExtendedCommunity::EvpnRoutersMac { mac })
+                let mac = MacAddress::parse(cur)?;
+                EvpnExtendedCommunity::EvpnRoutersMac { mac }
             }
             Ok(EvpnExtendedCommunitySubType::EvpnL2Attribute) => {
-                let (buf, control_flags) = be_u16(buf)?;
-                let (buf, l2_mtu) = be_u16(buf)?;
-                // Reserved 2-octets
-                let (buf, _) = be_u16(buf)?;
-                (
-                    buf,
-                    EvpnExtendedCommunity::EvpnL2Attribute {
-                        control_flags,
-                        l2_mtu,
-                    },
-                )
+                let control_flags = cur.read_u16_be()?;
+                let l2_mtu = cur.read_u16_be()?;
+                let _reserved = cur.read_u16_be()?;
+                EvpnExtendedCommunity::EvpnL2Attribute {
+                    control_flags,
+                    l2_mtu,
+                }
             }
             Ok(_) | Err(_) => {
-                let (buf, p1) = be_u32(buf)?;
-                let (buf, p2) = be_u16(buf)?;
-                let p1 = p1.to_be_bytes();
-                let p2 = p2.to_be_bytes();
-                let value: [u8; 6] = [p1[0], p1[1], p1[2], p1[2], p2[0], p2[1]];
-                (buf, EvpnExtendedCommunity::Unassigned { sub_type, value })
+                let value: [u8; 6] = cur.read_array()?;
+                EvpnExtendedCommunity::Unassigned { sub_type, value }
             }
         };
-        Ok((buf, community))
+        Ok(community)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ExperimentalExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidValueLength(usize),
+    #[error("Experimental Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, u8, LocatedExperimentalExtendedCommunityParsingError<'a>>
-    for ExperimentalExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-        code: u8,
-    ) -> IResult<Span<'a>, Self, LocatedExperimentalExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let input = buf;
-        let (buf, value) = nom::multi::count(be_u8, 6)(buf)?;
-        let len = value.len();
-        let value: [u8; 6] = value.try_into().map_err(|_| {
-            nom::Err::Error(LocatedExperimentalExtendedCommunityParsingError::new(
-                input,
-                ExperimentalExtendedCommunityParsingError::InvalidValueLength(len),
-            ))
-        })?;
-        Ok((
-            buf,
-            ExperimentalExtendedCommunity::new(code, sub_type, value),
-        ))
+impl<'a> ParseFromWithOneInput<'a, u8> for ExperimentalExtendedCommunity {
+    type Error = ExperimentalExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader, code: u8) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let value: [u8; 6] = cur.read_array()?;
+        Ok(ExperimentalExtendedCommunity::new(code, sub_type, value))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum UnknownExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidValueLength(usize),
+    #[error("Unknown Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, u8, LocatedUnknownExtendedCommunityParsingError<'a>>
-    for UnknownExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-        code: u8,
-    ) -> IResult<Span<'a>, Self, LocatedUnknownExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let input = buf;
-        let (buf, value) = nom::multi::count(be_u8, 6)(buf)?;
-        let len = value.len();
-        let value: [u8; 6] = value.try_into().map_err(|_| {
-            nom::Err::Error(LocatedUnknownExtendedCommunityParsingError::new(
-                input,
-                UnknownExtendedCommunityParsingError::InvalidValueLength(len),
-            ))
-        })?;
-        Ok((buf, UnknownExtendedCommunity::new(code, sub_type, value)))
+impl<'a> ParseFromWithOneInput<'a, u8> for UnknownExtendedCommunity {
+    type Error = UnknownExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader, code: u8) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let value: [u8; 6] = cur.read_array()?;
+        Ok(UnknownExtendedCommunity::new(code, sub_type, value))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum TransitiveIpv6ExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Transitive IPv6 Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedTransitiveIpv6ExtendedCommunityParsingError<'a>>
-    for TransitiveIpv6ExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedTransitiveIpv6ExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, global_admin) = be_u128(buf)?;
+impl<'a> ParseFrom<'a> for TransitiveIpv6ExtendedCommunity {
+    type Error = TransitiveIpv6ExtendedCommunityParsingError;
+
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let global_admin = cur.read_u128_be()?;
         let global_admin = Ipv6Addr::from(global_admin);
-        let (buf, local_admin) = be_u16(buf)?;
+        let local_admin = cur.read_u16_be()?;
         let ret = match TransitiveIpv6ExtendedCommunitySubType::try_from(sub_type) {
             Ok(TransitiveIpv6ExtendedCommunitySubType::RouteTarget) => {
                 TransitiveIpv6ExtendedCommunity::RouteTarget {
@@ -910,62 +800,43 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveIpv6ExtendedCommunityParsingError<'a>>
                 local_admin,
             },
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum NonTransitiveIpv6ExtendedCommunityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Non Transitive IPv6 Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedNonTransitiveIpv6ExtendedCommunityParsingError<'a>>
-    for NonTransitiveIpv6ExtendedCommunity
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedNonTransitiveIpv6ExtendedCommunityParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let (buf, global_admin) = be_u128(buf)?;
+impl<'a> ParseFrom<'a> for NonTransitiveIpv6ExtendedCommunity {
+    type Error = NonTransitiveIpv6ExtendedCommunityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let global_admin = cur.read_u128_be()?;
         let global_admin = Ipv6Addr::from(global_admin);
-        let (buf, local_admin) = be_u16(buf)?;
+        let local_admin = cur.read_u16_be()?;
         let ret = NonTransitiveIpv6ExtendedCommunity::Unassigned {
             sub_type,
             global_admin,
             local_admin,
         };
-        Ok((buf, ret))
+        Ok(ret)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum UnknownExtendedCommunityIpv6ParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidValueLength(usize),
+    #[error("Unknown IPv6 Extended Community parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, u8, LocatedUnknownExtendedCommunityIpv6ParsingError<'a>>
-    for UnknownExtendedCommunityIpv6
-{
-    fn from_wire(
-        buf: Span<'a>,
-        code: u8,
-    ) -> IResult<Span<'a>, Self, LocatedUnknownExtendedCommunityIpv6ParsingError<'a>> {
-        let (buf, sub_type) = be_u8(buf)?;
-        let input = buf;
-        let (buf, value) = nom::multi::count(be_u8, 18)(buf)?;
-        let len = value.len();
-        let value: [u8; 18] = value.try_into().map_err(|_| {
-            nom::Err::Error(LocatedUnknownExtendedCommunityIpv6ParsingError::new(
-                input,
-                UnknownExtendedCommunityIpv6ParsingError::InvalidValueLength(len),
-            ))
-        })?;
-        Ok((
-            buf,
-            UnknownExtendedCommunityIpv6::new(code, sub_type, value),
-        ))
+impl<'a> ParseFromWithOneInput<'a, u8> for UnknownExtendedCommunityIpv6 {
+    type Error = UnknownExtendedCommunityIpv6ParsingError;
+    fn parse(cur: &mut BytesReader, code: u8) -> Result<Self, Self::Error> {
+        let sub_type = cur.read_u8()?;
+        let value: [u8; 18] = cur.read_array()?;
+        Ok(UnknownExtendedCommunityIpv6::new(code, sub_type, value))
     }
 }

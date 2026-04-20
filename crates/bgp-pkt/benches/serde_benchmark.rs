@@ -1,7 +1,9 @@
+use bytes::BytesMut;
 use criterion::{Criterion, criterion_group, criterion_main};
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
 const OPEN_COMPLEX_NO_PARAMS: [u8; 29] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -128,47 +130,61 @@ const UPDATE_MPLS: [u8; 143] = [
     0x02, 0xfb, 0xf1, 0x00, 0x00, 0x00, 0x01
 ];
 
-pub fn test_open_message_no_params(span: Span<'_>, ctx: &mut BgpParsingContext) {
-    let x = BgpMessage::from_wire(span, ctx);
-    x.unwrap();
-}
-pub fn test_complex_open_message(span: Span<'_>, ctx: &mut BgpParsingContext) {
-    let x = BgpMessage::from_wire(span, ctx);
-    x.unwrap();
+pub fn test_open_message_no_params(reader: &mut BytesReader, ctx: &mut BgpParsingContext) {
+    assert_eq!(reader.remaining(), OPEN_COMPLEX_NO_PARAMS.len());
+    let x = BgpMessage::parse(reader, ctx);
+    assert!(matches!(x, Ok(..)), "Found: {x:?}")
 }
 
-pub fn test_bgp_message(span: Span<'_>, ctx: &mut BgpParsingContext) {
-    let x = BgpMessage::from_wire(span, ctx);
-    x.unwrap();
+pub fn test_complex_open_message(reader: &mut BytesReader, ctx: &mut BgpParsingContext) {
+    let x = BgpMessage::parse(reader, ctx);
+    assert!(matches!(x, Ok(..)), "Found: {x:?}")
+}
+
+pub fn test_bgp_message(reader: &mut BytesReader, ctx: &mut BgpParsingContext) {
+    let x = BgpMessage::parse(reader, ctx);
+    assert!(matches!(x, Ok(..)), "Found: {x:?}")
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let mut ctx = BgpParsingContext::default();
-    let no_params_span = Span::new(&OPEN_COMPLEX_NO_PARAMS);
-    let complex_span = Span::new(&OPEN_COMPLEX_RAW);
+    let no_params_span = BytesReader::new(BytesMut::from_iter(&OPEN_COMPLEX_NO_PARAMS));
+    let complex_span = BytesReader::new(BytesMut::from_iter(&OPEN_COMPLEX_RAW));
     c.bench_function("open no params", |b| {
-        b.iter(|| test_open_message_no_params(no_params_span, &mut ctx))
+        b.iter(|| {
+            let mut no_params_span = no_params_span.clone();
+            test_open_message_no_params(&mut no_params_span, &mut ctx)
+        })
     });
     c.bench_function("open complex", |b| {
-        b.iter(|| test_complex_open_message(complex_span, &mut ctx))
+        b.iter(|| {
+            let mut complex_span = complex_span.clone();
+            test_complex_open_message(&mut complex_span, &mut ctx)
+        })
     });
 
     // Setup the context to parse the Update BGP message with MPLS data
     let mut ctx = BgpParsingContext::default();
-    let open_mpls_span = Span::new(&OPEN_FOR_UPDATE_MPLS);
-    let _ = BgpMessage::from_wire(open_mpls_span, &mut ctx).unwrap();
-    let update_mpls_span = Span::new(&UPDATE_MPLS);
+    let mut open_mpls_span = BytesReader::new(BytesMut::from_iter(&OPEN_FOR_UPDATE_MPLS));
+    let _ = BgpMessage::parse(&mut open_mpls_span, &mut ctx).unwrap();
+    let update_mpls_span = BytesReader::new(BytesMut::from_iter(&UPDATE_MPLS));
     c.bench_function("Update MPLS", |b| {
-        b.iter(|| test_complex_open_message(update_mpls_span, &mut ctx))
+        b.iter(|| {
+            let mut update_mpls_span = update_mpls_span.clone();
+            test_complex_open_message(&mut update_mpls_span, &mut ctx)
+        })
     });
 
     // Setup the context to parse the Update BGP message with SRV6 data
     let mut ctx = BgpParsingContext::default();
-    let open_srv6_span = Span::new(&OPEN_FOR_UPDATE_SRV6);
-    let _ = BgpMessage::from_wire(open_srv6_span, &mut ctx).unwrap();
-    let update_srv6_span = Span::new(&UPDATE_SRV6);
+    let mut open_srv6_span = BytesReader::new(BytesMut::from_iter(&OPEN_FOR_UPDATE_SRV6));
+    let _ = BgpMessage::parse(&mut open_srv6_span, &mut ctx).unwrap();
+    let update_srv6_span = BytesReader::new(BytesMut::from_iter(&UPDATE_SRV6));
     c.bench_function("Update SRV6", |b| {
-        b.iter(|| test_complex_open_message(update_srv6_span, &mut ctx))
+        b.iter(|| {
+            let mut update_srv6_span = update_srv6_span.clone();
+            test_complex_open_message(&mut update_srv6_span, &mut ctx)
+        })
     });
 }
 

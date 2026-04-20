@@ -21,12 +21,13 @@ use crate::wire::deserializer::{
 use crate::wire::serializer::BgpMessageWritingError;
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
-use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
-use nom::Needed;
+use netgauze_parse_utils::WritablePdu;
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
-use tracing::{Level, debug, enabled, error, trace};
+use tracing::{Level, debug, enabled, trace};
 
 pub trait BgpCodecInitializer<Peer> {
     fn new(peer: &Peer) -> Self;
@@ -89,6 +90,7 @@ impl Decoder for BgpCodec {
     type Error = BgpCodecDecoderError;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let mut reader = BytesReader::new(buf.clone());
         if buf.len() >= 19 {
             let length: u16 = NetworkEndian::read_u16(&buf[16..19]);
             let length = length as usize;
@@ -101,9 +103,9 @@ impl Decoder for BgpCodec {
                 // ASN4 capability is used only when both peers agree on enabling ASN4
                 let asn4 = self.asn4_received.unwrap_or(false) && self.asn4_sent.unwrap_or(false);
                 self.ctx.set_asn4(asn4);
-                let ret = BgpMessage::from_wire(Span::new(buf), &mut self.ctx);
+                let ret = BgpMessage::parse(&mut reader, &mut self.ctx);
                 let decoding_result = match ret {
-                    Ok((_span, msg)) => {
+                    Ok(msg) => {
                         buf.advance(length);
                         if let BgpMessage::Open(ref open) = msg {
                             let asn4 = open
@@ -116,20 +118,21 @@ impl Decoder for BgpCodec {
                         Ok(Some((msg, self.ctx.reset_parsing_errors())))
                     }
                     Err(error) => {
-                        error!(error=%error, buffer=?buf, "error decoding BGP message");
-                        let err = match error {
-                            nom::Err::Incomplete(needed) => {
-                                let needed = match needed {
-                                    Needed::Unknown => None,
-                                    Needed::Size(size) => Some(size.get()),
-                                };
-                                BgpCodecDecoderError::Incomplete(needed)
-                            }
-                            nom::Err::Error(error) | nom::Err::Failure(error) => {
-                                BgpCodecDecoderError::BgpMessageParsingError(error.error().clone())
-                            }
-                        };
-                        Err(err)
+                        // error!(error=%error, buffer=?buf, "error decoding BGP message");
+                        // if let BgpMessageParsingError::Parse(ParseError::UnexpectedEof {})
+                        // let err = match error {
+                        //     nom::Err::Incomplete(needed) => {
+                        //         let needed = match needed {
+                        //             Needed::Unknown => None,
+                        //             Needed::Size(size) => Some(size.get()),
+                        //         };
+                        //         BgpCodecDecoderError::Incomplete(needed)
+                        //     }
+                        //     nom::Err::Error(error) | nom::Err::Failure(error) => {
+                        //         BgpCodecDecoderError::BgpMessageParsingError(error.error().
+                        // clone())     }
+                        // };
+                        Err(BgpCodecDecoderError::BgpMessageParsingError(error))
                     }
                 };
                 if enabled!(Level::TRACE) {

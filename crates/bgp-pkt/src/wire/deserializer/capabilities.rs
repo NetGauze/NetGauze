@@ -14,530 +14,651 @@
 // limitations under the License.
 
 use crate::capabilities::*;
-use crate::iana::{BgpCapabilityCode, UndefinedBgpCapabilityCode};
-use netgauze_iana::address_family::{
-    AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
-    UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
-};
-use netgauze_parse_utils::{
-    ErrorKindSerdeDeref, ReadablePdu, Span, parse_into_located, parse_till_empty,
-    parse_till_empty_into_located,
-};
-use nom::IResult;
-use nom::error::{ErrorKind, FromExternalError, ParseError};
-use nom::number::complete::{be_u8, be_u16, be_u32};
-use serde::{Deserialize, Serialize};
-
-use crate::iana::{BgpRoleValue, UndefinedBgpRoleValue};
+use crate::iana::{BgpCapabilityCode, BgpRoleValue};
 use crate::wire::{
     BGP_ROLE_CAPABILITY_LENGTH, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
     EXTENDED_MESSAGE_CAPABILITY_LENGTH, EXTENDED_NEXT_HOP_ENCODING_LENGTH,
     FOUR_OCTET_AS_CAPABILITY_LENGTH, GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH,
     MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
 };
-use netgauze_serde_macros::LocatedError;
+use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::ParseFrom;
+use serde::{Deserialize, Serialize};
 
 /// BGP Capability Parsing errors
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpCapabilityParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedCapabilityCode(#[from_external] UndefinedBgpCapabilityCode),
-    InvalidRouteRefreshLength(u8),
-    InvalidEnhancedRouteRefreshLength(u8),
-    InvalidExtendedMessageLength(u8),
-    FourOctetAsCapabilityError(#[from_located(module = "self")] FourOctetAsCapabilityParsingError),
-    MultiProtocolExtensionsCapabilityError(
-        #[from_located(module = "self")] MultiProtocolExtensionsCapabilityParsingError,
-    ),
-    GracefulRestartCapabilityError(
-        #[from_located(module = "self")] GracefulRestartCapabilityParsingError,
-    ),
-    AddPathCapabilityError(#[from_located(module = "self")] AddPathCapabilityParsingError),
-    ExtendedNextHopEncodingCapabilityError(
-        #[from_located(module = "self")] ExtendedNextHopEncodingCapabilityParsingError,
-    ),
-    MultipleLabelError(#[from_located(module = "self")] MultipleLabelParsingError),
-    BgpRoleCapabilityError(#[from_located(module = "self")] BgpRoleCapabilityParsingError),
+    #[error("BGP capability parsing Error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error("BGP capability undefined capability code at offset {offset} with code {code}")]
+    UndefinedCapabilityCode { offset: usize, code: u8 },
+
+    #[error(
+        "BGP capability invalid route refresh capability length at offset {offset} with length {length}"
+    )]
+    InvalidRouteRefreshLength { offset: usize, length: u8 },
+
+    #[error(
+        "BGP capability invalid enhanced route refresh capability length at offset {offset} with length {length}"
+    )]
+    InvalidEnhancedRouteRefreshLength { offset: usize, length: u8 },
+
+    #[error(
+        "BGP capability invalid extended message capability length at offset {offset} with length {length}"
+    )]
+    InvalidExtendedMessageLength { offset: usize, length: u8 },
+
+    #[error("BGP capability error: {0}")]
+    FourOctetAsCapabilityError(#[from] FourOctetAsCapabilityParsingError),
+
+    #[error("BGP capability error: {0}")]
+    MultiProtocolExtensionsCapabilityError(#[from] MultiProtocolExtensionsCapabilityParsingError),
+
+    #[error("BGP capability error: {0}")]
+    GracefulRestartCapabilityError(#[from] GracefulRestartCapabilityParsingError),
+
+    #[error("BGP capability error: {0}")]
+    AddPathCapabilityError(#[from] AddPathCapabilityParsingError),
+
+    #[error("BGP capability error: {0}")]
+    ExtendedNextHopEncodingCapabilityError(#[from] ExtendedNextHopEncodingCapabilityParsingError),
+
+    #[error("BGP capability error: {0}")]
+    MultipleLabelError(#[from] MultipleLabelParsingError),
+
+    #[error("BGP capability error: {0}")]
+    BgpRoleCapabilityError(#[from] BgpRoleCapabilityParsingError),
 }
 
 fn parse_experimental_capability(
     code: ExperimentalCapabilityCode,
-    buf: Span<'_>,
-) -> IResult<Span<'_>, BgpCapability, LocatedBgpCapabilityParsingError<'_>> {
-    let (buf, value) = nom::multi::length_count(be_u8, be_u8)(buf)?;
-    Ok((
-        buf,
-        BgpCapability::Experimental(ExperimentalCapability::new(code, value)),
-    ))
+    cur: &mut BytesReader,
+) -> Result<BgpCapability, BgpCapabilityParsingError> {
+    let len = cur.read_u8()?;
+    let value = cur.read_bytes(len as usize)?;
+    Ok(BgpCapability::Experimental(ExperimentalCapability::new(
+        code,
+        value.to_vec(),
+    )))
 }
 
 fn parse_unrecognized_capability(
     code: u8,
-    buf: Span<'_>,
-) -> IResult<Span<'_>, BgpCapability, LocatedBgpCapabilityParsingError<'_>> {
-    let (buf, value) = nom::multi::length_count(be_u8, be_u8)(buf)?;
-    Ok((
-        buf,
-        BgpCapability::Unrecognized(UnrecognizedCapability::new(code, value)),
-    ))
+    cur: &mut BytesReader,
+) -> Result<BgpCapability, BgpCapabilityParsingError> {
+    let len = cur.read_u8()?;
+    let value = cur.read_bytes(len as usize)?;
+    Ok(BgpCapability::Unrecognized(UnrecognizedCapability::new(
+        code,
+        value.to_vec(),
+    )))
 }
 
 /// Helper function to read and check the capability exact length
-#[inline]
-fn check_capability_length<'a, E, L: FromExternalError<Span<'a>, E> + ParseError<Span<'a>>>(
-    buf: Span<'a>,
-    expected: u8,
-    err: fn(u8) -> E,
-) -> IResult<Span<'a>, u8, L> {
-    let (buf, length) = nom::combinator::map_res(be_u8, |length| {
-        if length != expected {
-            Err(err(length))
-        } else {
-            Ok(length)
-        }
-    })(buf)?;
-    Ok((buf, length))
+#[inline(always)]
+fn check_capability_length(cur: &mut BytesReader, expected: u8) -> Result<u8, u8> {
+    let length = cur.read_u8().map_err(|_| 0)?;
+    if length == expected {
+        Ok(length)
+    } else {
+        Err(length)
+    }
 }
 
 fn parse_route_refresh_capability(
-    buf: Span<'_>,
-) -> IResult<Span<'_>, BgpCapability, LocatedBgpCapabilityParsingError<'_>> {
-    let (buf, _) = check_capability_length(buf, ROUTE_REFRESH_CAPABILITY_LENGTH, |x| {
-        BgpCapabilityParsingError::InvalidRouteRefreshLength(x)
+    cur: &mut BytesReader,
+) -> Result<BgpCapability, BgpCapabilityParsingError> {
+    check_capability_length(cur, ROUTE_REFRESH_CAPABILITY_LENGTH).map_err(|length| {
+        BgpCapabilityParsingError::InvalidRouteRefreshLength {
+            offset: cur.offset() - 1,
+            length,
+        }
     })?;
-    Ok((buf, BgpCapability::RouteRefresh))
+    Ok(BgpCapability::RouteRefresh)
 }
 
 fn parse_enhanced_route_refresh_capability(
-    buf: Span<'_>,
-) -> IResult<Span<'_>, BgpCapability, LocatedBgpCapabilityParsingError<'_>> {
-    let (buf, _) = check_capability_length(buf, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, |x| {
-        BgpCapabilityParsingError::InvalidEnhancedRouteRefreshLength(x)
+    cur: &mut BytesReader,
+) -> Result<BgpCapability, BgpCapabilityParsingError> {
+    check_capability_length(cur, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH).map_err(|length| {
+        BgpCapabilityParsingError::InvalidEnhancedRouteRefreshLength {
+            offset: cur.offset() - 1,
+            length,
+        }
     })?;
-    Ok((buf, BgpCapability::EnhancedRouteRefresh))
+    Ok(BgpCapability::EnhancedRouteRefresh)
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpCapabilityParsingError<'a>> for BgpCapability {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpCapabilityParsingError<'a>> {
-        let parsed: IResult<Span<'_>, BgpCapabilityCode, LocatedBgpCapabilityParsingError<'_>> =
-            nom::combinator::map_res(be_u8, BgpCapabilityCode::try_from)(buf);
-        match parsed {
-            Ok((buf, code)) => match code {
+impl<'a> ParseFrom<'a> for BgpCapability {
+    type Error = BgpCapabilityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let code = BgpCapabilityCode::try_from(cur.read_u8()?);
+        //.map_err(|err| BgpCapabilityParsingError::UndefinedCapabilityCode{offset:
+        //.map_err(|err| cur.offset() - 1, code: err.0})?;
+        match code {
+            Ok(code) => match code {
                 BgpCapabilityCode::MultiProtocolExtensions => {
-                    let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BgpCapability::MultiProtocolExtensions(cap)))
+                    let cap = MultiProtocolExtensionsCapability::parse(cur)?;
+                    Ok(BgpCapability::MultiProtocolExtensions(cap))
                 }
-                BgpCapabilityCode::RouteRefreshCapability => parse_route_refresh_capability(buf),
+                BgpCapabilityCode::RouteRefreshCapability => parse_route_refresh_capability(cur),
                 BgpCapabilityCode::OutboundRouteFilteringCapability => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_unrecognized_capability(code.into(), cur)
                 }
                 BgpCapabilityCode::ExtendedNextHopEncoding => {
-                    let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BgpCapability::ExtendedNextHopEncoding(cap)))
+                    let cap = ExtendedNextHopEncodingCapability::parse(cur)?;
+                    Ok(BgpCapability::ExtendedNextHopEncoding(cap))
                 }
                 BgpCapabilityCode::CiscoRouteRefresh => {
-                    let (buf, _) =
-                        check_capability_length(buf, ROUTE_REFRESH_CAPABILITY_LENGTH, |x| {
-                            BgpCapabilityParsingError::InvalidRouteRefreshLength(x)
-                        })?;
-                    Ok((buf, BgpCapability::CiscoRouteRefresh))
+                    check_capability_length(cur, ROUTE_REFRESH_CAPABILITY_LENGTH).map_err(
+                        |length| BgpCapabilityParsingError::InvalidRouteRefreshLength {
+                            offset: cur.offset() - 1,
+                            length,
+                        },
+                    )?;
+                    Ok(BgpCapability::CiscoRouteRefresh)
                 }
                 BgpCapabilityCode::BgpExtendedMessage => {
-                    let (buf, _) =
-                        check_capability_length(buf, EXTENDED_MESSAGE_CAPABILITY_LENGTH, |x| {
-                            BgpCapabilityParsingError::InvalidExtendedMessageLength(x)
-                        })?;
-                    Ok((buf, BgpCapability::ExtendedMessage))
+                    check_capability_length(cur, EXTENDED_MESSAGE_CAPABILITY_LENGTH).map_err(
+                        |length| BgpCapabilityParsingError::InvalidExtendedMessageLength {
+                            offset: cur.offset() - 1,
+                            length,
+                        },
+                    )?;
+                    Ok(BgpCapability::ExtendedMessage)
                 }
                 BgpCapabilityCode::BgpSecCapability => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_unrecognized_capability(code.into(), cur)
                 }
                 BgpCapabilityCode::MultipleLabelsCapability => {
-                    let (buf, cap) = parse_till_empty_into_located(buf)?;
-                    Ok((buf, BgpCapability::MultipleLabels(cap)))
+                    let mut cap = Vec::new();
+                    while !cur.is_empty() {
+                        let v = MultipleLabel::parse(cur)?;
+                        cap.push(v);
+                    }
+                    Ok(BgpCapability::MultipleLabels(cap))
                 }
                 BgpCapabilityCode::BgpRole => {
-                    let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BgpCapability::BgpRole(cap)))
+                    let cap = BgpRoleCapability::parse(cur)?;
+                    Ok(BgpCapability::BgpRole(cap))
                 }
                 BgpCapabilityCode::GracefulRestartCapability => {
-                    let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BgpCapability::GracefulRestartCapability(cap)))
+                    let cap = GracefulRestartCapability::parse(cur)?;
+                    Ok(BgpCapability::GracefulRestartCapability(cap))
                 }
                 BgpCapabilityCode::FourOctetAs => {
-                    let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BgpCapability::FourOctetAs(cap)))
+                    let cap = FourOctetAsCapability::parse(cur)?;
+                    Ok(BgpCapability::FourOctetAs(cap))
                 }
                 BgpCapabilityCode::SupportForDynamicCapability => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_unrecognized_capability(code.into(), cur)
                 }
                 BgpCapabilityCode::MultiSessionBgpCapability => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_unrecognized_capability(code.into(), cur)
                 }
                 BgpCapabilityCode::AddPathCapability => {
-                    let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BgpCapability::AddPath(cap)))
+                    let cap = AddPathCapability::parse(cur)?;
+                    Ok(BgpCapability::AddPath(cap))
                 }
                 BgpCapabilityCode::EnhancedRouteRefresh => {
-                    parse_enhanced_route_refresh_capability(buf)
+                    parse_enhanced_route_refresh_capability(cur)
                 }
                 BgpCapabilityCode::LongLivedGracefulRestartLLGRCapability => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_unrecognized_capability(code.into(), cur)
                 }
                 BgpCapabilityCode::RoutingPolicyDistribution => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_unrecognized_capability(code.into(), cur)
                 }
-                BgpCapabilityCode::FQDN => parse_unrecognized_capability(code.into(), buf),
+                BgpCapabilityCode::FQDN => parse_unrecognized_capability(code.into(), cur),
                 BgpCapabilityCode::Experimental239 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental239, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental239, cur)
                 }
                 BgpCapabilityCode::Experimental240 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental240, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental240, cur)
                 }
                 BgpCapabilityCode::Experimental241 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental241, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental241, cur)
                 }
                 BgpCapabilityCode::Experimental242 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental242, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental242, cur)
                 }
                 BgpCapabilityCode::Experimental243 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental243, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental243, cur)
                 }
                 BgpCapabilityCode::Experimental244 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental244, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental244, cur)
                 }
                 BgpCapabilityCode::Experimental245 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental245, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental245, cur)
                 }
                 BgpCapabilityCode::Experimental246 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental246, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental246, cur)
                 }
                 BgpCapabilityCode::Experimental247 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental247, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental247, cur)
                 }
                 BgpCapabilityCode::Experimental248 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental248, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental248, cur)
                 }
                 BgpCapabilityCode::Experimental249 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental249, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental249, cur)
                 }
                 BgpCapabilityCode::Experimental250 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental250, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental250, cur)
                 }
                 BgpCapabilityCode::Experimental251 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental251, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental251, cur)
                 }
                 BgpCapabilityCode::Experimental252 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental252, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental252, cur)
                 }
                 BgpCapabilityCode::Experimental253 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental253, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental253, cur)
                 }
                 BgpCapabilityCode::Experimental254 => {
-                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental254, buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental254, cur)
                 }
             },
-            Err(nom::Err::Error(LocatedBgpCapabilityParsingError {
-                span: buf,
-                error:
-                    BgpCapabilityParsingError::UndefinedCapabilityCode(UndefinedBgpCapabilityCode(_)),
-            })) => {
-                // Parse code again, since nom won't advance the buffer on map_res error
-                let (buf, code) = be_u8(buf)?;
-                parse_unrecognized_capability(code, buf)
-            }
-            Err(err) => Err(err),
+            Err(err) => parse_unrecognized_capability(err.0, cur),
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum FourOctetAsCapabilityParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidLength(u8),
+    #[error("Four-octet AS capability parsing error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error("Four-octet AS capability invalid length at offset {offset} with length {length}")]
+    InvalidLength { offset: usize, length: u8 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedFourOctetAsCapabilityParsingError<'a>> for FourOctetAsCapability {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedFourOctetAsCapabilityParsingError<'a>> {
-        let (buf, _) = check_capability_length(buf, FOUR_OCTET_AS_CAPABILITY_LENGTH, |x| {
-            FourOctetAsCapabilityParsingError::InvalidLength(x)
+impl<'a> ParseFrom<'a> for FourOctetAsCapability {
+    type Error = FourOctetAsCapabilityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        check_capability_length(cur, FOUR_OCTET_AS_CAPABILITY_LENGTH).map_err(|length| {
+            FourOctetAsCapabilityParsingError::InvalidLength {
+                offset: cur.offset() - 1,
+                length,
+            }
         })?;
-        let (buf, asn4) = be_u32(buf)?;
-        Ok((buf, FourOctetAsCapability::new(asn4)))
+        let asn4 = cur.read_u32_be()?;
+        Ok(FourOctetAsCapability::new(asn4))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum MultiProtocolExtensionsCapabilityParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidLength(u8),
-    AddressFamilyError(#[from_external] UndefinedAddressFamily),
-    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
-    AddressTypeError(InvalidAddressType),
+    #[error("Multi-protocol extensions capability parsing error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error(
+        "Multi-protocol extensions capability invalid length at offset {offset} with length {length}"
+    )]
+    InvalidLength { offset: usize, length: u8 },
+
+    #[error(
+        "Multi-protocol extensions capability undefined address family {afi} at offset {offset}"
+    )]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error(
+        "Multi-protocol extensions capability undefined subsequent address family {safi} at offset {offset}"
+    )]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error(
+        "Multi-protocol extensions capability address type error at offset {offset} for address family {afi} and subsequent address family {safi}"
+    )]
+    AddressTypeError { offset: usize, afi: u16, safi: u8 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a>>
-    for MultiProtocolExtensionsCapability
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedMultiProtocolExtensionsCapabilityParsingError<'a>> {
-        let (buf, _) =
-            check_capability_length(buf, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, |x| {
-                MultiProtocolExtensionsCapabilityParsingError::InvalidLength(x)
-            })?;
-        let input = buf;
-        let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
-        let (buf, _) = be_u8(buf)?;
-        let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
+impl<'a> ParseFrom<'a> for MultiProtocolExtensionsCapability {
+    type Error = MultiProtocolExtensionsCapabilityParsingError;
+
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        check_capability_length(cur, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH).map_err(
+            |length| MultiProtocolExtensionsCapabilityParsingError::InvalidLength {
+                offset: cur.offset() - 1,
+                length,
+            },
+        )?;
+        let afi = AddressFamily::try_from(cur.read_u16_be()?).map_err(|err| {
+            MultiProtocolExtensionsCapabilityParsingError::UndefinedAddressFamily {
+                offset: cur.offset() - 2,
+                afi: err.0,
+            }
+        })?;
+        let _ = cur.read_u8()?;
+        let safi = SubsequentAddressFamily::try_from(cur.read_u8()?).map_err(|err| {
+            MultiProtocolExtensionsCapabilityParsingError::UndefinedSubsequentAddressFamily {
+                offset: cur.offset() - 1,
+                safi: err.0,
+            }
+        })?;
         let address_type = match AddressType::from_afi_safi(afi, safi) {
             Ok(address_type) => address_type,
             Err(err) => {
-                return Err(nom::Err::Error(
-                    LocatedMultiProtocolExtensionsCapabilityParsingError::new(
-                        input,
-                        MultiProtocolExtensionsCapabilityParsingError::AddressTypeError(err),
-                    ),
-                ));
+                return Err(
+                    MultiProtocolExtensionsCapabilityParsingError::AddressTypeError {
+                        offset: cur.offset() - 3,
+                        afi: err.address_family().into(),
+                        safi: err.subsequent_address_family().into(),
+                    },
+                );
             }
         };
-        Ok((buf, MultiProtocolExtensionsCapability::new(address_type)))
+
+        Ok(MultiProtocolExtensionsCapability::new(address_type))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum GracefulRestartCapabilityParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    AddressFamilyError(#[from_external] UndefinedAddressFamily),
-    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
-    AddressTypeError(InvalidAddressType),
+    #[error("Graceful restart capability parsing error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error("Multiple Label undefined address family {afi} at offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error("Multiple Label undefined subsequent address family {safi} at offset {offset}")]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error(
+        "Multiple Label address type error at offset {offset} for address family {afi} and subsequent address family {safi}"
+    )]
+    AddressTypeError { offset: usize, afi: u16, safi: u8 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
-    for GracefulRestartCapability
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedGracefulRestartCapabilityParsingError<'a>> {
-        let (buf, params_buf) = nom::multi::length_data(be_u8)(buf)?;
-        let (params_buf, header) = be_u16(params_buf)?;
+impl<'a> ParseFrom<'a> for GracefulRestartCapability {
+    type Error = GracefulRestartCapabilityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let len = cur.read_u8()?;
+        let mut params_buf = cur.take_slice(len as usize)?;
+        let header = params_buf.read_u16_be()?;
         let restart = header & 0x8000 == 0x8000;
         let graceful_notification = header & 0x4000 == 0x4000;
         let time = header & 0x0fff;
-        let (_, address_families) = parse_till_empty(params_buf)?;
-        Ok((
-            buf,
-            GracefulRestartCapability::new(restart, graceful_notification, time, address_families),
+        let mut address_families = Vec::new();
+        while !params_buf.is_empty() {
+            let v = GracefulRestartAddressFamily::parse(&mut params_buf)?;
+            address_families.push(v);
+        }
+
+        Ok(GracefulRestartCapability::new(
+            restart,
+            graceful_notification,
+            time,
+            address_families,
         ))
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
-    for GracefulRestartAddressFamily
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedGracefulRestartCapabilityParsingError<'a>> {
-        let input = buf;
-        let (buf, ehe_buf) =
-            nom::bytes::complete::take(GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH as usize)(buf)?;
-        let (ehe_buf, nlri_afi) =
-            nom::combinator::map_res(be_u16, AddressFamily::try_from)(ehe_buf)?;
-        let (ehe_buf, nlri_safi) =
-            nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(ehe_buf)?;
-        let address_type = match AddressType::from_afi_safi(nlri_afi, nlri_safi) {
+impl<'a> ParseFrom<'a> for GracefulRestartAddressFamily {
+    type Error = GracefulRestartCapabilityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let mut ehe_buf = cur.take_slice(GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH as usize)?;
+        let afi = AddressFamily::try_from(ehe_buf.read_u16_be()?).map_err(|err| {
+            GracefulRestartCapabilityParsingError::UndefinedAddressFamily {
+                offset: ehe_buf.offset() - 2,
+                afi: err.0,
+            }
+        })?;
+        let safi = SubsequentAddressFamily::try_from(ehe_buf.read_u8()?).map_err(|err| {
+            GracefulRestartCapabilityParsingError::UndefinedSubsequentAddressFamily {
+                offset: ehe_buf.offset() - 1,
+                safi: err.0,
+            }
+        })?;
+        let address_type = match AddressType::from_afi_safi(afi, safi) {
             Ok(address_type) => address_type,
             Err(err) => {
-                return Err(nom::Err::Error(
-                    LocatedGracefulRestartCapabilityParsingError::new(
-                        input,
-                        GracefulRestartCapabilityParsingError::AddressTypeError(err),
-                    ),
-                ));
+                return Err(GracefulRestartCapabilityParsingError::AddressTypeError {
+                    offset: ehe_buf.offset() - 3,
+                    afi: err.address_family().into(),
+                    safi: err.subsequent_address_family().into(),
+                });
             }
         };
-        let (_, flags) = be_u8(ehe_buf)?;
+        let flags = ehe_buf.read_u8()?;
         let forwarding_state = flags & 0x80 == 0x80;
 
-        Ok((
-            buf,
-            GracefulRestartAddressFamily::new(forwarding_state, address_type),
+        Ok(GracefulRestartAddressFamily::new(
+            forwarding_state,
+            address_type,
         ))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum AddPathCapabilityParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    AddressFamilyError(#[from_external] UndefinedAddressFamily),
-    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
-    AddressTypeError(InvalidAddressType),
-    InvalidAddPathSendReceiveValue(u8),
+    #[error("Add path capability parsing error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error("Add path capability undefined address family {afi} at offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error("Add path capability undefined subsequent address family {safi} at offset {offset}")]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error(
+        "Add path capability address type error at offset {offset} for address family {afi} and subsequent address family {safi}"
+    )]
+    AddressTypeError { offset: usize, afi: u16, safi: u8 },
+
+    #[error("Add path capability invalid send receive value at offset {offset} with value {value}")]
+    InvalidAddPathSendReceiveValue { offset: usize, value: u8 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathCapability {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedAddPathCapabilityParsingError<'a>> {
-        let (buf, params_buf) = nom::multi::length_data(be_u8)(buf)?;
-        let (_, address_families) = parse_till_empty(params_buf)?;
-
-        Ok((buf, AddPathCapability::new(address_families)))
+impl<'a> ParseFrom<'a> for AddPathCapability {
+    type Error = AddPathCapabilityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let length = cur.read_u8()?;
+        let mut params_buf = cur.take_slice(length as usize)?;
+        let mut address_families = Vec::new();
+        while !params_buf.is_empty() {
+            let address_family = AddPathAddressFamily::parse(&mut params_buf)?;
+            address_families.push(address_family);
+        }
+        Ok(AddPathCapability::new(address_families))
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathAddressFamily {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedAddPathCapabilityParsingError<'a>> {
-        let input = buf;
-        let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
-        let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
+impl<'a> ParseFrom<'a> for AddPathAddressFamily {
+    type Error = AddPathCapabilityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let afi = AddressFamily::try_from(cur.read_u16_be()?).map_err(|err| {
+            AddPathCapabilityParsingError::UndefinedAddressFamily {
+                offset: cur.offset() - 2, // AFI is the last 2 bytes read
+                afi: err.0,
+            }
+        })?;
+        let safi = SubsequentAddressFamily::try_from(cur.read_u8()?).map_err(|err| {
+            AddPathCapabilityParsingError::UndefinedSubsequentAddressFamily {
+                offset: cur.offset() - 1, // SAFI is the last byte read
+                safi: err.0,
+            }
+        })?;
+
         let address_type = match AddressType::from_afi_safi(afi, safi) {
             Ok(address_type) => address_type,
             Err(err) => {
-                return Err(nom::Err::Error(LocatedAddPathCapabilityParsingError::new(
-                    input,
-                    AddPathCapabilityParsingError::AddressTypeError(err),
-                )));
+                return Err(AddPathCapabilityParsingError::AddressTypeError {
+                    offset: cur.offset() - 3,
+                    afi: err.address_family().into(),
+                    safi: err.subsequent_address_family().into(),
+                });
             }
         };
-        let (buf, (receive, send)) = nom::combinator::map_res(be_u8, |send_receive| {
-            if send_receive > 0x03u8 {
-                Err(AddPathCapabilityParsingError::InvalidAddPathSendReceiveValue(send_receive))
-            } else {
-                Ok((
-                    send_receive & 0x01u8 == 0x01u8,
-                    send_receive & 0x02u8 == 0x02u8,
-                ))
-            }
-        })(buf)?;
+        let send_receive = cur.read_u8()?;
+        let (receive, send) = if send_receive > 0x03u8 {
+            return Err(
+                AddPathCapabilityParsingError::InvalidAddPathSendReceiveValue {
+                    offset: cur.offset() - 1,
+                    value: send_receive,
+                },
+            );
+        } else {
+            (
+                send_receive & 0x01u8 == 0x01u8,
+                send_receive & 0x02u8 == 0x02u8,
+            )
+        };
 
-        Ok((buf, AddPathAddressFamily::new(address_type, send, receive)))
+        Ok(AddPathAddressFamily::new(address_type, send, receive))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ExtendedNextHopEncodingCapabilityParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    AddressFamilyError(#[from_external] UndefinedAddressFamily),
-    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
-    AddressTypeError(InvalidAddressType),
+    #[error("Extended next hop capability parsing error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error("Extended next hop capability undefined address family {afi} at offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error(
+        "Extended next hop capability undefined subsequent address family {safi} at offset {offset}"
+    )]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error(
+        "Extended next hop capability address type error at offset {offset} for address family {afi} and subsequent address family {safi}"
+    )]
+    AddressTypeError { offset: usize, afi: u16, safi: u8 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>>
-    for ExtendedNextHopEncodingCapability
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>> {
-        let (buf, encodings_buf) = nom::multi::length_data(be_u8)(buf)?;
-        let (_, encodings) = parse_till_empty(encodings_buf)?;
-
-        Ok((buf, ExtendedNextHopEncodingCapability::new(encodings)))
+impl<'a> ParseFrom<'a> for ExtendedNextHopEncodingCapability {
+    type Error = ExtendedNextHopEncodingCapabilityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let len = cur.read_u8()?;
+        let mut encoding_buf = cur.take_slice(len as usize)?;
+        let mut encodings = Vec::new();
+        while !encoding_buf.is_empty() {
+            let encoding = ExtendedNextHopEncoding::parse(&mut encoding_buf)?;
+            encodings.push(encoding);
+        }
+        Ok(ExtendedNextHopEncodingCapability::new(encodings))
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>>
-    for ExtendedNextHopEncoding
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>> {
-        let input = buf;
-        let (buf, ehe_buf) =
-            nom::bytes::complete::take(EXTENDED_NEXT_HOP_ENCODING_LENGTH as usize)(buf)?;
-        let (ehe_buf, nlri_afi) =
-            nom::combinator::map_res(be_u16, AddressFamily::try_from)(ehe_buf)?;
-        let (ehe_buf, nlri_safi) =
-            nom::combinator::map_res(be_u16, |x| SubsequentAddressFamily::try_from(x as u8))(
-                ehe_buf,
-            )?;
+impl<'a> ParseFrom<'a> for ExtendedNextHopEncoding {
+    type Error = ExtendedNextHopEncodingCapabilityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let mut ehe_buf = cur.take_slice(EXTENDED_NEXT_HOP_ENCODING_LENGTH as usize)?;
+        let nlri_afi = AddressFamily::try_from(ehe_buf.read_u16_be()?).map_err(|err| {
+            ExtendedNextHopEncodingCapabilityParsingError::UndefinedAddressFamily {
+                offset: ehe_buf.offset() - 2,
+                afi: err.0,
+            }
+        })?;
+        let nlri_safi =
+            SubsequentAddressFamily::try_from(ehe_buf.read_u16_be()? as u8).map_err(|err| {
+                ExtendedNextHopEncodingCapabilityParsingError::UndefinedSubsequentAddressFamily {
+                    offset: ehe_buf.offset() - 1, // SAFI is the last byte read
+                    safi: err.0,
+                }
+            })?;
         let address_type = match AddressType::from_afi_safi(nlri_afi, nlri_safi) {
             Ok(address_type) => address_type,
             Err(err) => {
-                return Err(nom::Err::Error(
-                    LocatedExtendedNextHopEncodingCapabilityParsingError::new(
-                        input,
-                        ExtendedNextHopEncodingCapabilityParsingError::AddressTypeError(err),
-                    ),
-                ));
+                return Err(
+                    ExtendedNextHopEncodingCapabilityParsingError::AddressTypeError {
+                        offset: ehe_buf.offset() - 3, // AFI and SAFI are the last 3 bytes read
+                        afi: err.address_family().into(),
+                        safi: err.subsequent_address_family().into(),
+                    },
+                );
             }
         };
 
-        let (_, next_hop_afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(ehe_buf)?;
+        let next_hop_afi = AddressFamily::try_from(ehe_buf.read_u16_be()?).map_err(|err| {
+            ExtendedNextHopEncodingCapabilityParsingError::UndefinedAddressFamily {
+                offset: ehe_buf.offset() - 2, // AFI is the last 2 bytes read
+                afi: err.0,
+            }
+        })?;
 
-        Ok((
-            buf,
-            ExtendedNextHopEncoding::new(address_type, next_hop_afi),
-        ))
+        Ok(ExtendedNextHopEncoding::new(address_type, next_hop_afi))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum MultipleLabelParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    AddressFamilyError(#[from_external] UndefinedAddressFamily),
-    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
-    AddressTypeError(InvalidAddressType),
+    #[error("Multiple Label parsing error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error("Multiple Label undefined address family {afi} at offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error("Multiple Label undefined subsequent address family {safi} at offset {offset}")]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error(
+        "Multiple Label address type error at offset {offset} for address family {afi} and subsequent address family {safi}"
+    )]
+    AddressTypeError { offset: usize, afi: u16, safi: u8 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedMultipleLabelParsingError<'a>> for MultipleLabel {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedMultipleLabelParsingError<'a>> {
-        let input = buf;
-        let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
-        let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
+impl<'a> ParseFrom<'a> for MultipleLabel {
+    type Error = MultipleLabelParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let afi = AddressFamily::try_from(cur.read_u16_be()?).map_err(|err| {
+            MultipleLabelParsingError::UndefinedAddressFamily { offset, afi: err.0 }
+        })?;
+        let safi = SubsequentAddressFamily::try_from(cur.read_u8()?).map_err(|err| {
+            MultipleLabelParsingError::UndefinedSubsequentAddressFamily {
+                offset: cur.offset() - 1,
+                safi: err.0,
+            }
+        })?;
         let address_type = match AddressType::from_afi_safi(afi, safi) {
             Ok(address_type) => address_type,
             Err(err) => {
-                return Err(nom::Err::Error(LocatedMultipleLabelParsingError::new(
-                    input,
-                    MultipleLabelParsingError::AddressTypeError(err),
-                )));
+                return Err(MultipleLabelParsingError::AddressTypeError {
+                    offset,
+                    afi: err.address_family().into(),
+                    safi: err.subsequent_address_family().into(),
+                });
             }
         };
-        let (buf, count) = be_u8(buf)?;
-        Ok((buf, MultipleLabel::new(address_type, count)))
+        let count = cur.read_u8()?;
+        Ok(MultipleLabel::new(address_type, count))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpRoleCapabilityParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidLength(u8),
-    UndefinedBgpRoleValue(#[from_external] UndefinedBgpRoleValue),
+    #[error("BGP Role Capability parsing error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error("BGP role capability length {length}  is invalid at offset {offset}")]
+    InvalidLength { offset: usize, length: u8 },
+
+    #[error("BGP role capability code {code:?} is unrecognizable at offset {offset}")]
+    UndefinedBgpRoleValue { offset: usize, code: u8 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpRoleCapabilityParsingError<'a>> for BgpRoleCapability {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBgpRoleCapabilityParsingError<'a>> {
-        let (buf, _) = check_capability_length(buf, BGP_ROLE_CAPABILITY_LENGTH, |x| {
-            BgpRoleCapabilityParsingError::InvalidLength(x)
+impl<'a> ParseFrom<'a> for BgpRoleCapability {
+    type Error = BgpRoleCapabilityParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        check_capability_length(cur, BGP_ROLE_CAPABILITY_LENGTH).map_err(|length| {
+            BgpRoleCapabilityParsingError::InvalidLength {
+                offset: cur.offset() - 1,
+                length,
+            }
         })?;
-        let (buf, role) = nom::combinator::map_res(be_u8, BgpRoleValue::try_from)(buf)?;
-        Ok((buf, BgpRoleCapability::new(role)))
+        let code = cur.read_u8()?;
+        let role = BgpRoleValue::try_from(code).map_err(|_| {
+            BgpRoleCapabilityParsingError::UndefinedBgpRoleValue {
+                offset: cur.offset() - 1, // code is the last byte read
+                code,
+            }
+        })?;
+        Ok(BgpRoleCapability::new(role))
     }
 }

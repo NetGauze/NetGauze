@@ -13,28 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::nlri::{InvalidIpv4UnicastNetwork, Ipv4Unicast, Ipv4UnicastAddress};
+use crate::nlri::{Ipv4Unicast, Ipv4UnicastAddress};
 use crate::path_attribute::{
     As4PathSegment, AsPath, AsPathSegmentType, NextHop, Origin, PathAttribute, PathAttributeValue,
 };
-use crate::wire::deserializer::nlri::{
-    Ipv4UnicastAddressParsingError, Ipv4UnicastParsingError, LocatedIpv4UnicastAddressParsingError,
-};
+use crate::wire::deserializer::nlri::{Ipv4UnicastAddressParsingError, Ipv4UnicastParsingError};
 use crate::wire::deserializer::update::BgpUpdateMessageParsingError;
-use crate::wire::deserializer::{
-    BgpMessageParsingError, BgpParsingContext, Ipv4PrefixParsingError,
-    LocatedBgpMessageParsingError,
-};
+use crate::wire::deserializer::{BgpMessageParsingError, BgpParsingContext};
 use crate::wire::serializer::BgpMessageWritingError;
 use crate::wire::serializer::nlri::Ipv4UnicastAddressWritingError;
 use crate::{BgpMessage, BgpUpdateMessage};
 use ipnet::Ipv4Net;
-use netgauze_parse_utils::Span;
+
+use netgauze_parse_utils::common::Ipv4PrefixParsingError;
+use netgauze_parse_utils::error::ParseError;
 use netgauze_parse_utils::test_helpers::{
-    test_parse_error_with_one_input, test_parsed_completely, test_parsed_completely_with_one_input,
-    test_write,
+    test_parse_error_with_one_input_bytes_reader, test_parsed_completely_bytes_reader,
+    test_parsed_completely_with_one_input_bytes_reader, test_write,
 };
-use nom::error::ErrorKind;
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
@@ -48,28 +44,31 @@ fn test_withdraw_route() -> Result<(), Ipv4UnicastAddressWritingError> {
     let good = Ipv4UnicastAddress::new_no_path_id(
         Ipv4Unicast::from_net(Ipv4Net::from_str("172.16.1.0/24").unwrap()).unwrap(),
     );
-    let bad_overflow = LocatedIpv4UnicastAddressParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_overflow_wire[1..]) },
+    let bad_overflow =
         Ipv4UnicastAddressParsingError::Ipv4UnicastError(Ipv4UnicastParsingError::Ipv4PrefixError(
-            Ipv4PrefixParsingError::NomError(ErrorKind::Eof),
-        )),
+            Ipv4PrefixParsingError::Parse(ParseError::UnexpectedEof {
+                offset: 1,
+                needed: 4,
+                available: 3,
+            }),
+        ));
+    let bad_prefix = Ipv4UnicastAddressParsingError::Ipv4UnicastError(
+        Ipv4UnicastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::InvalidIpv4PrefixLen {
+            offset: 0,
+            prefix_len: 33,
+        }),
     );
-    let bad_prefix = LocatedIpv4UnicastAddressParsingError::new(
-        unsafe { Span::new_from_raw_offset(0, &bad_prefix_wire) },
-        Ipv4UnicastAddressParsingError::Ipv4UnicastError(Ipv4UnicastParsingError::Ipv4PrefixError(
-            Ipv4PrefixParsingError::InvalidIpv4PrefixLen(33),
-        )),
-    );
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parse_error_with_one_input::<
+
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
+    test_parse_error_with_one_input_bytes_reader::<
         Ipv4UnicastAddress,
         bool,
-        LocatedIpv4UnicastAddressParsingError<'_>,
+        Ipv4UnicastAddressParsingError,
     >(&bad_overflow_wire, false, &bad_overflow);
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         Ipv4UnicastAddress,
         bool,
-        LocatedIpv4UnicastAddressParsingError<'_>,
+        Ipv4UnicastAddressParsingError,
     >(&bad_prefix_wire, false, &bad_prefix);
     test_write(&good, &good_wire)?;
     Ok(())
@@ -88,9 +87,9 @@ fn test_ipv4_nlri() -> Result<(), Ipv4UnicastAddressWritingError> {
     let not_octet_boundary2 =
         Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.128.0/23").unwrap()).unwrap();
 
-    test_parsed_completely(&octet_boundary_wire, &octet_boundary);
-    test_parsed_completely(&not_octet_boundary_wire, &not_octet_boundary);
-    test_parsed_completely(&not_octet_boundary2_wire, &not_octet_boundary2);
+    test_parsed_completely_bytes_reader(&octet_boundary_wire, &octet_boundary);
+    test_parsed_completely_bytes_reader(&not_octet_boundary_wire, &not_octet_boundary);
+    test_parsed_completely_bytes_reader(&not_octet_boundary2_wire, &not_octet_boundary2);
 
     test_write(&octet_boundary, &octet_boundary_wire)?;
     test_write(&not_octet_boundary, &not_octet_boundary_wire)?;
@@ -105,7 +104,7 @@ fn test_empty_update() -> Result<(), BgpMessageWritingError> {
         0xff, 0x00, 0x17, 0x02, 0x00, 0x00, 0x00, 0x00,
     ];
     let good = BgpMessage::Update(BgpUpdateMessage::new(vec![], vec![], vec![]));
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -128,7 +127,7 @@ fn test_withdraw_update() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_withdraw_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_withdraw,
@@ -243,16 +242,14 @@ fn test_update_non_unicast_nlri() -> Result<(), BgpMessageWritingError> {
             Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(172, 16, 2, 0), 24).unwrap()).unwrap(),
         )],
     ));
-    let invalid_nlri_address = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(21, &bad_multicast_nlri_wire[21..21 + 8]) },
-        BgpMessageParsingError::BgpUpdateMessageParsingError(
-            BgpUpdateMessageParsingError::InvalidIpv4UnicastNetwork(InvalidIpv4UnicastNetwork(
-                Ipv4Net::from_str("224.1.1.0/24").unwrap(),
-            )),
-        ),
+    let invalid_nlri_address = BgpMessageParsingError::BgpUpdateMessageParsingError(
+        BgpUpdateMessageParsingError::InvalidIpv4UnicastNetwork {
+            offset: 21,
+            network: Ipv4Net::from_str("224.1.1.0/24").unwrap(),
+        },
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_update_wire,
         &mut BgpParsingContext::default(),
         &good_update,
@@ -260,10 +257,10 @@ fn test_update_non_unicast_nlri() -> Result<(), BgpMessageWritingError> {
 
     test_write(&good_update, &good_update_wire)?;
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &bad_multicast_nlri_wire,
         &mut BgpParsingContext::new(
@@ -278,7 +275,7 @@ fn test_update_non_unicast_nlri() -> Result<(), BgpMessageWritingError> {
         &invalid_nlri_address,
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &bad_multicast_nlri_wire,
         &mut BgpParsingContext::new(
             true,
@@ -304,19 +301,20 @@ fn test_update_bad_length() -> Result<(), BgpMessageWritingError> {
         0x18, 0xac, 0x10, 0x02,
     ];
 
-    let bad_withdraw_length_short = LocatedBgpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(26, &bad_withdraw_length_short_wire[26..26 + 2]) },
-        BgpMessageParsingError::BgpUpdateMessageParsingError(
-            BgpUpdateMessageParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::NomError(
-                ErrorKind::Eof,
-            )),
-        ),
+    let bad_withdraw_length_short = BgpMessageParsingError::BgpUpdateMessageParsingError(
+        BgpUpdateMessageParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::Parse(
+            ParseError::UnexpectedEof {
+                offset: 26,
+                needed: 3,
+                available: 2,
+            },
+        )),
     );
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpMessage,
         &mut BgpParsingContext,
-        LocatedBgpMessageParsingError<'_>,
+        BgpMessageParsingError,
     >(
         &bad_withdraw_length_short_wire,
         &mut BgpParsingContext::default(),

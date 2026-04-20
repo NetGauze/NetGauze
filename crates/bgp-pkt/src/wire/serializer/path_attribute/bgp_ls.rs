@@ -20,10 +20,9 @@ use crate::path_attribute::{
 };
 use crate::wire::serializer::nlri::MplsLabelWritingError;
 use crate::wire::serializer::path_attribute::write_length;
-use crate::wire::serializer::{
-    IpAddrWritingError, MultiTopologyIdWritingError, write_tlv_header_t16_l16,
-};
+use crate::wire::serializer::{MultiTopologyIdWritingError, write_tlv_header_t16_l16};
 use byteorder::{NetworkEndian, WriteBytesExt};
+use netgauze_parse_utils::common::IpAddrWritingError;
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::io::Write;

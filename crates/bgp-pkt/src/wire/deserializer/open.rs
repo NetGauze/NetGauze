@@ -15,79 +15,74 @@
 
 use crate::BgpOpenMessage;
 use crate::capabilities::BgpCapability;
-use crate::iana::{BgpOpenMessageParameterType, UndefinedBgpOpenMessageParameterType};
+use crate::iana::BgpOpenMessageParameterType;
 use crate::notification::OpenMessageError;
 use crate::open::{BGP_VERSION, BgpOpenMessageParameter};
 use crate::wire::deserializer::BgpParsingContext;
 use crate::wire::deserializer::capabilities::BgpCapabilityParsingError;
-use netgauze_parse_utils::{
-    ErrorKindSerdeDeref, LocatedParsingError, ReadablePdu, ReadablePduWithOneInput, Span,
-    parse_into_located_one_input,
-};
-use netgauze_serde_macros::LocatedError;
-use nom::IResult;
-use nom::error::ErrorKind;
-use nom::number::complete::{be_u8, be_u16, be_u32};
+
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 /// BGP Open Message Parsing errors
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpOpenMessageParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UnsupportedVersionNumber(u8),
-    UnacceptableHoldTime(u16),
+    #[error("BGP open message parsing Error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error("BGP open unsupported BGP version number at offset {offset} with version {version}")]
+    UnsupportedVersionNumber { offset: usize, version: u8 },
+
+    #[error("BGP open unacceptable hold time at offset {offset} with hold time {time}")]
+    UnacceptableHoldTime { offset: usize, time: u16 },
+
     /// RFC 4271 specifies that BGP ID must be a valid unicast IP host address.
-    InvalidBgpId(u32),
-    ParameterError(#[from_located(module = "self")] BgpParameterParsingError),
+    #[error("BGP open invalid BGP ID at offset {offset} with BGP ID {bgp_id}")]
+    InvalidBgpId { offset: usize, bgp_id: u32 },
+
+    #[error("BGP open error: {0}")]
+    ParameterError(#[from] BgpParameterParsingError),
 }
 
 /// BGP Open Message Parsing errors
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpParameterParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedParameterType(#[from_external] UndefinedBgpOpenMessageParameterType),
-    CapabilityError(
-        #[from_located(module = "crate::wire::deserializer::capabilities")]
-        BgpCapabilityParsingError,
-    ),
+    #[error("BGP open parameter parsing Error: {0:?}")]
+    Parse(#[from] ParseError),
+
+    #[error("BGP open undefined parameter type at offset {offset} with code {code}")]
+    UndefinedParameterType { offset: usize, code: u8 },
+
+    #[error("BGP open parameter error: {0}")]
+    CapabilityError(#[from] BgpCapabilityParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpOpenMessageParsingError<'a>>
-    for BgpOpenMessage
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BgpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedBgpOpenMessageParsingError<'a>> {
-        let (buf, _) = nom::combinator::map_res(be_u8, |x| {
-            if x == 4 {
-                Ok(x)
-            } else {
-                Err(BgpOpenMessageParsingError::UnsupportedVersionNumber(x))
-            }
-        })(buf)?;
-        let (buf, my_as) = be_u16(buf)?;
-        let begin_buf = buf;
-        let (buf, hold_time) = be_u16(buf)?;
+impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessage {
+    type Error = BgpOpenMessageParsingError;
+    fn parse(cur: &mut BytesReader, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
+        let version = cur.read_u8()?;
+        if version != BGP_VERSION {
+            return Err(BgpOpenMessageParsingError::UnsupportedVersionNumber {
+                offset: cur.offset() - 1,
+                version,
+            });
+        }
+        let my_as = cur.read_u16_be()?;
+        let hold_time = cur.read_u16_be()?;
         // RFC 4271: If the Hold Time field of the OPEN message is unacceptable, then
         // the Error Subcode MUST be set to Unacceptable Hold Time. An implementation
         // MUST reject Hold Time values of one or two seconds. An implementation MAY
         // reject any proposed Hold Time.
         if hold_time == 1 || hold_time == 2 {
-            return Err(nom::Err::Error(LocatedBgpOpenMessageParsingError::new(
-                begin_buf,
-                BgpOpenMessageParsingError::UnacceptableHoldTime(hold_time),
-            )));
+            return Err(BgpOpenMessageParsingError::UnacceptableHoldTime {
+                offset: cur.offset() - 2,
+                time: hold_time,
+            });
         }
-        let (buf, bgp_id) = be_u32(buf)?;
-        let begin_buf = buf;
+        let bgp_id = cur.read_u32_be()?;
         let bgp_id = Ipv4Addr::from(bgp_id);
         // RFC 4271: If the BGP Identifier field of the OPEN message is syntactically
         // incorrect, then the Error Subcode MUST be set to Bad BGP Identifier.
@@ -95,103 +90,70 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpOpenMessa
         // a valid unicast IP host address. NOTE: not all BGP implementation
         // check for syntactic correctness
         if bgp_id.is_broadcast() || bgp_id.is_multicast() || bgp_id.is_unspecified() {
-            return Err(nom::Err::Error(LocatedBgpOpenMessageParsingError::new(
-                begin_buf,
-                BgpOpenMessageParsingError::InvalidBgpId(bgp_id.into()),
-            )));
+            return Err(BgpOpenMessageParsingError::InvalidBgpId {
+                offset: cur.offset() - 4,
+                bgp_id: bgp_id.into(),
+            });
         }
-        let (buf, mut params_buf) = nom::multi::length_data(be_u8)(buf)?;
+        let len = cur.read_u8()?;
+        let mut params_buf = cur.take_slice(len as usize)?;
         let mut params = Vec::new();
         while !params_buf.is_empty() {
-            let (tmp, element) = parse_into_located_one_input(params_buf, &mut *ctx)?;
+            let element = BgpOpenMessageParameter::parse(&mut params_buf, ctx)?;
             params.push(element);
-            params_buf = tmp;
         }
-        Ok((buf, BgpOpenMessage::new(my_as, hold_time, bgp_id, params)))
+        Ok(BgpOpenMessage::new(my_as, hold_time, bgp_id, params))
     }
 }
 
-impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpParameterParsingError<'a>>
-    for BgpOpenMessageParameter
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BgpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedBgpParameterParsingError<'a>> {
-        let begin_buf = buf;
-        let (buf, param_type) =
-            nom::combinator::map_res(be_u8, BgpOpenMessageParameterType::try_from)(buf)?;
+impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessageParameter {
+    type Error = BgpParameterParsingError;
+    fn parse(cur: &mut BytesReader, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
+        let param_type = BgpOpenMessageParameterType::try_from(cur.read_u8()?).map_err(|err| {
+            BgpParameterParsingError::UndefinedParameterType {
+                offset: cur.offset() - 1,
+                code: err.0,
+            }
+        })?;
         match param_type {
-            BgpOpenMessageParameterType::Capability => parse_capability_param(buf, ctx),
+            BgpOpenMessageParameterType::Capability => parse_capability_param(cur, ctx),
             BgpOpenMessageParameterType::ExtendedLength => {
-                Err(nom::Err::Error(LocatedBgpParameterParsingError::new(
-                    begin_buf,
-                    BgpParameterParsingError::UndefinedParameterType(
-                        UndefinedBgpOpenMessageParameterType(
-                            BgpOpenMessageParameterType::ExtendedLength.into(),
-                        ),
-                    ),
-                )))
+                Err(BgpParameterParsingError::UndefinedParameterType {
+                    offset: cur.offset() - 1,
+                    code: param_type.into(),
+                })
             }
         }
     }
 }
 
 #[inline]
-fn parse_capability_param<'a>(
-    buf: Span<'a>,
+fn parse_capability_param(
+    cur: &mut BytesReader,
     ctx: &mut BgpParsingContext,
-) -> IResult<Span<'a>, BgpOpenMessageParameter, LocatedBgpParameterParsingError<'a>> {
-    let (buf, mut capabilities_buf) = nom::multi::length_data(be_u8)(buf)?;
+) -> Result<BgpOpenMessageParameter, BgpParameterParsingError> {
+    let len = cur.read_u8()?;
+    let mut capabilities_buf = cur.take_slice(len as usize)?;
     let mut capabilities = Vec::new();
     while !capabilities_buf.is_empty() {
-        match BgpCapability::from_wire(capabilities_buf) {
-            Ok((tmp, capability)) => {
+        match BgpCapability::parse(&mut capabilities_buf) {
+            Ok(capability) => {
                 capabilities.push(capability);
-                capabilities_buf = tmp;
             }
             Err(err) => {
-                match err {
-                    nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed))?,
-                    nom::Err::Error(err) => {
-                        if !ctx.fail_on_capability_error {
-                            // Advance the parser and ignore malformed capability
-                            // RFC 5492 defines that a BGP speaker should ignore capabilities it
-                            // does not understand and not report any error.
-                            // It will only report a notification if the capability is
-                            // understood but not supported by the speaker
-                            let (tmp, _code) = be_u8(capabilities_buf)?;
-                            let (tmp, _value) = nom::multi::length_count(be_u8, be_u8)(tmp)?;
-                            capabilities_buf = tmp;
-                            ctx.parsing_errors
-                                .capability_errors
-                                .push(err.error().clone());
-                        } else {
-                            Err(nom::Err::Error(err.into()))?
-                        }
-                    }
-                    nom::Err::Failure(failure) => {
-                        if !ctx.fail_on_capability_error {
-                            // Advance the parser and ignore malformed capability
-                            // RFC 5492 defines that a BGP speaker should ignore capabilities it
-                            // does not understand and not report any error.
-                            // It will only report a notification if the capability is
-                            // understood but not supported by the speaker
-                            let (tmp, _code) = be_u8(capabilities_buf)?;
-                            let (tmp, _value) = nom::multi::length_count(be_u8, be_u8)(tmp)?;
-                            capabilities_buf = tmp;
-                            ctx.parsing_errors
-                                .capability_errors
-                                .push(failure.error().clone());
-                        } else {
-                            Err(nom::Err::Failure(failure.into()))?
-                        }
-                    }
+                if !ctx.fail_on_capability_error {
+                    // RFC 5492 defines that a BGP speaker should ignore capabilities it
+                    // does not understand and not report any error.
+                    // It will only report a notification if the capability is
+                    // understood but not supported by the speaker
+                    ctx.parsing_errors.capability_errors.push(err);
+                } else {
+                    return Err(BgpParameterParsingError::CapabilityError(err));
                 }
             }
         }
     }
-    Ok((buf, BgpOpenMessageParameter::Capabilities(capabilities)))
+    Ok(BgpOpenMessageParameter::Capabilities(capabilities))
 }
 
 impl From<BgpParameterParsingError> for OpenMessageError {
@@ -199,13 +161,11 @@ impl From<BgpParameterParsingError> for OpenMessageError {
         match param_err {
             // RFC 4271: If one of the Optional Parameters in the OPEN message is recognized, but is
             // malformed, then the Error Subcode MUST be set to 0 (Unspecific)
-            BgpParameterParsingError::NomError(_) => OpenMessageError::Unspecific { value: vec![] },
+            BgpParameterParsingError::Parse(_) => OpenMessageError::Unspecific { value: vec![] },
             // RFC 4271: If one of the Optional Parameters in the OPEN message is not recognized,
             // then the Error Subcode MUST be set to Unsupported Optional Parameters.
-            BgpParameterParsingError::UndefinedParameterType(param_type) => {
-                OpenMessageError::UnsupportedOptionalParameter {
-                    value: vec![param_type.0],
-                }
+            BgpParameterParsingError::UndefinedParameterType { offset: _, code } => {
+                OpenMessageError::UnsupportedOptionalParameter { value: vec![code] }
             }
             // RFC 5492 defines that a BGP speaker should ignore capabilities it
             // does not understand and not report any error.
@@ -222,9 +182,7 @@ impl From<BgpParameterParsingError> for OpenMessageError {
 impl From<BgpOpenMessageParsingError> for OpenMessageError {
     fn from(error: BgpOpenMessageParsingError) -> Self {
         match error {
-            BgpOpenMessageParsingError::NomError(_) => {
-                OpenMessageError::Unspecific { value: vec![] }
-            }
+            BgpOpenMessageParsingError::Parse(_) => OpenMessageError::Unspecific { value: vec![] },
             // RFC 4271: If the version number in the Version field of the received OPEN message is
             // not supported, then the Error Subcode MUST be set to Unsupported Version Number.
             // The Data field is a 2-octet unsigned integer, which indicates the largest,
@@ -232,21 +190,21 @@ impl From<BgpOpenMessageParsingError> for OpenMessageError {
             // indicated in the received OPEN message), or if the smallest, locally-supported
             // version number is greater than the version the remote BGP peer bid, then the
             // smallest, locally-supported version number.
-            BgpOpenMessageParsingError::UnsupportedVersionNumber(_) => {
+            BgpOpenMessageParsingError::UnsupportedVersionNumber { .. } => {
                 OpenMessageError::UnsupportedVersionNumber {
                     value: (BGP_VERSION as u16).to_be_bytes().to_vec(),
                 }
             }
-            BgpOpenMessageParsingError::UnacceptableHoldTime(hold_time) => {
+            BgpOpenMessageParsingError::UnacceptableHoldTime { offset: _, time } => {
                 OpenMessageError::UnacceptableHoldTime {
-                    value: hold_time.to_be_bytes().to_vec(),
+                    value: time.to_be_bytes().to_vec(),
                 }
             }
             // RFC 4271: If the BGP Identifier field of the OPEN message is syntactically incorrect,
             // then the Error Subcode MUST be set to Bad BGP Identifier. Syntactic correctness means
             // that the BGP Identifier field represents a valid unicast IP host address.
             // NOTE: not all BGP implementation check for syntactic correctness
-            BgpOpenMessageParsingError::InvalidBgpId(bgp_id) => {
+            BgpOpenMessageParsingError::InvalidBgpId { bgp_id, .. } => {
                 OpenMessageError::BadBgpIdentifier {
                     value: bgp_id.to_be_bytes().to_vec(),
                 }

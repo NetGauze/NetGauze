@@ -19,21 +19,16 @@ use crate::wire::deserializer::path_attribute::*;
 use crate::wire::serializer::path_attribute::*;
 
 use crate::nlri::*;
-use crate::wire::deserializer::Ipv4PrefixParsingError;
 use crate::wire::deserializer::nlri::{
     Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
     Ipv6UnicastParsingError,
 };
 use ipnet::{Ipv4Net, Ipv6Net};
-use netgauze_iana::address_family::{
-    AddressFamily, AddressType, SubsequentAddressFamily, UndefinedAddressFamily,
-    UndefinedSubsequentAddressFamily,
-};
-use netgauze_parse_utils::Span;
+use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
 use netgauze_parse_utils::test_helpers::*;
 
 use crate::community::*;
-use crate::iana::{BgpSidAttributeTypeError, IanaValueError, UndefinedRouteDistinguisherTypeCode};
+use crate::iana::{BgpSidAttributeTypeError, IanaValueError};
 use crate::update::BgpUpdateMessage;
 use crate::wire::deserializer::BgpParsingContext;
 use crate::wire::deserializer::nlri::{
@@ -42,7 +37,8 @@ use crate::wire::deserializer::nlri::{
     Ipv6UnicastAddressParsingError, RouteDistinguisherParsingError,
 };
 use crate::wire::serializer::BgpMessageWritingError;
-use nom::error::ErrorKind;
+use netgauze_parse_utils::common::Ipv4PrefixParsingError;
+use netgauze_parse_utils::error::ParseError;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
@@ -59,35 +55,32 @@ fn test_origin_value() -> Result<(), OriginWritingError> {
     let igp = Origin::IGP;
     let egp = Origin::EGP;
     let incomplete = Origin::Incomplete;
-    let bad_zero_length = LocatedOriginParsingError::new(
-        Span::new(&bad_zero_length_wire),
-        OriginParsingError::InvalidOriginLength(PathAttributeLength::U8(0)),
-    );
+    let bad_zero_length = OriginParsingError::InvalidOriginLength {
+        offset: 0,
+        length: PathAttributeLength::U8(0),
+    };
 
-    let bad_long_length = LocatedOriginParsingError::new(
-        Span::new(&bad_long_length_wire),
-        OriginParsingError::InvalidOriginLength(PathAttributeLength::U8(2)),
-    );
+    let bad_long_length = OriginParsingError::InvalidOriginLength {
+        offset: 0,
+        length: PathAttributeLength::U8(2),
+    };
 
-    let bad_invalid_code = LocatedOriginParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_invalid_code_wire[1..]) },
-        OriginParsingError::UndefinedOrigin(UndefinedOrigin(3)),
-    );
+    let bad_invalid_code = OriginParsingError::UndefinedOrigin { offset: 1, code: 3 };
 
-    test_parsed_completely_with_one_input(&good_igp_wire, false, &igp);
-    test_parsed_completely_with_one_input(&good_egp_wire, false, &egp);
-    test_parsed_completely_with_one_input(&good_incomplete_wire, false, &incomplete);
-    test_parse_error_with_one_input::<'_, Origin, bool, LocatedOriginParsingError<'_>>(
+    test_parsed_completely_with_one_input_bytes_reader(&good_igp_wire, false, &igp);
+    test_parsed_completely_with_one_input_bytes_reader(&good_egp_wire, false, &egp);
+    test_parsed_completely_with_one_input_bytes_reader(&good_incomplete_wire, false, &incomplete);
+    test_parse_error_with_one_input_bytes_reader::<'_, Origin, bool, OriginParsingError>(
         &bad_zero_length_wire,
         false,
         &bad_zero_length,
     );
-    test_parse_error_with_one_input::<'_, Origin, bool, LocatedOriginParsingError<'_>>(
+    test_parse_error_with_one_input_bytes_reader::<'_, Origin, bool, OriginParsingError>(
         &bad_long_length_wire,
         false,
         &bad_long_length,
     );
-    test_parse_error_with_one_input::<'_, Origin, bool, LocatedOriginParsingError<'_>>(
+    test_parse_error_with_one_input_bytes_reader::<'_, Origin, bool, OriginParsingError>(
         &bad_invalid_code_wire,
         false,
         &bad_invalid_code,
@@ -123,41 +116,43 @@ fn test_path_attribute_origin() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    let bad_extended = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(4, &bad_extended_wire[4..]) },
-        PathAttributeParsingError::OriginError(OriginParsingError::UndefinedOrigin(
-            UndefinedOrigin(3),
-        )),
-    );
+    let bad_extended =
+        PathAttributeParsingError::OriginError(OriginParsingError::UndefinedOrigin {
+            offset: 4,
+            code: 3,
+        });
 
-    let bad_incomplete = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(3, &bad_incomplete_wire[3..]) },
-        PathAttributeParsingError::OriginError(OriginParsingError::NomError(ErrorKind::Eof)),
-    );
+    let bad_incomplete = PathAttributeParsingError::OriginError(OriginParsingError::Parse(
+        ParseError::UnexpectedEof {
+            offset: 3,
+            available: 0,
+            needed: 1,
+        },
+    ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_extended_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_extended,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &bad_extended_wire,
         &mut BgpParsingContext::asn2_default(),
         &bad_extended,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &bad_incomplete_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -180,31 +175,28 @@ fn test_as2_path_segment() -> Result<(), AsPathWritingError> {
     let set = As2PathSegment::new(AsPathSegmentType::AsSet, vec![1]);
     let seq = As2PathSegment::new(AsPathSegmentType::AsSequence, vec![1]);
 
-    let bad_empty = LocatedAsPathParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_empty_wire[1..]) },
-        AsPathParsingError::ZeroSegmentLength,
-    );
+    let bad_empty = AsPathParsingError::ZeroSegmentLength { offset: 1 };
+    let bad_undefined_segment_type = AsPathParsingError::UndefinedAsPathSegmentType {
+        offset: 0,
+        code: 0x00,
+    };
+    let bad_incomplete = AsPathParsingError::InvalidAsPathLength {
+        offset: 1,
+        expecting: 2,
+        found: 1,
+    };
 
-    let bad_undefined_segment_type = LocatedAsPathParsingError::new(
-        Span::new(&bad_undefined_segment_type_wire),
-        AsPathParsingError::UndefinedAsPathSegmentType(UndefinedAsPathSegmentType(0x00)),
+    test_parsed_completely_bytes_reader(&good_set_wire, &set);
+    test_parsed_completely_bytes_reader(&good_seq_wire, &seq);
+    test_parse_error_bytes_reader::<As2PathSegment, AsPathParsingError>(
+        &bad_empty_wire,
+        &bad_empty,
     );
-    let bad_incomplete = LocatedAsPathParsingError::new(
-        unsafe { Span::new_from_raw_offset(2, &bad_incomplete_wire[2..]) },
-        AsPathParsingError::InvalidAsPathLength {
-            expecting: 2,
-            found: 1,
-        },
-    );
-
-    test_parsed_completely(&good_set_wire, &set);
-    test_parsed_completely(&good_seq_wire, &seq);
-    test_parse_error::<As2PathSegment, LocatedAsPathParsingError<'_>>(&bad_empty_wire, &bad_empty);
-    test_parse_error::<As2PathSegment, LocatedAsPathParsingError<'_>>(
+    test_parse_error_bytes_reader::<As2PathSegment, AsPathParsingError>(
         &bad_undefined_segment_type_wire,
         &bad_undefined_segment_type,
     );
-    test_parse_error::<As2PathSegment, LocatedAsPathParsingError<'_>>(
+    test_parse_error_bytes_reader::<As2PathSegment, AsPathParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -224,21 +216,21 @@ fn test_as4_path_segment() -> Result<(), AsPathWritingError> {
     let set = As4PathSegment::new(AsPathSegmentType::AsSet, vec![1]);
     let seq = As4PathSegment::new(AsPathSegmentType::AsSequence, vec![1]);
 
-    let bad_empty = LocatedAsPathParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_empty_wire[1..]) },
-        AsPathParsingError::ZeroSegmentLength,
+    let bad_empty = AsPathParsingError::ZeroSegmentLength { offset: 1 };
+
+    let undefined_segment_type = AsPathParsingError::UndefinedAsPathSegmentType {
+        offset: 0,
+        code: 0x00,
+    };
+
+    test_parsed_completely_bytes_reader(&good_set_wire, &set);
+    test_parsed_completely_bytes_reader(&good_seq_wire, &seq);
+
+    test_parse_error_bytes_reader::<As4PathSegment, AsPathParsingError>(
+        &bad_empty_wire,
+        &bad_empty,
     );
-
-    let undefined_segment_type = LocatedAsPathParsingError::new(
-        unsafe { Span::new_from_raw_offset(0, &undefined_segment_type_wire) },
-        AsPathParsingError::UndefinedAsPathSegmentType(UndefinedAsPathSegmentType(0x00)),
-    );
-
-    test_parsed_completely(&good_set_wire, &set);
-    test_parsed_completely(&good_seq_wire, &seq);
-
-    test_parse_error::<As4PathSegment, LocatedAsPathParsingError<'_>>(&bad_empty_wire, &bad_empty);
-    test_parse_error::<As4PathSegment, LocatedAsPathParsingError<'_>>(
+    test_parse_error_bytes_reader::<As4PathSegment, AsPathParsingError>(
         &undefined_segment_type_wire,
         &undefined_segment_type,
     );
@@ -265,23 +257,41 @@ fn test_as2_path_segments() -> Result<(), AsPathWritingError> {
         As2PathSegment::new(AsPathSegmentType::AsSequence, vec![1]),
     ]);
     let good_empty = AsPath::As2PathSegments(vec![]);
-    let bad_underflow = nom::Err::Incomplete(nom::Needed::new(4));
-    let bad_overflow = nom::Err::Incomplete(nom::Needed::new(2));
+    let bad_underflow = AsPathParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 1,
+        needed: 8,
+        available: 4,
+    });
+    let bad_overflow = AsPathParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 1,
+        needed: 8,
+        available: 6,
+    });
 
-    test_parsed_completely_with_two_inputs(&good_wire, false, false, &good);
-    test_parsed_completely_with_two_inputs(&good_empty_wire, false, false, &good_empty);
-    test_parsed_completely_with_two_inputs(&good_extended_wire, true, false, &good_extended);
-    test_parse_error_with_two_inputs::<AsPath, bool, bool, LocatedAsPathParsingError<'_>>(
+    test_parsed_completely_with_two_inputs_bytes_reader(&good_wire, false, false, &good);
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &good_empty_wire,
+        false,
+        false,
+        &good_empty,
+    );
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &good_extended_wire,
+        true,
+        false,
+        &good_extended,
+    );
+    test_parse_error_with_two_inputs_bytes_reader::<AsPath, bool, bool, AsPathParsingError>(
         &bad_underflow_wire,
         false,
         false,
-        bad_underflow,
+        &bad_underflow,
     );
-    test_parse_error_with_two_inputs::<AsPath, bool, bool, LocatedAsPathParsingError<'_>>(
+    test_parse_error_with_two_inputs_bytes_reader::<AsPath, bool, bool, AsPathParsingError>(
         &bad_overflow_wire,
         false,
         false,
-        bad_overflow,
+        &bad_overflow,
     );
 
     test_write_with_one_input(&good, false, &good_wire)?;
@@ -310,24 +320,32 @@ fn test_as4_path_segments() -> Result<(), AsPathWritingError> {
         As4PathSegment::new(AsPathSegmentType::AsSequence, vec![1]),
     ]);
 
-    let bad_underflow = nom::Err::Incomplete(nom::Needed::new(4));
-    let bad_overflow = nom::Err::Incomplete(nom::Needed::new(2));
+    let bad_underflow = AsPathParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 2,
+        needed: 8,
+        available: 4,
+    });
+    let bad_overflow = AsPathParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 2,
+        needed: 8,
+        available: 6,
+    });
 
-    test_parsed_completely_with_two_inputs(&good_empty_wire, true, true, &good_empty);
-    test_parsed_completely_with_two_inputs(&good_one_wire, true, true, &good_one);
-    test_parsed_completely_with_two_inputs(&good_two_wire, true, true, &good_two);
+    test_parsed_completely_with_two_inputs_bytes_reader(&good_empty_wire, true, true, &good_empty);
+    test_parsed_completely_with_two_inputs_bytes_reader(&good_one_wire, true, true, &good_one);
+    test_parsed_completely_with_two_inputs_bytes_reader(&good_two_wire, true, true, &good_two);
 
-    test_parse_error_with_two_inputs::<AsPath, bool, bool, LocatedAsPathParsingError<'_>>(
+    test_parse_error_with_two_inputs_bytes_reader::<AsPath, bool, bool, AsPathParsingError>(
         &bad_underflow_wire,
         true,
         true,
-        bad_underflow,
+        &bad_underflow,
     );
-    test_parse_error_with_two_inputs::<AsPath, bool, bool, LocatedAsPathParsingError<'_>>(
+    test_parse_error_with_two_inputs_bytes_reader::<AsPath, bool, bool, AsPathParsingError>(
         &bad_overflow_wire,
         true,
         true,
-        bad_overflow,
+        &bad_overflow,
     );
 
     test_write_with_one_input(&good_empty, true, &good_empty_wire)?;
@@ -366,27 +384,26 @@ fn test_path_attribute_as2_path() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    let undefined_segment_type = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(4, &undefined_segment_type_wire[4..]) },
-        PathAttributeParsingError::AsPathError(AsPathParsingError::UndefinedAsPathSegmentType(
-            UndefinedAsPathSegmentType(0),
-        )),
-    );
+    let undefined_segment_type =
+        PathAttributeParsingError::AsPathError(AsPathParsingError::UndefinedAsPathSegmentType {
+            offset: 4,
+            code: 0,
+        });
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire_extended,
         &mut BgpParsingContext::asn2_default(),
         &good_extended,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &undefined_segment_type_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -429,8 +446,12 @@ fn test_path_attribute_as4_path() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire,
+        &mut BgpParsingContext::default(),
+        &good,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire_extended,
         &mut BgpParsingContext::default(),
         &good_extended,
@@ -486,17 +507,17 @@ fn test_path_attribute_as4_path_transitional() -> Result<(), PathAttributeWritin
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire_extended,
         &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire_partial,
         &mut BgpParsingContext::default(),
         &good_partial,
@@ -514,13 +535,13 @@ fn test_next_hop() -> Result<(), NextHopWritingError> {
     let bad_wire = [0x05, 0xac, 0x10, 0x03, 0x02];
 
     let good = NextHop::new(Ipv4Addr::new(172, 16, 3, 2));
-    let bad = LocatedNextHopParsingError::new(
-        unsafe { Span::new_from_raw_offset(0, &bad_wire) },
-        NextHopParsingError::InvalidNextHopLength(PathAttributeLength::U8(5)),
-    );
+    let bad = NextHopParsingError::InvalidNextHopLength {
+        offset: 0,
+        length: PathAttributeLength::U8(5),
+    };
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parse_error_with_one_input::<NextHop, bool, LocatedNextHopParsingError<'_>>(
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
+    test_parse_error_with_one_input_bytes_reader::<NextHop, bool, NextHopParsingError>(
         &bad_wire, false, &bad,
     );
 
@@ -550,27 +571,25 @@ fn test_path_attribute_next_hop() -> Result<(), PathAttributeWritingError> {
         PathAttributeValue::NextHop(NextHop::new(Ipv4Addr::new(172, 16, 3, 1))),
     )
     .unwrap();
-    let bad = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(2, &bad_wire[2..]) },
-        PathAttributeParsingError::NextHopError(NextHopParsingError::InvalidNextHopLength(
-            PathAttributeLength::U16(3),
-        )),
-    );
+    let bad = PathAttributeParsingError::NextHopError(NextHopParsingError::InvalidNextHopLength {
+        offset: 2,
+        length: PathAttributeLength::U16(3),
+    });
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire_extended,
         &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(&bad_wire, &mut BgpParsingContext::asn2_default(), &bad);
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
@@ -585,17 +604,17 @@ fn test_multi_exit_discriminator() -> Result<(), MultiExitDiscriminatorWritingEr
 
     let good = MultiExitDiscriminator::new(1);
     let good_extended = MultiExitDiscriminator::new(1);
-    let bad = LocatedMultiExitDiscriminatorParsingError::new(
-        Span::new(&bad_wire),
-        MultiExitDiscriminatorParsingError::InvalidLength(PathAttributeLength::U8(3)),
-    );
+    let bad = MultiExitDiscriminatorParsingError::InvalidLength {
+        offset: 0,
+        length: PathAttributeLength::U8(3),
+    };
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
-    test_parse_error_with_one_input::<
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input_bytes_reader::<
         MultiExitDiscriminator,
         bool,
-        LocatedMultiExitDiscriminatorParsingError<'_>,
+        MultiExitDiscriminatorParsingError,
     >(&bad_wire, false, &bad);
 
     test_write_with_one_input(&good, false, &good_wire)?;
@@ -625,27 +644,24 @@ fn test_path_attribute_multi_exit_discriminator() -> Result<(), PathAttributeWri
         PathAttributeValue::MultiExitDiscriminator(MultiExitDiscriminator::new(1)),
     )
     .unwrap();
-    let bad_eof = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(3, &bad_eof_wire[3..]) },
-        PathAttributeParsingError::MultiExitDiscriminatorError(
-            MultiExitDiscriminatorParsingError::NomError(ErrorKind::Eof),
-        ),
+    let bad_eof = PathAttributeParsingError::MultiExitDiscriminatorError(
+        MultiExitDiscriminatorParsingError::Parse(ParseError::eof(3, 4, 3)),
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire_extended,
         &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &bad_eof_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -666,27 +682,29 @@ fn test_local_preference() -> Result<(), LocalPreferenceWritingError> {
 
     let good = LocalPreference::new(1);
     let good_extended = LocalPreference::new(1);
-    let bad_underflow = LocatedLocalPreferenceParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_underflow_wire[1..]) },
-        LocalPreferenceParsingError::NomError(ErrorKind::Eof),
-    );
-    let bad_length = LocatedLocalPreferenceParsingError::new(
-        Span::new(&bad_length_wire),
-        LocalPreferenceParsingError::InvalidLength(PathAttributeLength::U8(3)),
-    );
+    let bad_underflow = LocalPreferenceParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 1,
+        needed: 4,
+        available: 3,
+    });
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
-    test_parse_error_with_one_input::<LocalPreference, bool, LocatedLocalPreferenceParsingError<'_>>(
-        &bad_underflow_wire,
-        false,
-        &bad_underflow,
-    );
-    test_parse_error_with_one_input::<LocalPreference, bool, LocatedLocalPreferenceParsingError<'_>>(
-        &bad_length_wire,
-        false,
-        &bad_length,
-    );
+    let bad_length = LocalPreferenceParsingError::InvalidLength {
+        offset: 0,
+        length: PathAttributeLength::U8(3),
+    };
+
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input_bytes_reader::<
+        LocalPreference,
+        bool,
+        LocalPreferenceParsingError,
+    >(&bad_underflow_wire, false, &bad_underflow);
+    test_parse_error_with_one_input_bytes_reader::<
+        LocalPreference,
+        bool,
+        LocalPreferenceParsingError,
+    >(&bad_length_wire, false, &bad_length);
 
     test_write_with_one_input(&good, false, &good_wire)?;
     test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
@@ -715,12 +733,12 @@ fn test_path_attribute_local_preference() -> Result<(), PathAttributeWritingErro
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_extended_wire,
         &mut BgpParsingContext::default(),
         &good_extended,
@@ -739,27 +757,27 @@ fn test_atomic_aggregate() -> Result<(), AtomicAggregateWritingError> {
 
     let good = AtomicAggregate;
     let good_extended = AtomicAggregate;
-    let bad_length = LocatedAtomicAggregateParsingError::new(
-        Span::new(&bad_length_wire),
-        AtomicAggregateParsingError::InvalidLength(PathAttributeLength::U8(1)),
-    );
-    let bad_extended_length = LocatedAtomicAggregateParsingError::new(
-        Span::new(&bad_extended_length_wire),
-        AtomicAggregateParsingError::InvalidLength(PathAttributeLength::U16(1)),
-    );
+    let bad_length = AtomicAggregateParsingError::InvalidLength {
+        offset: 0,
+        length: PathAttributeLength::U8(1),
+    };
+    let bad_extended_length = AtomicAggregateParsingError::InvalidLength {
+        offset: 0,
+        length: PathAttributeLength::U16(1),
+    };
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
-    test_parse_error_with_one_input::<AtomicAggregate, bool, LocatedAtomicAggregateParsingError<'_>>(
-        &bad_length_wire,
-        false,
-        &bad_length,
-    );
-    test_parse_error_with_one_input::<AtomicAggregate, bool, LocatedAtomicAggregateParsingError<'_>>(
-        &bad_extended_length_wire,
-        true,
-        &bad_extended_length,
-    );
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input_bytes_reader::<
+        AtomicAggregate,
+        bool,
+        AtomicAggregateParsingError,
+    >(&bad_length_wire, false, &bad_length);
+    test_parse_error_with_one_input_bytes_reader::<
+        AtomicAggregate,
+        bool,
+        AtomicAggregateParsingError,
+    >(&bad_extended_length_wire, true, &bad_extended_length);
 
     test_write_with_one_input(&good, false, &good_wire)?;
     test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
@@ -790,42 +808,42 @@ fn test_path_attribute_atomic_aggregate() -> Result<(), PathAttributeWritingErro
         PathAttributeValue::AtomicAggregate(AtomicAggregate),
     )
     .unwrap();
-    let bad_length = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(2, &bad_length_wire[2..]) },
-        PathAttributeParsingError::AtomicAggregateError(
-            AtomicAggregateParsingError::InvalidLength(PathAttributeLength::U8(1)),
-        ),
+    let bad_length = PathAttributeParsingError::AtomicAggregateError(
+        AtomicAggregateParsingError::InvalidLength {
+            offset: 2,
+            length: PathAttributeLength::U8(1),
+        },
     );
-    let bad_extended_length = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(2, &bad_extended_length_wire[2..]) },
-        PathAttributeParsingError::AtomicAggregateError(
-            AtomicAggregateParsingError::InvalidLength(PathAttributeLength::U16(1)),
-        ),
+    let bad_extended_length = PathAttributeParsingError::AtomicAggregateError(
+        AtomicAggregateParsingError::InvalidLength {
+            offset: 2,
+            length: PathAttributeLength::U16(1),
+        },
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_extended_wire,
         &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &bad_length_wire,
         &mut BgpParsingContext::asn2_default(),
         &bad_length,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &bad_extended_length_wire,
         &mut BgpParsingContext::default(),
@@ -847,24 +865,23 @@ fn test_as2_aggregator() -> Result<(), AggregatorWritingError> {
     let good = As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10));
     let good_extended = As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10));
 
-    let bad_length = LocatedAggregatorParsingError::new(
-        Span::new(&bad_length_wire),
-        AggregatorParsingError::InvalidLength(PathAttributeLength::U8(5)),
-    );
+    let bad_length = AggregatorParsingError::InvalidLength {
+        offset: 0,
+        length: PathAttributeLength::U8(5),
+    };
+    let bad_extended_length = AggregatorParsingError::InvalidLength {
+        offset: 0,
+        length: PathAttributeLength::U16(7),
+    };
 
-    let bad_extended_length = LocatedAggregatorParsingError::new(
-        Span::new(&bad_extended_length_wire),
-        AggregatorParsingError::InvalidLength(PathAttributeLength::U16(7)),
-    );
-
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
-    test_parse_error_with_one_input::<As2Aggregator, bool, LocatedAggregatorParsingError<'_>>(
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input_bytes_reader::<As2Aggregator, bool, AggregatorParsingError>(
         &bad_length_wire,
         false,
         &bad_length,
     );
-    test_parse_error_with_one_input::<As2Aggregator, bool, LocatedAggregatorParsingError<'_>>(
+    test_parse_error_with_one_input_bytes_reader::<As2Aggregator, bool, AggregatorParsingError>(
         &bad_extended_length_wire,
         true,
         &bad_extended_length,
@@ -885,24 +902,23 @@ fn test_as4_aggregator() -> Result<(), AggregatorWritingError> {
     let good = As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10));
     let good_extended = As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10));
 
-    let bad_length = LocatedAggregatorParsingError::new(
-        Span::new(&bad_length_wire),
-        AggregatorParsingError::InvalidLength(PathAttributeLength::U8(9)),
-    );
+    let bad_length = AggregatorParsingError::InvalidLength {
+        offset: 0,
+        length: PathAttributeLength::U8(9),
+    };
+    let bad_extended_length = AggregatorParsingError::InvalidLength {
+        offset: 0,
+        length: PathAttributeLength::U16(7),
+    };
 
-    let bad_extended_length = LocatedAggregatorParsingError::new(
-        Span::new(&bad_extended_length_wire),
-        AggregatorParsingError::InvalidLength(PathAttributeLength::U16(7)),
-    );
-
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
-    test_parse_error_with_one_input::<As4Aggregator, bool, LocatedAggregatorParsingError<'_>>(
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input_bytes_reader::<As4Aggregator, bool, AggregatorParsingError>(
         &bad_length_wire,
         false,
         &bad_length,
     );
-    test_parse_error_with_one_input::<As4Aggregator, bool, LocatedAggregatorParsingError<'_>>(
+    test_parse_error_with_one_input_bytes_reader::<As4Aggregator, bool, AggregatorParsingError>(
         &bad_extended_length_wire,
         true,
         &bad_extended_length,
@@ -970,53 +986,52 @@ fn test_path_attribute_as2_aggregator() -> Result<(), PathAttributeWritingError>
     )
     .unwrap();
 
-    let bad_length = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(2, &bad_length_wire[2..]) },
-        PathAttributeParsingError::AggregatorError(AggregatorParsingError::InvalidLength(
-            PathAttributeLength::U8(8),
-        )),
-    );
+    let bad_length =
+        PathAttributeParsingError::AggregatorError(AggregatorParsingError::InvalidLength {
+            offset: 2,
+            length: PathAttributeLength::U8(8),
+        });
+    let bad_incomplete = PathAttributeParsingError::AggregatorError(AggregatorParsingError::Parse(
+        ParseError::UnexpectedEof {
+            offset: 5,
+            needed: 4,
+            available: 3,
+        },
+    ));
 
-    let bad_incomplete = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(5, &bad_incomplete_wire[5..]) },
-        PathAttributeParsingError::AggregatorError(AggregatorParsingError::NomError(
-            ErrorKind::Eof,
-        )),
-    );
-
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_partial_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_partial,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_extended_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_extended,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_partial_extended_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_partial_extended,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &bad_length_wire,
         &mut BgpParsingContext::asn2_default(),
         &bad_length,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &bad_incomplete_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -1093,18 +1108,22 @@ fn test_parse_path_attribute_as4_aggregator() -> Result<(), PathAttributeWriting
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire,
+        &mut BgpParsingContext::default(),
+        &good,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_partial_wire,
         &mut BgpParsingContext::default(),
         &good_partial,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_extended_wire,
         &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_partial_extended_wire,
         &mut BgpParsingContext::default(),
         &good_partial_extended,
@@ -1170,22 +1189,22 @@ fn test_parse_path_attribute_communities() -> Result<(), PathAttributeWritingErr
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_zero_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_zero,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_one_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_one,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_two_wire,
         &mut BgpParsingContext::asn2_default(),
         &good_two,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_two_wire_extended,
         &mut BgpParsingContext::default(),
         &good_two_extended,
@@ -1264,17 +1283,14 @@ fn test_mp_reach_nlri_ipv6() -> Result<(), MpReachWritingError> {
         value: unknown_address_type_wire[4..].to_vec(),
     };
 
-    let invalid_afi = LocatedMpReachParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &invalid_afi_wire[1..]) },
-        MpReachParsingError::UndefinedAddressFamily(UndefinedAddressFamily(0xff)),
-    );
-
-    let invalid_safi = LocatedMpReachParsingError::new(
-        unsafe { Span::new_from_raw_offset(3, &invalid_safi_wire[3..]) },
-        MpReachParsingError::UndefinedSubsequentAddressFamily(UndefinedSubsequentAddressFamily(
-            0xff,
-        )),
-    );
+    let invalid_afi = MpReachParsingError::UndefinedAddressFamily {
+        offset: 1,
+        afi: 0xff,
+    };
+    let invalid_safi = MpReachParsingError::UndefinedSubsequentAddressFamily {
+        offset: 3,
+        safi: 0xff,
+    };
 
     assert_eq!(good.address_type(), Ok(AddressType::Ipv6Unicast));
     assert_eq!(good.afi(), AddressType::Ipv6Unicast.address_family());
@@ -1293,21 +1309,21 @@ fn test_mp_reach_nlri_ipv6() -> Result<(), MpReachWritingError> {
         SubsequentAddressFamily::Unicast
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &good_wire,
         false,
         &HashMap::new(),
         &HashMap::new(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &good_extended_wire,
         true,
         &HashMap::new(),
         &HashMap::new(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &unknown_address_type_wire,
         false,
         &HashMap::new(),
@@ -1315,31 +1331,31 @@ fn test_mp_reach_nlri_ipv6() -> Result<(), MpReachWritingError> {
         &unknown_address_type,
     );
 
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_three_inputs_bytes_reader::<
         MpReach,
         bool,
         &HashMap<AddressType, u8>,
         &HashMap<AddressType, bool>,
-        LocatedMpReachParsingError<'_>,
+        MpReachParsingError,
     >(
         &invalid_afi_wire,
         false,
         &HashMap::new(),
         &HashMap::new(),
-        nom::Err::Error(invalid_afi),
+        &invalid_afi,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_three_inputs_bytes_reader::<
         MpReach,
         bool,
         &HashMap<AddressType, u8>,
         &HashMap<AddressType, bool>,
-        LocatedMpReachParsingError<'_>,
+        MpReachParsingError,
     >(
         &invalid_safi_wire,
         false,
         &HashMap::new(),
         &HashMap::new(),
-        nom::Err::Error(invalid_safi),
+        &invalid_safi,
     );
 
     test_write_with_one_input(&good, false, &good_wire)?;
@@ -1378,7 +1394,7 @@ fn test_mp_reach_nlri_ipv4_ipv6_next_hop() -> Result<(), MpReachWritingError> {
         )],
     };
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &good_no_link_local_wire,
         true,
         &HashMap::new(),
@@ -1386,7 +1402,7 @@ fn test_mp_reach_nlri_ipv4_ipv6_next_hop() -> Result<(), MpReachWritingError> {
         &good_no_link_local,
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &good_link_local_wire,
         true,
         &HashMap::new(),
@@ -1440,7 +1456,7 @@ fn test_mp_reach_nlri_ipv4_mpls_labels_ipv6_next_hop() -> Result<(), MpReachWrit
         ],
     };
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &good_no_link_local_wire,
         true,
         &HashMap::new(),
@@ -1448,7 +1464,7 @@ fn test_mp_reach_nlri_ipv4_mpls_labels_ipv6_next_hop() -> Result<(), MpReachWrit
         &good_no_link_local,
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &good_link_local_wire,
         true,
         &HashMap::new(),
@@ -1488,26 +1504,28 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_unicast() -> Result<(), PathAttr
     )
     .unwrap();
 
-    let invalid = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(14, &invalid_wire[14..]) },
+    let invalid =
         PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv4UnicastAddressError(
             Ipv4UnicastAddressParsingError::Ipv4UnicastError(
-                Ipv4UnicastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::NomError(
-                    ErrorKind::Eof,
+                Ipv4UnicastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::Parse(
+                    ParseError::UnexpectedEof {
+                        offset: 14,
+                        needed: 4,
+                        available: 2,
+                    },
                 )),
             ),
-        )),
-    );
+        ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &invalid_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -1545,28 +1563,29 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_multicast() -> Result<(), PathAt
     )
     .unwrap();
 
-    let invalid = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(14, &invalid_wire[14..]) },
-        PathAttributeParsingError::MpReachErrorError(
-            MpReachParsingError::Ipv4MulticastAddressError(
-                Ipv4MulticastAddressParsingError::Ipv4MulticastError(
-                    Ipv4MulticastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::NomError(
-                        ErrorKind::Eof,
-                    )),
-                ),
+    let invalid = PathAttributeParsingError::MpReachErrorError(
+        MpReachParsingError::Ipv4MulticastAddressError(
+            Ipv4MulticastAddressParsingError::Ipv4MulticastError(
+                Ipv4MulticastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::Parse(
+                    ParseError::UnexpectedEof {
+                        offset: 14,
+                        needed: 4,
+                        available: 2,
+                    },
+                )),
             ),
         ),
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &invalid_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -1620,26 +1639,25 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_unicast() -> Result<(), PathAttr
     )
     .unwrap();
 
-    let invalid = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(40, &invalid_addr_wire[40..]) },
+    let invalid =
         PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv6UnicastAddressError(
             Ipv6UnicastAddressParsingError::Ipv6UnicastError(
-                Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
-                    Ipv6Net::from_str("ff01:db8:1:2::/64").unwrap(),
-                )),
+                Ipv6UnicastParsingError::InvalidUnicastNetwork {
+                    offset: 40,
+                    network: Ipv6Net::from_str("ff01:db8:1:2::/64").unwrap(),
+                },
             ),
-        )),
-    );
+        ));
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &invalid_addr_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -1694,30 +1712,26 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAt
     )
     .unwrap();
 
-    let invalid = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(40, &invalid_addr_wire[40..]) },
-        PathAttributeParsingError::MpReachErrorError(
-            MpReachParsingError::Ipv6MulticastAddressError(
-                Ipv6MulticastAddressParsingError::Ipv6MulticastError(
-                    Ipv6MulticastParsingError::InvalidMulticastNetwork(
-                        InvalidIpv6MulticastNetwork(
-                            Ipv6Net::from_str("2001:db8:1:2::/64").unwrap(),
-                        ),
-                    ),
-                ),
+    let invalid = PathAttributeParsingError::MpReachErrorError(
+        MpReachParsingError::Ipv6MulticastAddressError(
+            Ipv6MulticastAddressParsingError::Ipv6MulticastError(
+                Ipv6MulticastParsingError::InvalidMulticastNetwork {
+                    offset: 40,
+                    network: Ipv6Net::from_str("2001:db8:1:2::/64").unwrap(),
+                },
             ),
         ),
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &invalid_addr_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -1761,28 +1775,26 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_unicast() -> Result<(), PathAt
     )
     .unwrap();
 
-    let invalid_afi = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(7, &invalid_afi_wire[7..]) },
-        PathAttributeParsingError::MpUnreachErrorError(
-            MpUnreachParsingError::Ipv6UnicastAddressError(
-                Ipv6UnicastAddressParsingError::Ipv6UnicastError(
-                    Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
-                        Ipv6Net::from_str("ff01:db8::/32").unwrap(),
-                    )),
-                ),
+    let invalid_afi = PathAttributeParsingError::MpUnreachErrorError(
+        MpUnreachParsingError::Ipv6UnicastAddressError(
+            Ipv6UnicastAddressParsingError::Ipv6UnicastError(
+                Ipv6UnicastParsingError::InvalidUnicastNetwork {
+                    offset: 7,
+                    network: Ipv6Net::from_str("ff01:db8::/32").unwrap(),
+                },
             ),
         ),
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &invalid_afi_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -1824,28 +1836,26 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast()
     )
     .unwrap();
 
-    let invalid_afi = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(7, &invalid_afi_wire[7..]) },
-        PathAttributeParsingError::MpUnreachErrorError(
-            MpUnreachParsingError::Ipv6MulticastAddressError(
-                Ipv6MulticastAddressParsingError::Ipv6MulticastError(
-                    Ipv6MulticastParsingError::InvalidMulticastNetwork(
-                        InvalidIpv6MulticastNetwork(Ipv6Net::from_str("2001:db8::/32").unwrap()),
-                    ),
-                ),
+    let invalid_afi = PathAttributeParsingError::MpUnreachErrorError(
+        MpUnreachParsingError::Ipv6MulticastAddressError(
+            Ipv6MulticastAddressParsingError::Ipv6MulticastError(
+                Ipv6MulticastParsingError::InvalidMulticastNetwork {
+                    offset: 7,
+                    network: Ipv6Net::from_str("2001:db8::/32").unwrap(),
+                },
             ),
         ),
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &invalid_afi_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -1896,7 +1906,7 @@ fn test_mp_reach_labeled_vpn_ipv4() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -1942,35 +1952,30 @@ fn test_mp_reach_multi_labels_vp_ipv4() -> Result<(), PathAttributeWritingError>
         PathAttributeValue::MpReach(mp_reach),
     )
     .unwrap();
-
-    let limit_exceeded1 = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(37, &good_wire[37..]) },
-        PathAttributeParsingError::MpReachErrorError(
-            MpReachParsingError::Ipv4MplsVpnUnicastAddressError(
-                Ipv4MplsVpnUnicastAddressParsingError::RouteDistinguisherError(
-                    RouteDistinguisherParsingError::UndefinedRouteDistinguisherTypeCode(
-                        UndefinedRouteDistinguisherTypeCode(65),
-                    ),
-                ),
+    let limit_exceeded1 = PathAttributeParsingError::MpReachErrorError(
+        MpReachParsingError::Ipv4MplsVpnUnicastAddressError(
+            Ipv4MplsVpnUnicastAddressParsingError::RouteDistinguisherError(
+                RouteDistinguisherParsingError::UndefinedRouteDistinguisherTypeCode {
+                    offset: 37,
+                    code: 65,
+                },
             ),
         ),
     );
 
-    let limit_exceeded2 = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(37, &good_wire[37..]) },
-        PathAttributeParsingError::MpReachErrorError(
-            MpReachParsingError::Ipv4MplsVpnUnicastAddressError(
-                Ipv4MplsVpnUnicastAddressParsingError::RouteDistinguisherError(
-                    RouteDistinguisherParsingError::UndefinedRouteDistinguisherTypeCode(
-                        UndefinedRouteDistinguisherTypeCode(65),
-                    ),
-                ),
+    let limit_exceeded2 = PathAttributeParsingError::MpReachErrorError(
+        MpReachParsingError::Ipv4MplsVpnUnicastAddressError(
+            Ipv4MplsVpnUnicastAddressParsingError::RouteDistinguisherError(
+                RouteDistinguisherParsingError::UndefinedRouteDistinguisherTypeCode {
+                    offset: 37,
+                    code: 65,
+                },
             ),
         ),
     );
 
     // Test valid input
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::new(
             false,
@@ -1985,7 +1990,7 @@ fn test_mp_reach_multi_labels_vp_ipv4() -> Result<(), PathAttributeWritingError>
     );
 
     // Test with MAX limit
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::new(
             false,
@@ -2001,10 +2006,10 @@ fn test_mp_reach_multi_labels_vp_ipv4() -> Result<(), PathAttributeWritingError>
 
     // Test with no limit spec, should default to one label and fail since there's
     // two labels
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -2012,10 +2017,10 @@ fn test_mp_reach_multi_labels_vp_ipv4() -> Result<(), PathAttributeWritingError>
     );
 
     // Test with with one label limit, should fail since there's two labels
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &good_wire,
         &mut BgpParsingContext::new(
@@ -2090,7 +2095,7 @@ fn test_mp_reach_labeled_vpn_ipv6() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2126,7 +2131,7 @@ fn test_mp_reach_nlri_mpls_labels_ipv6() -> Result<(), PathAttributeWritingError
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2156,7 +2161,7 @@ fn test_transitive_two_octet_extended_community() -> Result<(), PathAttributeWri
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2186,7 +2191,7 @@ fn test_non_transitive_two_octet_extended_community() -> Result<(), PathAttribut
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2214,7 +2219,7 @@ fn test_transitive_ipv4_extended_community() -> Result<(), PathAttributeWritingE
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2239,7 +2244,7 @@ fn test_unknown_extended_community() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2281,7 +2286,7 @@ fn test_multiple_extended_communities() -> Result<(), PathAttributeWritingError>
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2306,7 +2311,7 @@ fn test_large_community() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2327,7 +2332,7 @@ fn test_originator() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2350,7 +2355,7 @@ fn test_cluster_list() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2367,8 +2372,13 @@ fn test_unknown_attribute() -> Result<(), UnknownAttributeWritingError> {
     let good = UnknownAttribute::new(0, vec![0xac, 0x10, 0x03, 0x02]);
     let good_extended = UnknownAttribute::new(0, vec![0xac, 0x10, 0x03, 0x02]);
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parsed_completely_with_two_inputs_bytes_reader(&good_wire[1..], 0, false, &good);
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &good_extended_wire[1..],
+        0,
+        true,
+        &good_extended,
+    );
     test_write_with_one_input(&good, false, &good_wire)?;
     test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
     Ok(())
@@ -2398,26 +2408,28 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
     )
     .unwrap();
 
-    let bad_incomplete = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(2, &bad_incomplete_wire[2..]) },
-        PathAttributeParsingError::UnknownAttributeError(
-            UnknownAttributeParsingError::InvalidLength {
-                expecting: 4,
-                actual: 3,
-            },
-        ),
+    let bad_incomplete = PathAttributeParsingError::UnknownAttributeError(
+        UnknownAttributeParsingError::InvalidLength {
+            offset: 1,
+            expecting: 4,
+            actual: 3,
+        },
     );
 
-    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire,
+        &mut BgpParsingContext::default(),
+        &good,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_extended_wire,
         &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,
-        LocatedPathAttributeParsingError<'_>,
+        PathAttributeParsingError,
     >(
         &bad_incomplete_wire,
         &mut BgpParsingContext::asn2_default(),
@@ -2526,7 +2538,7 @@ fn test_path_attr_route_target_membership() -> Result<(), PathAttributeWritingEr
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2548,7 +2560,7 @@ fn test_otc_path_attribute() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2572,7 +2584,7 @@ fn test_aigp_path_attribute() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::asn2_default(),
         &good,
@@ -2608,10 +2620,15 @@ fn test_ipv4_nlri_mpls_labels_address() -> Result<(), PathAttributeWritingError>
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire,
+        &mut BgpParsingContext::default(),
+        &good,
+    );
     test_write(&good, &good_wire)?;
     Ok(())
 }
+
 #[test]
 pub fn test_segment_identifier_label_index() -> Result<(), BgpMessageWritingError> {
     let good_wire: [u8; 89] = [
@@ -2701,7 +2718,11 @@ pub fn test_segment_identifier_label_index() -> Result<(), BgpMessageWritingErro
         vec![],
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire,
+        &mut BgpParsingContext::default(),
+        &good,
+    );
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -2709,17 +2730,16 @@ pub fn test_segment_identifier_label_index() -> Result<(), BgpMessageWritingErro
 #[test]
 pub fn test_segment_identifier_bad_tlv_type_error() {
     let bad_wire = [10, 0, 0, 7, 0, 0, 0, 0, 0, 0, 90];
-    let bad = &LocatedSegmentIdentifierParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_wire[1..]) },
-        SegmentIdentifierParsingError::BgpPrefixSidTlvError(
-            BgpPrefixSidTlvParsingError::BadBgpPrefixSidTlvType(BgpSidAttributeTypeError(
-                IanaValueError::Reserved(0),
-            )),
-        ),
+    let bad = SegmentIdentifierParsingError::BgpPrefixSidTlvError(
+        BgpPrefixSidTlvParsingError::BadBgpPrefixSidTlvType {
+            offset: 1,
+            error: BgpSidAttributeTypeError(IanaValueError::Reserved(0)),
+        },
     );
-    test_parse_error_with_one_input::<
+
+    test_parse_error_with_one_input_bytes_reader::<
         PrefixSegmentIdentifier,
         bool,
-        LocatedSegmentIdentifierParsingError<'_>,
-    >(&bad_wire, false, bad);
+        SegmentIdentifierParsingError,
+    >(&bad_wire, false, &bad);
 }

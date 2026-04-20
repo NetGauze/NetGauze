@@ -18,7 +18,7 @@ use crate::wire::deserializer::BgpParsingContext;
 use crate::wire::serializer::BgpMessageWritingError;
 use crate::wire::tests::BGP_MARKER;
 use netgauze_parse_utils::test_helpers::{
-    combine, test_parsed_completely_with_one_input, test_write,
+    combine, test_parsed_completely_with_one_input_bytes_reader, test_write,
 };
 
 #[test]
@@ -27,12 +27,16 @@ fn test_keep_alive() -> Result<(), BgpMessageWritingError> {
 
     let good = BgpMessage::KeepAlive;
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire[..],
         &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_one_input(&good_wire[..], &mut BgpParsingContext::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire[..],
+        &mut BgpParsingContext::default(),
+        &good,
+    );
 
     test_write(&good, &good_wire[..])?;
     Ok(())

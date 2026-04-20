@@ -17,106 +17,91 @@ use crate::iana::{
     BgpLsAttributeType, BgpLsAttributeTypeError, BgpLsNodeFlagsBits, IanaValueError,
 };
 use crate::nlri::{
-    IgpFlags, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, SharedRiskLinkGroupValue,
+    IgpFlags, MplsLabel, MplsProtocolMask, MultiTopologyIdData, SharedRiskLinkGroupValue,
 };
 use crate::path_attribute::{
     BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, LinkProtectionType,
 };
-use crate::wire::deserializer::nlri::MplsLabelParsingError;
+use crate::wire::deserializer::nlri::{MplsLabelParsingError, MultiTopologyIdDataParsingError};
 use crate::wire::deserializer::read_tlv_header_t16_l16;
 use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
-use netgauze_parse_utils::{
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
-    parse_into_located_one_input, parse_till_empty_into_located,
-};
-use netgauze_serde_macros::LocatedError;
-use nom::IResult;
-use nom::error::{ErrorKind, FromExternalError};
-use nom::number::complete::{be_f32, be_u8, be_u16, be_u32, be_u64, be_u128};
+
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::BitAnd;
-use std::string::FromUtf8Error;
 
 /// BGP Link-State Attribute Parsing Errors
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpLsAttributeParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UnknownTlvType(#[from_external] BgpLsAttributeTypeError),
-    Utf8Error(String),
-    WrongIpAddrLength(usize),
-    BadUnreservedBandwidthLength(usize),
-    MplsLabelParsingError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] MplsLabelParsingError,
-    ),
-    BadSidValue(u8),
+    #[error("BGP-LS attribute parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("BGP-LS attribute unknown TLV type {error} at offset {offset}")]
+    UnknownTlvType {
+        offset: usize,
+        error: BgpLsAttributeTypeError,
+    },
+    #[error("BGP-LS attribute UTF-8 error {error} at offset {offset}")]
+    Utf8Error { offset: usize, error: String },
+    #[error("BGP-LS attribute IP invalid address length {length} at offset {offset}")]
+    WrongIpAddrLength { offset: usize, length: usize },
+    #[error("BGP-LS attribute error: {0}")]
+    MplsLabelParsingError(#[from] MplsLabelParsingError),
+    #[error("BGP-LS bad SID value {value} at offset {offset}")]
+    BadSidValue { offset: usize, value: u8 },
+    #[error("BGP-LS attribute error: {0}")]
+    MultiTopologyIdDataError(#[from] MultiTopologyIdDataParsingError),
 }
 
-impl<'a> FromExternalError<Span<'a>, FromUtf8Error> for LocatedBgpLsAttributeParsingError<'a> {
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: FromUtf8Error) -> Self {
-        LocatedBgpLsAttributeParsingError::new(
-            input,
-            BgpLsAttributeParsingError::Utf8Error(error.to_string()),
-        )
-    }
-}
-
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpLsAttributeParsingError<'a>>
-    for BgpLsAttribute
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
-        let (_buf, ls_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsAttribute {
+    type Error = BgpLsAttributeParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut ls_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
 
-        let (span, attributes) = parse_till_empty_into_located(ls_buf)?;
-
-        Ok((span, BgpLsAttribute { attributes }))
+        let mut attributes = Vec::new();
+        while !ls_buf.is_empty() {
+            let attribute = BgpLsAttributeValue::parse(&mut ls_buf)?;
+            attributes.push(attribute);
+        }
+        Ok(BgpLsAttribute { attributes })
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttributeValue {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
-        let (tlv_type, tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
+impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
+    type Error = BgpLsAttributeParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let (tlv_type, tlv_length, mut data) =
+            read_tlv_header_t16_l16::<BgpLsAttributeParsingError>(cur)?;
 
         let tlv_type = match BgpLsAttributeType::try_from(tlv_type) {
             Ok(value) => value,
             Err(BgpLsAttributeTypeError(IanaValueError::Unknown(value))) => {
-                return Ok((
-                    remainder,
-                    BgpLsAttributeValue::Unknown {
-                        code: value,
-                        value: data.to_vec(),
-                    },
-                ));
+                return Ok(BgpLsAttributeValue::Unknown {
+                    code: value,
+                    value: data.read_bytes(data.remaining())?.to_vec(),
+                });
             }
             Err(error) => {
-                return Err(nom::Err::Error(LocatedBgpLsAttributeParsingError::new(
-                    buf,
-                    BgpLsAttributeParsingError::UnknownTlvType(error),
-                )));
+                return Err(BgpLsAttributeParsingError::UnknownTlvType { offset, error });
             }
         };
 
         let tlv = match tlv_type {
             BgpLsAttributeType::MultiTopologyIdentifier => {
-                let (_, mtid) = parse_into_located::<
-                    LocatedBgpLsAttributeParsingError<'_>,
-                    LocatedBgpLsAttributeParsingError<'_>,
-                    MultiTopologyIdData,
-                >(data)?;
+                let mtid = MultiTopologyIdData::parse(&mut data)?;
                 BgpLsAttributeValue::MultiTopologyIdentifier(mtid)
             }
             BgpLsAttributeType::NodeFlagBits => {
-                let (_, flags) = be_u8(data)?;
+                let flags = data.read_u8()?;
                 BgpLsAttributeValue::NodeFlagBits {
                     overload: flags.bitand(BgpLsNodeFlagsBits::Overload as u8)
                         == BgpLsNodeFlagsBits::Overload as u8,
@@ -131,62 +116,64 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                     v6: flags.bitand(BgpLsNodeFlagsBits::V6 as u8) == BgpLsNodeFlagsBits::V6 as u8,
                 }
             }
-            BgpLsAttributeType::OpaqueNodeAttribute => {
-                BgpLsAttributeValue::OpaqueNodeAttribute(data.to_vec())
-            }
+            BgpLsAttributeType::OpaqueNodeAttribute => BgpLsAttributeValue::OpaqueNodeAttribute(
+                data.read_bytes(data.remaining())?.to_vec(),
+            ),
             BgpLsAttributeType::NodeNameTlv => {
-                let (_, str) = nom::combinator::map_res(
-                    nom::bytes::complete::take(tlv_length),
-                    |x: Span<'_>| String::from_utf8(x.to_vec()),
-                )(data)?;
+                let offset = data.offset();
+                let str_buf = data.read_bytes(tlv_length as usize)?;
+                let str = String::from_utf8(str_buf.to_vec()).map_err(|e| {
+                    BgpLsAttributeParsingError::Utf8Error {
+                        offset,
+                        error: e.to_string(),
+                    }
+                })?;
                 BgpLsAttributeValue::NodeNameTlv(str)
             }
-            BgpLsAttributeType::IsIsArea => BgpLsAttributeValue::IsIsArea(data.to_vec()),
+            BgpLsAttributeType::IsIsArea => {
+                BgpLsAttributeValue::IsIsArea(data.read_bytes(data.remaining())?.to_vec())
+            }
             BgpLsAttributeType::LocalNodeIpv4RouterId => {
-                let (_, address) = be_u32(data)?;
+                let address = data.read_u32_be()?;
                 BgpLsAttributeValue::LocalNodeIpv4RouterId(Ipv4Addr::from(address))
             }
             BgpLsAttributeType::LocalNodeIpv6RouterId => {
-                let (_, address) = be_u128(data)?;
+                let address = data.read_u128_be()?;
                 BgpLsAttributeValue::LocalNodeIpv6RouterId(Ipv6Addr::from(address))
             }
             BgpLsAttributeType::RemoteNodeIpv4RouterId => {
-                let (_, address) = be_u32(data)?;
+                let address = data.read_u32_be()?;
                 BgpLsAttributeValue::RemoteNodeIpv4RouterId(Ipv4Addr::from(address))
             }
             BgpLsAttributeType::RemoteNodeIpv6RouterId => {
-                let (_, address) = be_u128(data)?;
+                let address = data.read_u128_be()?;
                 BgpLsAttributeValue::RemoteNodeIpv6RouterId(Ipv6Addr::from(address))
             }
             BgpLsAttributeType::RemoteNodeAdministrativeGroupColor => {
-                let (_, color) = be_u32(data)?;
+                let color = data.read_u32_be()?;
                 BgpLsAttributeValue::RemoteNodeAdministrativeGroupColor(color)
             }
             BgpLsAttributeType::MaximumLinkBandwidth => {
-                let (_, bandwidth) = be_f32(data)?;
+                let bandwidth = data.read_f32_be()?;
                 BgpLsAttributeValue::MaximumLinkBandwidth(bandwidth)
             }
             BgpLsAttributeType::MaximumReservableLinkBandwidth => {
-                let (_, bandwidth) = be_f32(data)?;
+                let bandwidth = data.read_f32_be()?;
                 BgpLsAttributeValue::MaximumReservableLinkBandwidth(bandwidth)
             }
             BgpLsAttributeType::UnreservedBandwidth => {
-                let (_, vec) = nom::multi::count(be_f32, 8)(data)?;
-                let len = vec.len();
-                let value: [f32; 8] = vec.try_into().map_err(|_| {
-                    nom::Err::Error(LocatedBgpLsAttributeParsingError::new(
-                        data,
-                        BgpLsAttributeParsingError::BadUnreservedBandwidthLength(len),
-                    ))
-                })?;
+                let mut value: [f32; 8] = [0.0; 8];
+                for v in &mut value {
+                    *v = data.read_f32_be()?;
+                }
                 BgpLsAttributeValue::UnreservedBandwidth(value)
             }
             BgpLsAttributeType::TeDefaultMetric => {
-                let (_, metric) = be_u32(data)?;
+                let metric = data.read_u32_be()?;
                 BgpLsAttributeValue::TeDefaultMetric(metric)
             }
             BgpLsAttributeType::LinkProtectionType => {
-                let (_, flags) = be_u16(data)?;
+                let flags = data.read_u16_be()?;
                 BgpLsAttributeValue::LinkProtectionType {
                     extra_traffic: flags.bitand(LinkProtectionType::ExtraTraffic as u16)
                         == LinkProtectionType::ExtraTraffic as u16,
@@ -203,7 +190,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                 }
             }
             BgpLsAttributeType::MplsProtocolMask => {
-                let (_, flags) = be_u8(data)?;
+                let flags = data.read_u8()?;
                 BgpLsAttributeValue::MplsProtocolMask {
                     ldp: flags.bitand(MplsProtocolMask::LabelDistributionProtocol as u8)
                         == MplsProtocolMask::LabelDistributionProtocol as u8,
@@ -211,23 +198,33 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                         == MplsProtocolMask::ExtensionToRsvpForLspTunnels as u8,
                 }
             }
-            BgpLsAttributeType::IgpMetric => BgpLsAttributeValue::IgpMetric(data.to_vec()),
+            BgpLsAttributeType::IgpMetric => {
+                BgpLsAttributeValue::IgpMetric(data.read_bytes(data.remaining())?.to_vec())
+            }
             BgpLsAttributeType::SharedRiskLinkGroup => {
-                let (_, values) = parse_till_empty_into_located(data)?;
+                let mut values = Vec::new();
+                while !data.is_empty() {
+                    let v = SharedRiskLinkGroupValue::parse(&mut data)?;
+                    values.push(v);
+                }
                 BgpLsAttributeValue::SharedRiskLinkGroup(values)
             }
-            BgpLsAttributeType::OpaqueLinkAttribute => {
-                BgpLsAttributeValue::OpaqueLinkAttribute(data.to_vec())
-            }
+            BgpLsAttributeType::OpaqueLinkAttribute => BgpLsAttributeValue::OpaqueLinkAttribute(
+                data.read_bytes(data.remaining())?.to_vec(),
+            ),
             BgpLsAttributeType::LinkName => {
-                let (_, str) = nom::combinator::map_res(
-                    nom::bytes::complete::take(tlv_length),
-                    |x: Span<'_>| String::from_utf8(x.to_vec()),
-                )(data)?;
+                let offset = data.offset();
+                let str_buf = data.read_bytes(tlv_length as usize)?;
+                let str = String::from_utf8(str_buf.to_vec()).map_err(|e| {
+                    BgpLsAttributeParsingError::Utf8Error {
+                        offset,
+                        error: e.to_string(),
+                    }
+                })?;
                 BgpLsAttributeValue::LinkName(str)
             }
             BgpLsAttributeType::IgpFlags => {
-                let (_, flags) = be_u8(data)?;
+                let flags = data.read_u8()?;
                 BgpLsAttributeValue::IgpFlags {
                     isis_up_down: flags.bitand(IgpFlags::IsIsUp as u8) == IgpFlags::IsIsUp as u8,
                     ospf_no_unicast: flags.bitand(IgpFlags::OspfNoUnicast as u8)
@@ -239,129 +236,99 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                 }
             }
             BgpLsAttributeType::IgpRouteTag => {
-                let (_, vec) = parse_till_empty_into_located(data)?;
+                let mut vec = Vec::new();
+                while !data.is_empty() {
+                    let v = cur.read_u32_be()?;
+                    vec.push(v);
+                }
                 BgpLsAttributeValue::IgpRouteTag(vec)
             }
             BgpLsAttributeType::IgpExtendedRouteTag => {
-                let (_, vec) = parse_till_empty_into_located(data)?;
+                let mut vec = Vec::new();
+                while !data.is_empty() {
+                    let v = cur.read_u64_be()?;
+                    vec.push(v);
+                }
                 BgpLsAttributeValue::IgpExtendedRouteTag(vec)
             }
             BgpLsAttributeType::PrefixMetric => {
-                let (_, metric) = be_u32(data)?;
+                let metric = data.read_u32_be()?;
                 BgpLsAttributeValue::PrefixMetric(metric)
             }
             BgpLsAttributeType::OspfForwardingAddress => {
                 let address = if tlv_length == IPV4_LEN as u16 {
-                    let (_, ip) = be_u32(data)?;
+                    let ip = data.read_u32_be()?;
                     IpAddr::V4(Ipv4Addr::from(ip))
                 } else if tlv_length == IPV6_LEN as u16 {
-                    let (_, ip) = be_u128(data)?;
+                    let ip = data.read_u128_be()?;
                     IpAddr::V6(Ipv6Addr::from(ip))
                 } else {
-                    return Err(nom::Err::Error(LocatedBgpLsAttributeParsingError::new(
-                        data,
-                        BgpLsAttributeParsingError::WrongIpAddrLength(tlv_length.into()),
-                    )));
+                    return Err(BgpLsAttributeParsingError::WrongIpAddrLength {
+                        offset,
+                        length: tlv_length as usize,
+                    });
                 };
 
                 BgpLsAttributeValue::OspfForwardingAddress(address)
             }
             BgpLsAttributeType::OpaquePrefixAttribute => {
-                BgpLsAttributeValue::OpaquePrefixAttribute(data.to_vec())
+                BgpLsAttributeValue::OpaquePrefixAttribute(
+                    data.read_bytes(data.remaining())?.to_vec(),
+                )
             }
             BgpLsAttributeType::PeerNodeSid => {
-                let (_, value) = parse_into_located_one_input(data, tlv_length)?;
+                let value = BgpLsPeerSid::parse(&mut data, tlv_length)?;
                 BgpLsAttributeValue::PeerNodeSid(value)
             }
             BgpLsAttributeType::PeerAdjSid => {
-                let (_, value) = parse_into_located_one_input(data, tlv_length)?;
+                let value = BgpLsPeerSid::parse(&mut data, tlv_length)?;
                 BgpLsAttributeValue::PeerAdjSid(value)
             }
             BgpLsAttributeType::PeerSetSid => {
-                let (_, value) = parse_into_located_one_input(data, tlv_length)?;
+                let value = BgpLsPeerSid::parse(&mut data, tlv_length)?;
                 BgpLsAttributeValue::PeerSetSid(value)
             }
         };
-
-        Ok((remainder, tlv))
+        Ok(tlv)
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for u32 {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
-        be_u32(buf)
+impl<'a> ParseFrom<'a> for SharedRiskLinkGroupValue {
+    type Error = BgpLsAttributeParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let value = cur.read_u32_be()?;
+        Ok(SharedRiskLinkGroupValue(value))
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for u64 {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
-        be_u64(buf)
-    }
-}
-
-impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for SharedRiskLinkGroupValue {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
-        let (span, value) = be_u32(buf)?;
-        Ok((span, SharedRiskLinkGroupValue(value)))
-    }
-}
-
-impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for MultiTopologyIdData {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
-        let (span, value) = parse_till_empty_into_located::<
-            LocatedBgpLsAttributeParsingError<'_>,
-            LocatedBgpLsAttributeParsingError<'_>,
-            MultiTopologyId,
-        >(buf)?;
-        Ok((span, MultiTopologyIdData(value)))
-    }
-}
-
-impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for MultiTopologyId {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
-        let (buf, mtid) = be_u16(buf)?;
-
-        Ok((buf, MultiTopologyId::from(mtid)))
-    }
-}
-
-impl<'a> ReadablePduWithOneInput<'a, u16, LocatedBgpLsAttributeParsingError<'a>> for BgpLsPeerSid {
-    fn from_wire(
-        buf: Span<'a>,
-        length: u16,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
-        let (span, flags) = be_u8(buf)?;
-        let (span, weight) = be_u8(span)?;
-        let (span, _reserved) = be_u16(span)?;
+impl<'a> ParseFromWithOneInput<'a, u16> for BgpLsPeerSid {
+    type Error = BgpLsAttributeParsingError;
+    fn parse(cur: &mut BytesReader, length: u16) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let flags = cur.read_u8()?;
+        let weight = cur.read_u8()?;
+        let _reserved = cur.read_u16_be()?;
 
         if length == 7 && Self::flags_have_v_flag(flags) {
-            let (span, label) = parse_into_located(span)?;
-
+            let label = MplsLabel::parse(cur)?;
             // TODO check if max 20 rightmost bits are set
-
-            Ok((
-                span,
-                BgpLsPeerSid::LabelValue {
-                    flags,
-                    weight,
-                    label,
-                },
-            ))
+            Ok(BgpLsPeerSid::LabelValue {
+                flags,
+                weight,
+                label,
+            })
         } else if length == 8 && !Self::flags_have_v_flag(flags) {
-            let (span, index) = be_u32(span)?;
-            Ok((
-                span,
-                BgpLsPeerSid::IndexValue {
-                    flags,
-                    weight,
-                    index,
-                },
-            ))
+            let index = cur.read_u32_be()?;
+            Ok(BgpLsPeerSid::IndexValue {
+                flags,
+                weight,
+                index,
+            })
         } else {
-            Err(nom::Err::Error(LocatedBgpLsAttributeParsingError::new(
-                buf,
-                BgpLsAttributeParsingError::BadSidValue(flags),
-            )))
+            Err(BgpLsAttributeParsingError::BadSidValue {
+                offset,
+                value: flags,
+            })
         }
     }
 }

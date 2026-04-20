@@ -13,25 +13,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::iana::{
-    L2EvpnRouteTypeCode, RouteDistinguisherTypeCode, UndefinedRouteDistinguisherTypeCode,
-};
+use crate::iana::{L2EvpnRouteTypeCode, RouteDistinguisherTypeCode};
 use crate::nlri::*;
-use crate::wire::deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError};
 use crate::wire::serializer::nlri::{
     IPV4_LEN_BITS, IPV6_LEN, IPV6_LEN_BITS, LABELED_IPV4_LEN, LABELED_IPV6_LEN,
     MAC_ADDRESS_LEN_BITS, MPLS_LABEL_LEN_BITS, RD_LEN,
 };
 use ipnet::{Ipv4Net, Ipv6Net};
-use netgauze_parse_utils::{
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs,
-    ReadablePduWithTwoInputs, Span, parse_into_located, parse_into_located_one_input,
-    parse_into_located_two_inputs,
+use netgauze_parse_utils::common::{Ipv4PrefixParsingError, Ipv6PrefixParsingError};
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::{
+    ParseFrom, ParseFromWithOneInput, ParseFromWithThreeInputs, ParseFromWithTwoInputs,
 };
-use netgauze_serde_macros::LocatedError;
-use nom::IResult;
-use nom::error::ErrorKind;
-use nom::number::complete::{be_u8, be_u16, be_u32, be_u128};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -42,169 +36,191 @@ pub(crate) const L2_EVPN_IPV4_PREFIX_ROUTE_LEN: usize = 34;
 /// [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136)
 pub(crate) const L2_EVPN_IPV6_PREFIX_ROUTE_LEN: usize = 58;
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum MplsLabelParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("MPLS Label address parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedMplsLabelParsingError<'a>> for MplsLabel {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedMplsLabelParsingError<'a>> {
-        let (buf, p1) = be_u8(buf)?;
-        let (buf, p2) = be_u8(buf)?;
-        let (buf, p3) = be_u8(buf)?;
-        Ok((buf, MplsLabel::new([p1, p2, p3])))
+impl<'a> ParseFrom<'a> for MplsLabel {
+    type Error = MplsLabelParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let label: [u8; 3] = cur.read_array()?;
+        Ok(MplsLabel::new(label))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum RouteDistinguisherParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedRouteDistinguisherTypeCode(#[from_external] UndefinedRouteDistinguisherTypeCode),
-    /// LeafAdRoutes is expected to be all `1`
-    InvalidLeafAdRoutes(u16, u32),
+    #[error("Route Distinguisher parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("Invalid Route Distinguisher `{code}` at offset {offset}")]
+    UndefinedRouteDistinguisherTypeCode { offset: usize, code: u16 },
+
+    #[error(
+        "Invalid LeafAdRoutes at offset {offset}: {num1}:{num2}, LeafAdRoutes is expected to be all `1`"
+    )]
+    InvalidLeafAdRoutes { offset: usize, num1: u16, num2: u32 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedRouteDistinguisherParsingError<'a>> for RouteDistinguisher {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedRouteDistinguisherParsingError<'a>> {
-        let (buf, rd_type) =
-            nom::combinator::map_res(be_u16, RouteDistinguisherTypeCode::try_from)(buf)?;
+impl<'a> ParseFrom<'a> for RouteDistinguisher {
+    type Error = RouteDistinguisherParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let rd_type = cur.read_u16_be()?;
+        let rd_type = RouteDistinguisherTypeCode::try_from(rd_type).map_err(|error| {
+            RouteDistinguisherParsingError::UndefinedRouteDistinguisherTypeCode {
+                offset,
+                code: error.0,
+            }
+        })?;
+
         match rd_type {
             RouteDistinguisherTypeCode::As2Administrator => {
-                let (buf, asn2) = be_u16(buf)?;
-                let (buf, number) = be_u32(buf)?;
-                Ok((buf, RouteDistinguisher::As2Administrator { asn2, number }))
+                let asn2 = cur.read_u16_be()?;
+                let number = cur.read_u32_be()?;
+                Ok(RouteDistinguisher::As2Administrator { asn2, number })
             }
             RouteDistinguisherTypeCode::Ipv4Administrator => {
-                let (buf, ip) = be_u32(buf)?;
+                let ip = cur.read_u32_be()?;
                 let ip = Ipv4Addr::from(ip);
-                let (buf, number) = be_u16(buf)?;
-                Ok((buf, RouteDistinguisher::Ipv4Administrator { ip, number }))
+                let number = cur.read_u16_be()?;
+                Ok(RouteDistinguisher::Ipv4Administrator { ip, number })
             }
             RouteDistinguisherTypeCode::As4Administrator => {
-                let (buf, asn4) = be_u32(buf)?;
-                let (buf, number) = be_u16(buf)?;
-                Ok((buf, RouteDistinguisher::As4Administrator { asn4, number }))
+                let asn4 = cur.read_u32_be()?;
+                let number = cur.read_u16_be()?;
+                Ok(RouteDistinguisher::As4Administrator { asn4, number })
             }
             RouteDistinguisherTypeCode::LeafAdRoutes => {
-                let input = buf;
-                let (buf, num1) = be_u16(buf)?;
-                let (buf, num2) = be_u32(buf)?;
+                let num1 = cur.read_u16_be()?;
+                let num2 = cur.read_u32_be()?;
                 if num1 != u16::MAX || num2 != u32::MAX {
-                    Err(nom::Err::Error(LocatedRouteDistinguisherParsingError::new(
-                        input,
-                        RouteDistinguisherParsingError::InvalidLeafAdRoutes(num1, num2),
-                    )))
+                    Err(RouteDistinguisherParsingError::InvalidLeafAdRoutes { offset, num1, num2 })
                 } else {
-                    Ok((buf, RouteDistinguisher::LeafAdRoutes))
+                    Ok(RouteDistinguisher::LeafAdRoutes)
                 }
             }
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum LabeledIpv4NextHopParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
+    #[error("Labeled IPv4 parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("Invalid Labeled IPv4 Next Hop: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedLabeledIpv4NextHopParsingError<'a>> for LabeledIpv4NextHop {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedLabeledIpv4NextHopParsingError<'a>> {
-        let (buf, rd) = parse_into_located(buf)?;
-        let (buf, ip) = be_u32(buf)?;
+impl<'a> ParseFrom<'a> for LabeledIpv4NextHop {
+    type Error = LabeledIpv4NextHopParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let rd = RouteDistinguisher::parse(cur)?;
+        let ip = cur.read_u32_be()?;
         let ip = Ipv4Addr::from(ip);
-        Ok((buf, LabeledIpv4NextHop::new(rd, ip)))
+        Ok(LabeledIpv4NextHop::new(rd, ip))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum LabeledIpv6NextHopParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
+    #[error("Labeled IPv6 Next Hop parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("Invalid Labeled IPv6 Next Hop: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedLabeledIpv6NextHopParsingError<'a>> for LabeledIpv6NextHop {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedLabeledIpv6NextHopParsingError<'a>> {
-        let (buf, rd) = parse_into_located(buf)?;
-        let (buf, (next_hop, local)) = if buf.len() == IPV6_LEN as usize {
-            let (buf, ip) = be_u128(buf)?;
-            (buf, (Ipv6Addr::from(ip), None))
+impl<'a> ParseFrom<'a> for LabeledIpv6NextHop {
+    type Error = LabeledIpv6NextHopParsingError;
+
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let rd = RouteDistinguisher::parse(cur)?;
+        let ip = cur.read_u128_be()?;
+        let next_hop = Ipv6Addr::from(ip);
+        let local = if cur.remaining() == IPV6_LEN as usize {
+            let ip = cur.read_u128_be()?;
+            Some(Ipv6Addr::from(ip))
         } else {
-            let (buf, ip) = be_u128(buf)?;
-            let (buf, local) = be_u128(buf)?;
-            (buf, (Ipv6Addr::from(ip), Some(Ipv6Addr::from(local))))
+            None
         };
-        Ok((buf, LabeledIpv6NextHop::new(rd, next_hop, local)))
+        Ok(LabeledIpv6NextHop::new(rd, next_hop, local))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum LabeledNextHopParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidLength(u8),
-    LabeledIpv4NextHopError(#[from_located(module = "self")] LabeledIpv4NextHopParsingError),
-    LabeledIpv6NextHopError(#[from_located(module = "self")] LabeledIpv6NextHopParsingError),
+    #[error("Labeled Next Hop parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("Label next hop invalid length {len} at offset {offset}")]
+    InvalidLength { offset: usize, len: u8 },
+
+    #[error("Invalid Labeled Next Hop: {0}")]
+    LabeledIpv4NextHopError(#[from] LabeledIpv4NextHopParsingError),
+
+    #[error("Invalid Labeled Next Hop: {0}")]
+    LabeledIpv6NextHopError(#[from] LabeledIpv6NextHopParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedLabeledNextHopParsingError<'a>> for LabeledNextHop {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedLabeledNextHopParsingError<'a>> {
-        let input = buf;
-        let (buf, prefix_len) = be_u8(buf)?;
-        let (buf, address_buf) = nom::bytes::complete::take(prefix_len)(buf)?;
+impl<'a> ParseFrom<'a> for LabeledNextHop {
+    type Error = LabeledNextHopParsingError;
+
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let prefix_len = cur.read_u8()?;
+        let mut address_buf = cur.take_slice(prefix_len as usize)?;
         if prefix_len == LABELED_IPV4_LEN {
-            let (_, labeled_ipv4) = parse_into_located(address_buf)?;
-            Ok((buf, LabeledNextHop::Ipv4(labeled_ipv4)))
+            let labeled_ipv4 = LabeledIpv4NextHop::parse(&mut address_buf)?;
+            Ok(LabeledNextHop::Ipv4(labeled_ipv4))
         } else if prefix_len == LABELED_IPV6_LEN {
-            let (_, labeled_ipv6) = parse_into_located(address_buf)?;
-            Ok((buf, LabeledNextHop::Ipv6(labeled_ipv6)))
+            let labeled_ipv6 = LabeledIpv6NextHop::parse(&mut address_buf)?;
+            Ok(LabeledNextHop::Ipv6(labeled_ipv6))
         } else {
-            Err(nom::Err::Error(LocatedLabeledNextHopParsingError::new(
-                input,
-                LabeledNextHopParsingError::InvalidLength(prefix_len),
-            )))
+            Err(LabeledNextHopParsingError::InvalidLength {
+                offset,
+                len: prefix_len,
+            })
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv4MplsVpnUnicastAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidPrefixLength(u8),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
-    Ipv4UnicastError(#[from_located(module = "self")] Ipv4UnicastParsingError),
-    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
+    #[error("IPv4 MPLS VPN Unicast address parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("Invalid IPv4 MPLS VPN Unicast address prefix length: {len} at offset {offset}")]
+    InvalidLength { offset: usize, len: u8 },
+
+    #[error("Invalid IPv4 MPLS VPN Unicast address: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
+
+    #[error("Invalid IPv4 MPLS VPN Unicast address: {0}")]
+    Ipv4UnicastError(#[from] Ipv4UnicastParsingError),
+
+    #[error("Invalid IPv4 MPLS VPN Unicast address: {0}")]
+    MplsLabelError(#[from] MplsLabelParsingError),
 }
 
-impl<'a>
-    ReadablePduWithThreeInputs<'a, bool, bool, u8, LocatedIpv4MplsVpnUnicastAddressParsingError<'a>>
-    for Ipv4MplsVpnUnicastAddress
-{
-    fn from_wire(
-        buf: Span<'a>,
+impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv4MplsVpnUnicastAddress {
+    type Error = Ipv4MplsVpnUnicastAddressParsingError;
+    fn parse(
+        cur: &mut BytesReader,
         add_path: bool,
         is_unreach: bool,
         multiple_labels_limit: u8,
-    ) -> IResult<Span<'a>, Self, LocatedIpv4MplsVpnUnicastAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (prefix_buf, path_id) = be_u32(buf)?;
-            (prefix_buf, Some(path_id))
+    ) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let input = buf;
-        let (buf, prefix_len) = be_u8(buf)?;
+        let offset = cur.offset();
+        let prefix_len = cur.read_u8()?;
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
             u8::MAX
         } else {
@@ -212,75 +228,76 @@ impl<'a>
         };
         // consuming only the bytes specified by the prefix length field, since MPLS
         // stack is read until the last bit is set.
-        let (buf, prefix_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
-        let (prefix_buf, label_stack) =
-            parse_mpls_label_stack(prefix_buf, is_unreach, multiple_labels_limit).map_err(
-                |err| match err {
-                    nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
-                    nom::Err::Error(error) => nom::Err::Error(error.into()),
-                    nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
-                },
-            )?;
-        let (prefix_buf, rd) = parse_into_located(prefix_buf)?;
+        let mut prefix_buf = cur.take_slice(prefix_bytes as usize)?;
+        let label_stack =
+            parse_mpls_label_stack(&mut prefix_buf, is_unreach, multiple_labels_limit)?;
+        let rd = RouteDistinguisher::parse(&mut prefix_buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first
         let remainder_prefix_len = match prefix_len.checked_sub(read_prefix) {
             None => {
-                return Err(nom::Err::Error(
-                    LocatedIpv4MplsVpnUnicastAddressParsingError::new(
-                        input,
-                        Ipv4MplsVpnUnicastAddressParsingError::InvalidPrefixLength(prefix_len),
-                    ),
-                ));
+                return Err(Ipv4MplsVpnUnicastAddressParsingError::InvalidLength {
+                    offset,
+                    len: prefix_len,
+                });
             }
             Some(val) => val,
         };
-        let (remainder, network) =
-            parse_into_located_two_inputs(prefix_buf, remainder_prefix_len, input)?;
+        let network = <Ipv4Unicast as ParseFromWithTwoInputs<'_, _, _>>::parse(
+            &mut prefix_buf,
+            remainder_prefix_len,
+            offset,
+        )?;
         // Check all the bytes specified by the prefix length are consumed
-        if !remainder.is_empty() {
-            return Err(nom::Err::Error(
-                LocatedIpv4MplsVpnUnicastAddressParsingError::new(
-                    input,
-                    Ipv4MplsVpnUnicastAddressParsingError::InvalidPrefixLength(prefix_len),
-                ),
-            ));
+        if !prefix_buf.is_empty() {
+            return Err(Ipv4MplsVpnUnicastAddressParsingError::InvalidLength {
+                offset,
+                len: prefix_len,
+            });
         }
-        Ok((
-            buf,
-            Ipv4MplsVpnUnicastAddress::new(path_id, rd, label_stack, network),
+        Ok(Ipv4MplsVpnUnicastAddress::new(
+            path_id,
+            rd,
+            label_stack,
+            network,
         ))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv6MplsVpnUnicastAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
-    InvalidPrefixLength(u8),
-    Ipv6UnicastError(#[from_located(module = "self")] Ipv6UnicastParsingError),
+    #[error("IPv6 MPLS VPN Unicast address parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("Invalid IPv6 MPLS VPN Unicast address: {0}")]
+    MplsLabelError(#[from] MplsLabelParsingError),
+
+    #[error("Invalid IPv6 MPLS VPN Unicast address: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
+
+    #[error("Invalid IPv6 MPLS VPN Unicast address prefix length: {len} at offset {offset}")]
+    InvalidLength { offset: usize, len: u8 },
+
+    #[error("Invalid IPv6 MPLS VPN Unicast address: {0}")]
+    Ipv6UnicastError(#[from] Ipv6UnicastParsingError),
 }
 
-impl<'a>
-    ReadablePduWithThreeInputs<'a, bool, bool, u8, LocatedIpv6MplsVpnUnicastAddressParsingError<'a>>
-    for Ipv6MplsVpnUnicastAddress
-{
-    fn from_wire(
-        buf: Span<'a>,
+impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv6MplsVpnUnicastAddress {
+    type Error = Ipv6MplsVpnUnicastAddressParsingError;
+
+    fn parse(
+        cur: &mut BytesReader,
         add_path: bool,
         is_unreach: bool,
         multiple_labels_limit: u8,
-    ) -> IResult<Span<'a>, Self, LocatedIpv6MplsVpnUnicastAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+    ) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let input = buf;
-        let (buf, prefix_len) = be_u8(buf)?;
+        let offset = cur.offset();
+        let prefix_len = cur.read_u8()?;
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
             u8::MAX
         } else {
@@ -288,893 +305,861 @@ impl<'a>
         };
         // consuming only the bytes specified by the prefix length field, since MPLS
         // stack is read until the last bit is set.
-        let (buf, prefix_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
-        let (prefix_buf, label_stack) =
-            parse_mpls_label_stack(prefix_buf, is_unreach, multiple_labels_limit).map_err(
-                |err| match err {
-                    nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
-                    nom::Err::Error(error) => nom::Err::Error(error.into()),
-                    nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
-                },
-            )?;
-        let (prefix_buf, rd) = parse_into_located(prefix_buf)?;
+        let mut prefix_buf = cur.take_slice(prefix_bytes as usize)?;
+        let label_stack =
+            parse_mpls_label_stack(&mut prefix_buf, is_unreach, multiple_labels_limit)?;
+        let rd = RouteDistinguisher::parse(&mut prefix_buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first
         let remainder_prefix_len = match prefix_len.checked_sub(read_prefix) {
             None => {
-                return Err(nom::Err::Error(
-                    LocatedIpv6MplsVpnUnicastAddressParsingError::new(
-                        input,
-                        Ipv6MplsVpnUnicastAddressParsingError::InvalidPrefixLength(prefix_len),
-                    ),
-                ));
+                return Err(Ipv6MplsVpnUnicastAddressParsingError::InvalidLength {
+                    offset,
+                    len: prefix_len,
+                });
             }
             Some(val) => val,
         };
-        let (remainder, network) =
-            parse_into_located_two_inputs(prefix_buf, remainder_prefix_len, input)?;
+        let network = <Ipv6Unicast as ParseFromWithTwoInputs<'a, _, _>>::parse(
+            &mut prefix_buf,
+            remainder_prefix_len,
+            offset,
+        )?;
         // Check all the bytes specified by the prefix length are consumed
-        if !remainder.is_empty() {
-            return Err(nom::Err::Error(
-                LocatedIpv6MplsVpnUnicastAddressParsingError::new(
-                    input,
-                    Ipv6MplsVpnUnicastAddressParsingError::InvalidPrefixLength(prefix_len),
-                ),
-            ));
+        if !prefix_buf.is_empty() {
+            return Err(Ipv6MplsVpnUnicastAddressParsingError::InvalidLength {
+                offset,
+                len: prefix_len,
+            });
         }
-        Ok((
-            buf,
-            Ipv6MplsVpnUnicastAddress::new(path_id, rd, label_stack, network),
+        Ok(Ipv6MplsVpnUnicastAddress::new(
+            path_id,
+            rd,
+            label_stack,
+            network,
         ))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv6UnicastParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    Ipv6PrefixError(
-        #[from_external]
-        #[from_located(module = "crate::wire::deserializer")]
-        Ipv6PrefixParsingError,
-    ),
-    InvalidUnicastNetwork(#[from_external] InvalidIpv6UnicastNetwork),
+    #[error("Invalid IPv6 Unicast Address: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("Invalid IPv6 Unicast: {0}")]
+    Ipv6PrefixError(#[from] Ipv6PrefixParsingError),
+
+    #[error("Invalid IPv6 Unicast network {network:?} at offset {offset}")]
+    InvalidUnicastNetwork { offset: usize, network: Ipv6Net },
 }
 
-impl<'a> ReadablePdu<'a, LocatedIpv6UnicastParsingError<'a>> for Ipv6Unicast {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv6UnicastParsingError<'a>> {
-        let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
-        Ok((buf, net))
+impl<'a> ParseFrom<'a> for Ipv6Unicast {
+    type Error = Ipv6UnicastParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let net = <Ipv6Net as ParseFrom>::parse(cur)?;
+        let unicast_net = Ipv6Unicast::from_net(net).map_err(|_| {
+            Ipv6UnicastParsingError::InvalidUnicastNetwork {
+                offset,
+                network: net,
+            }
+        })?;
+        Ok(unicast_net)
     }
 }
 
-impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6UnicastParsingError<'a>>
-    for Ipv6Unicast
-{
-    fn from_wire(
-        buf: Span<'a>,
-        prefix_len: u8,
-        prefix_input: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedIpv6UnicastParsingError<'a>> {
-        let (buf, net) = nom::combinator::map_res(
-            |span| parse_into_located_two_inputs(span, prefix_len, prefix_input),
-            Self::from_net,
-        )(buf)?;
-        Ok((buf, net))
+impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv6Unicast {
+    type Error = Ipv6UnicastParsingError;
+    fn parse(cur: &mut BytesReader, prefix_len: u8, offset: usize) -> Result<Self, Self::Error> {
+        let net = <Ipv6Net as ParseFromWithTwoInputs<'a, _, _>>::parse(cur, prefix_len, offset)?;
+        let unicast_net = Ipv6Unicast::from_net(net).map_err(|_| {
+            Ipv6UnicastParsingError::InvalidUnicastNetwork {
+                offset,
+                network: net,
+            }
+        })?;
+        Ok(unicast_net)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv6UnicastAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    Ipv6UnicastError(#[from_located(module = "self")] Ipv6UnicastParsingError),
+    #[error("IPv6 Unicast Address parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("IPv6 Unicast Address error: {0}")]
+    Ipv6UnicastError(#[from] Ipv6UnicastParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6UnicastAddressParsingError<'a>>
-    for Ipv6UnicastAddress
-{
-    fn from_wire(
-        buf: Span<'a>,
-        add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedIpv6UnicastAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+impl<'a> ParseFromWithOneInput<'a, bool> for Ipv6UnicastAddress {
+    type Error = Ipv6UnicastAddressParsingError;
+    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let (buf, net) = parse_into_located(buf)?;
-        Ok((buf, Ipv6UnicastAddress::new(path_id, net)))
+        let net = <Ipv6Unicast as ParseFrom>::parse(cur)?;
+        Ok(Ipv6UnicastAddress::new(path_id, net))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv6MulticastParsingError {
-    Ipv6PrefixError(
-        #[from_external]
-        #[from_located(module = "crate::wire::deserializer")]
-        Ipv6PrefixParsingError,
-    ),
-    InvalidMulticastNetwork(#[from_external] InvalidIpv6MulticastNetwork),
+    #[error("Invalid IPv6 Multicast: {0}")]
+    Ipv6PrefixError(#[from] Ipv6PrefixParsingError),
+    #[error("Invalid IPv6 Multicast network {network} at offset {offset}")]
+    InvalidMulticastNetwork { offset: usize, network: Ipv6Net },
 }
 
-impl<'a> ReadablePdu<'a, LocatedIpv6MulticastParsingError<'a>> for Ipv6Multicast {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv6MulticastParsingError<'a>> {
-        let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
-        Ok((buf, net))
+impl<'a> ParseFrom<'a> for Ipv6Multicast {
+    type Error = Ipv6MulticastParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let network = <Ipv6Net as ParseFrom<'_>>::parse(cur)?;
+        let net = Ipv6Multicast::from_net(network)
+            .map_err(|_| Ipv6MulticastParsingError::InvalidMulticastNetwork { offset, network })?;
+        Ok(net)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv6MulticastAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    Ipv6MulticastError(#[from_located(module = "self")] Ipv6MulticastParsingError),
+    #[error("IPv6 Multicast Address parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("IPv6 Multicast Address error: {0}")]
+    Ipv6MulticastError(#[from] Ipv6MulticastParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6MulticastAddressParsingError<'a>>
-    for Ipv6MulticastAddress
-{
-    fn from_wire(
-        buf: Span<'a>,
-        add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedIpv6MulticastAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+impl<'a> ParseFromWithOneInput<'a, bool> for Ipv6MulticastAddress {
+    type Error = Ipv6MulticastAddressParsingError;
+    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let (buf, net) = parse_into_located(buf)?;
-        Ok((buf, Ipv6MulticastAddress::new(path_id, net)))
+        let net = Ipv6Multicast::parse(cur)?;
+        Ok(Ipv6MulticastAddress::new(path_id, net))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv4UnicastParsingError {
-    Ipv4PrefixError(
-        #[from_external]
-        #[from_located(module = "crate::wire::deserializer")]
-        Ipv4PrefixParsingError,
-    ),
-    InvalidUnicastNetwork(#[from_external] InvalidIpv4UnicastNetwork),
+    #[error("Invalid IPv4 Unicast: {0}")]
+    Ipv4PrefixError(#[from] Ipv4PrefixParsingError),
+
+    #[error("Invalid IPv4 unicast network {network} at offset {offset}")]
+    InvalidUnicastNetwork { offset: usize, network: Ipv4Net },
 }
 
-impl<'a> ReadablePdu<'a, LocatedIpv4UnicastParsingError<'a>> for Ipv4Unicast {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv4UnicastParsingError<'a>> {
-        let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
-        Ok((buf, net))
+impl<'a> ParseFrom<'a> for Ipv4Unicast {
+    type Error = Ipv4UnicastParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let network = <Ipv4Net as ParseFrom>::parse(cur)?;
+        let unicast = Self::from_net(network)
+            .map_err(|_| Ipv4UnicastParsingError::InvalidUnicastNetwork { offset, network })?;
+        Ok(unicast)
     }
 }
 
-impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4UnicastParsingError<'a>>
-    for Ipv4Unicast
-{
-    fn from_wire(
-        buf: Span<'a>,
-        prefix_len: u8,
-        prefix_input: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedIpv4UnicastParsingError<'a>> {
-        let (buf, net) = nom::combinator::map_res(
-            |span| parse_into_located_two_inputs(span, prefix_len, prefix_input),
-            Self::from_net,
-        )(buf)?;
-        Ok((buf, net))
+impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv4Unicast {
+    type Error = Ipv4UnicastParsingError;
+    fn parse(cur: &mut BytesReader, prefix_len: u8, offset: usize) -> Result<Self, Self::Error> {
+        let ipv4_net =
+            <Ipv4Net as ParseFromWithTwoInputs<'_, _, _>>::parse(cur, prefix_len, offset)?;
+        let net = Self::from_net(ipv4_net).map_err(|_| {
+            Ipv4UnicastParsingError::InvalidUnicastNetwork {
+                offset,
+                network: ipv4_net,
+            }
+        })?;
+        Ok(net)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv4UnicastAddressParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    Ipv4UnicastError(#[from_located(module = "self")] Ipv4UnicastParsingError),
+    #[error("IPv4 Unicast Address parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("IPv4 Unicast Address error: {0}")]
+    Ipv4UnicastError(#[from] Ipv4UnicastParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4UnicastAddressParsingError<'a>>
-    for Ipv4UnicastAddress
-{
-    fn from_wire(
-        buf: Span<'a>,
-        add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedIpv4UnicastAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, add_path) = be_u32(buf)?;
-            (buf, Some(add_path))
+impl<'a> ParseFromWithOneInput<'a, bool> for Ipv4UnicastAddress {
+    type Error = Ipv4UnicastAddressParsingError;
+    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let (buf, net) = parse_into_located(buf)?;
-        Ok((buf, Ipv4UnicastAddress::new(path_id, net)))
+        let net = <Ipv4Unicast as ParseFrom<'_>>::parse(cur)?;
+        Ok(Ipv4UnicastAddress::new(path_id, net))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv4MulticastParsingError {
-    Ipv4PrefixError(
-        #[from_external]
-        #[from_located(module = "crate::wire::deserializer")]
-        Ipv4PrefixParsingError,
-    ),
-    InvalidMulticastNetwork(#[from_external] InvalidIpv4MulticastNetwork),
+    #[error("Invalid IPv4 Multicast: {0}")]
+    Ipv4PrefixError(#[from] Ipv4PrefixParsingError),
+
+    #[error("Invalid IPv4 Multicast network {network} at offset {offset}")]
+    InvalidMulticastNetwork { offset: usize, network: Ipv4Net },
 }
 
-impl<'a> ReadablePdu<'a, LocatedIpv4MulticastParsingError<'a>> for Ipv4Multicast {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv4MulticastParsingError<'a>> {
-        let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
-        Ok((buf, net))
+impl<'a> ParseFrom<'a> for Ipv4Multicast {
+    type Error = Ipv4MulticastParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let net = <Ipv4Net as ParseFrom<'_>>::parse(cur)?;
+        let net = Ipv4Multicast::from_net(net).map_err(|_| {
+            Ipv4MulticastParsingError::InvalidMulticastNetwork {
+                offset,
+                network: net,
+            }
+        })?;
+        Ok(net)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv4MulticastAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    Ipv4MulticastError(#[from_located(module = "self")] Ipv4MulticastParsingError),
+    #[error("IPv4 Multicast Address parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("IPv4 Multicast Address error: {0}")]
+    Ipv4MulticastError(#[from] Ipv4MulticastParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4MulticastAddressParsingError<'a>>
-    for Ipv4MulticastAddress
-{
-    fn from_wire(
-        buf: Span<'a>,
-        add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedIpv4MulticastAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+impl<'a> ParseFromWithOneInput<'a, bool> for Ipv4MulticastAddress {
+    type Error = Ipv4MulticastAddressParsingError;
+    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let (buf, net) = parse_into_located(buf)?;
-        Ok((buf, Ipv4MulticastAddress::new(path_id, net)))
+        let multicast = Ipv4Multicast::parse(cur)?;
+        Ok(Ipv4MulticastAddress::new(path_id, multicast))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum MacAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Mac Address parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
-impl<'a> ReadablePdu<'a, LocatedMacAddressParsingError<'a>> for MacAddress {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedMacAddressParsingError<'a>> {
-        let (buf, byte0) = be_u8(buf)?;
-        let (buf, byte1) = be_u8(buf)?;
-        let (buf, byte2) = be_u8(buf)?;
-        let (buf, byte3) = be_u8(buf)?;
-        let (buf, byte4) = be_u8(buf)?;
-        let (buf, byte5) = be_u8(buf)?;
-        Ok((buf, MacAddress([byte0, byte1, byte2, byte3, byte4, byte5])))
+impl<'a> ParseFrom<'a> for MacAddress {
+    type Error = MacAddressParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let mac_address: [u8; 6] = cur.read_array()?;
+        Ok(MacAddress(mac_address))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum EthernetSegmentIdentifierParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Ethernet Segment Identifier parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedEthernetSegmentIdentifierParsingError<'a>>
-    for EthernetSegmentIdentifier
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedEthernetSegmentIdentifierParsingError<'a>> {
-        let (buf, byte0) = be_u8(buf)?;
-        let (buf, byte1) = be_u8(buf)?;
-        let (buf, byte2) = be_u8(buf)?;
-        let (buf, byte3) = be_u8(buf)?;
-        let (buf, byte4) = be_u8(buf)?;
-        let (buf, byte5) = be_u8(buf)?;
-        let (buf, byte6) = be_u8(buf)?;
-        let (buf, byte7) = be_u8(buf)?;
-        let (buf, byte8) = be_u8(buf)?;
-        let (buf, byte9) = be_u8(buf)?;
-        Ok((
-            buf,
-            EthernetSegmentIdentifier([
-                byte0, byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9,
-            ]),
-        ))
+impl<'a> ParseFrom<'a> for EthernetSegmentIdentifier {
+    type Error = EthernetSegmentIdentifierParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let segment = cur.read_array()?;
+        Ok(EthernetSegmentIdentifier(segment))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum EthernetTagParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Ethernet Tag parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedEthernetTagParsingError<'a>> for EthernetTag {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedEthernetTagParsingError<'a>> {
-        let (buf, tag) = be_u32(buf)?;
-        Ok((buf, EthernetTag(tag)))
+impl<'a> ParseFrom<'a> for EthernetTag {
+    type Error = EthernetTagParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let tag = cur.read_u32_be()?;
+        Ok(EthernetTag(tag))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum EthernetAutoDiscoveryParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
-    EthernetSegmentIdentifierError(
-        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
-    ),
-    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
-    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
+    #[error("Ethernet Auto Discovery parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Ethernet Auto Discovery error: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
+    #[error("Ethernet Auto Discovery error: {0}")]
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierParsingError),
+    #[error("Ethernet Auto Discovery error: {0}")]
+    EthernetTagError(#[from] EthernetTagParsingError),
+    #[error("Ethernet Auto Discovery error: {0}")]
+    MplsLabelError(#[from] MplsLabelParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedEthernetAutoDiscoveryParsingError<'a>> for EthernetAutoDiscovery {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedEthernetAutoDiscoveryParsingError<'a>> {
-        let (buf, rd) = parse_into_located(buf)?;
-        let (buf, segment_id) = parse_into_located(buf)?;
-        let (buf, tag) = parse_into_located(buf)?;
-        let (buf, mpls_label) = parse_into_located(buf)?;
-        Ok((
-            buf,
-            EthernetAutoDiscovery::new(rd, segment_id, tag, mpls_label),
-        ))
+impl<'a> ParseFrom<'a> for EthernetAutoDiscovery {
+    type Error = EthernetAutoDiscoveryParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let rd = RouteDistinguisher::parse(cur)?;
+        let segment_id = EthernetSegmentIdentifier::parse(cur)?;
+        let tag = EthernetTag::parse(cur)?;
+        let mpls_label = MplsLabel::parse(cur)?;
+        Ok(EthernetAutoDiscovery::new(rd, segment_id, tag, mpls_label))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum MacIpAdvertisementParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidMacAddressLength(u8),
-    InvalidIpAddressAddressLength(u8),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
-    EthernetSegmentIdentifierError(
-        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
-    ),
-    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
-    MacAddressError(#[from_located(module = "self")] MacAddressParsingError),
-    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
+    #[error("Mac IP Advertisement parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Mac IP Advertisement error invalid address length {length} at offset {offset}")]
+    InvalidMacAddressLength { offset: usize, length: u8 },
+    #[error("Mac IP Advertisement error invalid ip address length {length} at offset {offset}")]
+    InvalidIpAddressAddressLength { offset: usize, length: u8 },
+    #[error("Mac IP Advertisement error: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
+    #[error("Mac IP Advertisement error: {0}")]
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierParsingError),
+    #[error("Mac IP Advertisement error: {0}")]
+    EthernetTagError(#[from] EthernetTagParsingError),
+    #[error("Mac IP Advertisement error: {0}")]
+    MacAddressError(#[from] MacAddressParsingError),
+    #[error("Mac IP Advertisement error: {0}")]
+    MplsLabelError(#[from] MplsLabelParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedMacIpAdvertisementParsingError<'a>> for MacIpAdvertisement {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedMacIpAdvertisementParsingError<'a>> {
-        let (buf, rd) = parse_into_located(buf)?;
-        let (buf, segment_id) = parse_into_located(buf)?;
-        let (buf, tag) = parse_into_located(buf)?;
-        let input = buf;
-        let (buf, mac_len) = be_u8(buf)?;
+impl<'a> ParseFrom<'a> for MacIpAdvertisement {
+    type Error = MacIpAdvertisementParsingError;
+
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let rd = RouteDistinguisher::parse(cur)?;
+        let segment_id = EthernetSegmentIdentifier::parse(cur)?;
+        let tag = EthernetTag::parse(cur)?;
+        let offset = cur.offset();
+        let mac_len = cur.read_u8()?;
         if mac_len != MAC_ADDRESS_LEN_BITS {
-            return Err(nom::Err::Error(LocatedMacIpAdvertisementParsingError::new(
-                input,
-                MacIpAdvertisementParsingError::InvalidMacAddressLength(mac_len),
-            )));
+            return Err(MacIpAdvertisementParsingError::InvalidMacAddressLength {
+                offset,
+                length: mac_len,
+            });
         }
-        let (buf, mac) = parse_into_located(buf)?;
-        let input = buf;
-        let (buf, ip_len) = be_u8(buf)?;
-        let (buf, ip) = match ip_len {
-            0 => (buf, None),
+        let mac = MacAddress::parse(cur)?;
+        let offset = cur.offset();
+        let ip_len = cur.read_u8()?;
+        let ip = match ip_len {
+            0 => None,
             IPV4_LEN_BITS => {
-                let (buf, ip) = be_u32(buf)?;
-                (buf, Some(IpAddr::V4(Ipv4Addr::from(ip))))
+                let ip = cur.read_u32_be()?;
+                Some(IpAddr::V4(Ipv4Addr::from(ip)))
             }
             IPV6_LEN_BITS => {
-                let (buf, ip) = be_u128(buf)?;
-                (buf, Some(IpAddr::V6(Ipv6Addr::from(ip))))
+                let ip = cur.read_u128_be()?;
+                Some(IpAddr::V6(Ipv6Addr::from(ip)))
             }
             _ => {
-                return Err(nom::Err::Error(LocatedMacIpAdvertisementParsingError::new(
-                    input,
-                    MacIpAdvertisementParsingError::InvalidIpAddressAddressLength(ip_len),
-                )));
+                return Err(
+                    MacIpAdvertisementParsingError::InvalidIpAddressAddressLength {
+                        offset,
+                        length: ip_len,
+                    },
+                );
             }
         };
 
-        let (buf, mpls_label) = parse_into_located(buf)?;
-        let (buf, mpls_label2) = if buf.len() > 0 {
-            let (buf, mpls_label2) = parse_into_located(buf)?;
-            (buf, Some(mpls_label2))
+        let mpls_label = MplsLabel::parse(cur)?;
+        let mpls_label2 = if !cur.is_empty() {
+            Some(MplsLabel::parse(cur)?)
         } else {
-            (buf, None)
+            None
         };
-        Ok((
-            buf,
-            MacIpAdvertisement::new(rd, segment_id, tag, mac, ip, mpls_label, mpls_label2),
+        Ok(MacIpAdvertisement::new(
+            rd,
+            segment_id,
+            tag,
+            mac,
+            ip,
+            mpls_label,
+            mpls_label2,
         ))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum InclusiveMulticastEthernetTagRouteParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidIpAddressAddressLength(u8),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
-    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
+    #[error("Inclusive Multicast EthernetTag route parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error(
+        "Invalid address length {length} in Inclusive Multicast EthernetTag route at offset {offset}"
+    )]
+    InvalidIpAddressAddressLength { offset: usize, length: u8 },
+    #[error("Inclusive Multicast EthernetTag route parsing error: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
+    #[error("Inclusive Multicast EthernetTag route parsing error: {0}")]
+    EthernetTagError(#[from] EthernetTagParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedInclusiveMulticastEthernetTagRouteParsingError<'a>>
-    for InclusiveMulticastEthernetTagRoute
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedInclusiveMulticastEthernetTagRouteParsingError<'a>> {
-        let (buf, rd) = parse_into_located(buf)?;
-        let (buf, tag) = parse_into_located(buf)?;
-        let input = buf;
-        let (buf, ip_len) = be_u8(buf)?;
-        let (buf, ip) = match ip_len {
+impl<'a> ParseFrom<'a> for InclusiveMulticastEthernetTagRoute {
+    type Error = InclusiveMulticastEthernetTagRouteParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let rd = RouteDistinguisher::parse(cur)?;
+        let tag = EthernetTag::parse(cur)?;
+        let offset = cur.offset();
+        let ip_len = cur.read_u8()?;
+        let ip = match ip_len {
             IPV4_LEN_BITS => {
-                let (buf, ip) = be_u32(buf)?;
-                (buf, IpAddr::V4(Ipv4Addr::from(ip)))
+                let ip = cur.read_u32_be()?;
+                IpAddr::V4(Ipv4Addr::from(ip))
             }
             IPV6_LEN_BITS => {
-                let (buf, ip) = be_u128(buf)?;
-                (buf, IpAddr::V6(Ipv6Addr::from(ip)))
+                let ip = cur.read_u128_be()?;
+                IpAddr::V6(Ipv6Addr::from(ip))
             }
             _ => {
-                return Err(nom::Err::Error(
-                    LocatedInclusiveMulticastEthernetTagRouteParsingError::new(
-                        input,
-                        InclusiveMulticastEthernetTagRouteParsingError::InvalidIpAddressAddressLength(ip_len),
-                    ),
-                ));
+                return Err(
+                    InclusiveMulticastEthernetTagRouteParsingError::InvalidIpAddressAddressLength {
+                        offset,
+                        length: ip_len,
+                    },
+                );
             }
         };
-        Ok((buf, InclusiveMulticastEthernetTagRoute::new(rd, tag, ip)))
+        Ok(InclusiveMulticastEthernetTagRoute::new(rd, tag, ip))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum EthernetSegmentRouteParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidIpAddressAddressLength(u8),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
-    EthernetSegmentIdentifierError(
-        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
-    ),
+    #[error("Invalid Ethernet Segment route parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Invalid address length {length} in Ethernet Segment route at offset {offset}")]
+    InvalidIpAddressAddressLength { offset: usize, length: u8 },
+    #[error("Invalid Ethernet Segment route parsing error: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
+    #[error("Invalid Ethernet Segment route parsing error: {0}")]
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedEthernetSegmentRouteParsingError<'a>> for EthernetSegmentRoute {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedEthernetSegmentRouteParsingError<'a>> {
-        let (buf, rd) = parse_into_located(buf)?;
-        let (buf, segment_id) = parse_into_located(buf)?;
-        let input = buf;
-        let (buf, ip_len) = be_u8(buf)?;
-        let (buf, ip) = match ip_len {
+impl<'a> ParseFrom<'a> for EthernetSegmentRoute {
+    type Error = EthernetSegmentRouteParsingError;
+
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let rd = RouteDistinguisher::parse(cur)?;
+        let segment_id = EthernetSegmentIdentifier::parse(cur)?;
+        let offset = cur.offset();
+        let ip_len = cur.read_u8()?;
+        let ip = match ip_len {
             IPV4_LEN_BITS => {
-                let (buf, ip) = be_u32(buf)?;
-                (buf, IpAddr::V4(Ipv4Addr::from(ip)))
+                let ip = cur.read_u32_be()?;
+                IpAddr::V4(Ipv4Addr::from(ip))
             }
             IPV6_LEN_BITS => {
-                let (buf, ip) = be_u128(buf)?;
-                (buf, IpAddr::V6(Ipv6Addr::from(ip)))
+                let ip = cur.read_u128_be()?;
+                IpAddr::V6(Ipv6Addr::from(ip))
             }
             _ => {
-                return Err(nom::Err::Error(
-                    LocatedEthernetSegmentRouteParsingError::new(
-                        input,
-                        EthernetSegmentRouteParsingError::InvalidIpAddressAddressLength(ip_len),
-                    ),
-                ));
+                return Err(
+                    EthernetSegmentRouteParsingError::InvalidIpAddressAddressLength {
+                        offset,
+                        length: ip_len,
+                    },
+                );
             }
         };
-        Ok((buf, EthernetSegmentRoute::new(rd, segment_id, ip)))
+        Ok(EthernetSegmentRoute::new(rd, segment_id, ip))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum L2EvpnRouteParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    EthernetAutoDiscoveryError(#[from_located(module = "self")] EthernetAutoDiscoveryParsingError),
-    MacIpAdvertisementError(#[from_located(module = "self")] MacIpAdvertisementParsingError),
-    InclusiveMulticastEthernetTagRouteError(
-        #[from_located(module = "self")] InclusiveMulticastEthernetTagRouteParsingError,
-    ),
-    EthernetSegmentRouteError(#[from_located(module = "self")] EthernetSegmentRouteParsingError),
-    L2EvpnIpPrefixRouteError(#[from_located(module = "self")] L2EvpnIpPrefixRouteParsingError),
+    #[error("Invalid L2 EVPN route parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("L2 EvPN route error: {0}")]
+    EthernetAutoDiscoveryError(#[from] EthernetAutoDiscoveryParsingError),
+    #[error("L2 EvPN route error: {0}")]
+    MacIpAdvertisementError(#[from] MacIpAdvertisementParsingError),
+    #[error("L2 EvPN route error: {0}")]
+    InclusiveMulticastEthernetTagRouteError(#[from] InclusiveMulticastEthernetTagRouteParsingError),
+    #[error("L2 EvPN route error: {0}")]
+    EthernetSegmentRouteError(#[from] EthernetSegmentRouteParsingError),
+    #[error("L2 EvPN route error: {0}")]
+    L2EvpnIpPrefixRouteError(#[from] L2EvpnIpPrefixRouteParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedL2EvpnRouteParsingError<'a>> for L2EvpnRoute {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedL2EvpnRouteParsingError<'a>> {
-        let (buf, typ_code) = be_u8(buf)?;
-        let (buf, len) = be_u8(buf)?;
-        let (buf, route_buf) = nom::bytes::complete::take(len)(buf)?;
+impl<'a> ParseFrom<'a> for L2EvpnRoute {
+    type Error = L2EvpnRouteParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let typ_code = cur.read_u8()?;
+        let len = cur.read_u8()?;
+        let mut route_buf = cur.take_slice(len as usize)?;
         let typ = L2EvpnRouteTypeCode::try_from(typ_code);
-        let (_buf, value) = match typ {
+        let value = match typ {
             Ok(L2EvpnRouteTypeCode::EthernetAutoDiscovery) => {
-                let (buf, value) = parse_into_located(route_buf)?;
-                (buf, L2EvpnRoute::EthernetAutoDiscovery(value))
+                let value = EthernetAutoDiscovery::parse(&mut route_buf)?;
+                L2EvpnRoute::EthernetAutoDiscovery(value)
             }
             Ok(L2EvpnRouteTypeCode::MacIpAdvertisement) => {
-                let (buf, value) = parse_into_located(route_buf)?;
-                (buf, L2EvpnRoute::MacIpAdvertisement(value))
+                let value = MacIpAdvertisement::parse(&mut route_buf)?;
+                L2EvpnRoute::MacIpAdvertisement(value)
             }
             Ok(L2EvpnRouteTypeCode::InclusiveMulticastEthernetTagRoute) => {
-                let (buf, value) = parse_into_located(route_buf)?;
-                (buf, L2EvpnRoute::InclusiveMulticastEthernetTagRoute(value))
+                let value = InclusiveMulticastEthernetTagRoute::parse(&mut route_buf)?;
+                L2EvpnRoute::InclusiveMulticastEthernetTagRoute(value)
             }
             Ok(L2EvpnRouteTypeCode::EthernetSegmentRoute) => {
-                let (buf, value) = parse_into_located(route_buf)?;
-                (buf, L2EvpnRoute::EthernetSegmentRoute(value))
+                let value = EthernetSegmentRoute::parse(&mut route_buf)?;
+                L2EvpnRoute::EthernetSegmentRoute(value)
             }
             Ok(L2EvpnRouteTypeCode::IpPrefix) => {
-                let (buf, value) = parse_into_located(route_buf)?;
-                (buf, L2EvpnRoute::IpPrefixRoute(value))
+                let value = L2EvpnIpPrefixRoute::parse(&mut route_buf)?;
+                L2EvpnRoute::IpPrefixRoute(value)
             }
             Ok(_) | Err(_) => {
-                let (buf, len) = be_u8(buf)?;
-                let (buf, value): (Span<'_>, Span<'_>) = nom::bytes::complete::take(len)(buf)?;
-                (
-                    buf,
-                    L2EvpnRoute::Unknown {
-                        code: typ_code,
-                        value: value.to_vec(),
-                    },
-                )
+                let len = cur.read_u8()?;
+                let value = cur.read_bytes(len as usize)?;
+                L2EvpnRoute::Unknown {
+                    code: typ_code,
+                    value: value.to_vec(),
+                }
             }
         };
-        Ok((buf, value))
+        Ok(value)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum L2EvpnAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    L2EvpnRouteError(#[from_located(module = "self")] L2EvpnRouteParsingError),
+    #[error("Invalid L2 EVPN address")]
+    Parse(#[from] ParseError),
+    #[error("L2 EvPN address error: {0}")]
+    L2EvpnRouteError(#[from] L2EvpnRouteParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedL2EvpnAddressParsingError<'a>> for L2EvpnAddress {
-    fn from_wire(
-        buf: Span<'a>,
-        add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedL2EvpnAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+impl<'a> ParseFromWithOneInput<'a, bool> for L2EvpnAddress {
+    type Error = L2EvpnAddressParsingError;
+    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let (buf, route) = parse_into_located(buf)?;
-        Ok((buf, L2EvpnAddress::new(path_id, route)))
+        let route = L2EvpnRoute::parse(cur)?;
+        Ok(L2EvpnAddress::new(path_id, route))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum L2EvpnIpv4PrefixRouteParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
-    EthernetSegmentIdentifierError(
-        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
-    ),
-    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
-    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
-    Ipv4PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError),
+    #[error("L2 EVPN IPv4 prefix route parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("EVPN IPv4 prefix route error: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
+    #[error("EVPN IPv4 prefix route error: {0}")]
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierParsingError),
+    #[error("EVPN IPv4 prefix route error: {0}")]
+    EthernetTagError(#[from] EthernetTagParsingError),
+    #[error("EVPN IPv4 prefix route error: {0}")]
+    MplsLabelError(#[from] MplsLabelParsingError),
+    #[error("EVPN IPv4 prefix route error: {0}")]
+    Ipv4PrefixError(#[from] Ipv4PrefixParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv4PrefixRouteParsingError<'a>> for L2EvpnIpv4PrefixRoute {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedL2EvpnIpv4PrefixRouteParsingError<'a>> {
-        let (buf, rd) = parse_into_located(buf)?;
-        let (buf, segment_id) = parse_into_located(buf)?;
-        let (buf, tag) = parse_into_located(buf)?;
-        let input = buf;
-        let (buf, prefix_len) = be_u8(buf)?;
-        let (buf, network) = be_u32(buf)?;
+impl<'a> ParseFrom<'a> for L2EvpnIpv4PrefixRoute {
+    type Error = L2EvpnIpv4PrefixRouteParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let rd = RouteDistinguisher::parse(cur)?;
+        let segment_id = EthernetSegmentIdentifier::parse(cur)?;
+        let tag = EthernetTag::parse(cur)?;
+        let offset = cur.offset();
+        let prefix_len = cur.read_u8()?;
+        let network = cur.read_u32_be()?;
         let prefix = match Ipv4Net::new(Ipv4Addr::from(network), prefix_len) {
             Ok(prefix) => prefix,
             Err(_) => {
-                return Err(nom::Err::Error(
-                    LocatedL2EvpnIpv4PrefixRouteParsingError::new(
-                        input,
-                        L2EvpnIpv4PrefixRouteParsingError::Ipv4PrefixError(
-                            Ipv4PrefixParsingError::InvalidIpv4PrefixLen(prefix_len),
-                        ),
-                    ),
+                return Err(L2EvpnIpv4PrefixRouteParsingError::Ipv4PrefixError(
+                    Ipv4PrefixParsingError::InvalidIpv4PrefixLen { offset, prefix_len },
                 ));
             }
         };
-        let (buf, gateway) = be_u32(buf)?;
+        let gateway = cur.read_u32_be()?;
         let gateway = Ipv4Addr::from(gateway);
-        let (buf, mpls_label) = parse_into_located(buf)?;
-        Ok((
-            buf,
-            L2EvpnIpv4PrefixRoute::new(rd, segment_id, tag, prefix, gateway, mpls_label),
+        let mpls_label = MplsLabel::parse(cur)?;
+        Ok(L2EvpnIpv4PrefixRoute::new(
+            rd, segment_id, tag, prefix, gateway, mpls_label,
         ))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum L2EvpnIpv6PrefixRouteParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
-    EthernetSegmentIdentifierError(
-        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
-    ),
-    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
-    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
-    Ipv6PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv6PrefixParsingError),
+    #[error("L2 EVPN IPv6 prefix route parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("EVPN IPv6 prefix route error: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
+    #[error("EVPN IPv6 prefix route error: {0}")]
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierParsingError),
+    #[error("EVPN IPv6 prefix route error: {0}")]
+    EthernetTagError(#[from] EthernetTagParsingError),
+    #[error("EVPN IPv6 prefix route error: {0}")]
+    MplsLabelError(#[from] MplsLabelParsingError),
+    #[error("EVPN IPv6 prefix route error: {0}")]
+    Ipv6PrefixError(#[from] Ipv6PrefixParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv6PrefixRouteParsingError<'a>> for L2EvpnIpv6PrefixRoute {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedL2EvpnIpv6PrefixRouteParsingError<'a>> {
-        let (buf, rd) = parse_into_located(buf)?;
-        let (buf, segment_id) = parse_into_located(buf)?;
-        let (buf, tag) = parse_into_located(buf)?;
-        let input = buf;
-        let (buf, prefix_len) = be_u8(buf)?;
-        let (buf, network) = be_u128(buf)?;
+impl<'a> ParseFrom<'a> for L2EvpnIpv6PrefixRoute {
+    type Error = L2EvpnIpv6PrefixRouteParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let rd = RouteDistinguisher::parse(cur)?;
+        let segment_id = EthernetSegmentIdentifier::parse(cur)?;
+        let tag = EthernetTag::parse(cur)?;
+        let offset = cur.offset();
+        let prefix_len = cur.read_u8()?;
+        let network = cur.read_u128_be()?;
         let prefix = match Ipv6Net::new(Ipv6Addr::from(network), prefix_len) {
             Ok(prefix) => prefix,
             Err(_) => {
-                return Err(nom::Err::Error(
-                    LocatedL2EvpnIpv6PrefixRouteParsingError::new(
-                        input,
-                        L2EvpnIpv6PrefixRouteParsingError::Ipv6PrefixError(
-                            Ipv6PrefixParsingError::InvalidIpv6PrefixLen(prefix_len),
-                        ),
-                    ),
+                return Err(L2EvpnIpv6PrefixRouteParsingError::Ipv6PrefixError(
+                    Ipv6PrefixParsingError::InvalidIpv6PrefixLen { offset, prefix_len },
                 ));
             }
         };
-        let (buf, gateway) = be_u128(buf)?;
+        let gateway = cur.read_u128_be()?;
         let gateway = Ipv6Addr::from(gateway);
-        let (buf, mpls_label) = parse_into_located(buf)?;
-        Ok((
-            buf,
-            L2EvpnIpv6PrefixRoute::new(rd, segment_id, tag, prefix, gateway, mpls_label),
+        let mpls_label = MplsLabel::parse(cur)?;
+        Ok(L2EvpnIpv6PrefixRoute::new(
+            rd, segment_id, tag, prefix, gateway, mpls_label,
         ))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum L2EvpnIpPrefixRouteParsingError {
-    InvalidBufferLength(usize),
-    L2EvpnIpv4PrefixRouteError(#[from_located(module = "self")] L2EvpnIpv4PrefixRouteParsingError),
-    L2EvpnIpv6PrefixRouteError(#[from_located(module = "self")] L2EvpnIpv6PrefixRouteParsingError),
+    #[error("L2 EVPN IP Prefix Route invalid buffer length {length} at offset {offset}")]
+    InvalidBufferLength { offset: usize, length: usize },
+    #[error("Invalid L2 EVPN IP Prefix Route {0}")]
+    L2EvpnIpv4PrefixRouteError(#[from] L2EvpnIpv4PrefixRouteParsingError),
+    #[error("Invalid L2 EVPN IP Prefix Route {0}")]
+    L2EvpnIpv6PrefixRouteError(#[from] L2EvpnIpv6PrefixRouteParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedL2EvpnIpPrefixRouteParsingError<'a>> for L2EvpnIpPrefixRoute {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedL2EvpnIpPrefixRouteParsingError<'a>> {
-        match buf.len() {
+impl<'a> ParseFrom<'a> for L2EvpnIpPrefixRoute {
+    type Error = L2EvpnIpPrefixRouteParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        match cur.remaining() {
             L2_EVPN_IPV4_PREFIX_ROUTE_LEN => {
-                let (buf, value) = parse_into_located(buf)?;
-                Ok((buf, L2EvpnIpPrefixRoute::V4(value)))
+                let value = L2EvpnIpv4PrefixRoute::parse(cur)?;
+                Ok(L2EvpnIpPrefixRoute::V4(value))
             }
             L2_EVPN_IPV6_PREFIX_ROUTE_LEN => {
-                let (buf, value) = parse_into_located(buf)?;
-                Ok((buf, L2EvpnIpPrefixRoute::V6(value)))
+                let value = L2EvpnIpv6PrefixRoute::parse(cur)?;
+                Ok(L2EvpnIpPrefixRoute::V6(value))
             }
-            _ => Err(nom::Err::Error(
-                LocatedL2EvpnIpPrefixRouteParsingError::new(
-                    buf,
-                    L2EvpnIpPrefixRouteParsingError::InvalidBufferLength(buf.len()),
-                ),
-            )),
+            _ => Err(L2EvpnIpPrefixRouteParsingError::InvalidBufferLength {
+                offset,
+                length: cur.remaining(),
+            }),
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum RouteTargetMembershipAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidPrefixLen(u8),
-    LocatedRouteTargetMembershipParsingError(
-        #[from_located(module = "self")] RouteTargetMembershipParsingError,
-    ),
+    #[error("Route Target membership address parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Invalid route target membership prefix length {length} at offset {offset}")]
+    InvalidPrefixLen { offset: usize, length: u8 },
+    #[error("Invalid Route Target membership address: {0}")]
+    RouteTargetMembershipParsingError(#[from] RouteTargetMembershipParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedRouteTargetMembershipAddressParsingError<'a>>
-    for RouteTargetMembershipAddress
-{
-    fn from_wire(
-        buf: Span<'a>,
-        add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedRouteTargetMembershipAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+impl<'a> ParseFromWithOneInput<'a, bool> for RouteTargetMembershipAddress {
+    type Error = RouteTargetMembershipAddressParsingError;
+    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let input = buf;
-        let (buf, prefix_len) = be_u8(buf)?;
-        let (buf, membership) = if prefix_len == 0 {
-            (buf, None)
+        let offset = cur.offset();
+        let prefix_len = cur.read_u8()?;
+        let membership = if prefix_len == 0 {
+            None
         } else if !(32..=96).contains(&prefix_len) {
-            return Err(nom::Err::Error(
-                LocatedRouteTargetMembershipAddressParsingError::new(
-                    input,
-                    RouteTargetMembershipAddressParsingError::InvalidPrefixLen(prefix_len),
-                ),
-            ));
+            return Err(RouteTargetMembershipAddressParsingError::InvalidPrefixLen {
+                offset,
+                length: prefix_len,
+            });
         } else {
-            let (buf, membership) = parse_into_located_one_input(buf, prefix_len)?;
-            (buf, Some(membership))
+            let membership = RouteTargetMembership::parse(cur, prefix_len)?;
+            Some(membership)
         };
-        Ok((buf, RouteTargetMembershipAddress::new(path_id, membership)))
+        Ok(RouteTargetMembershipAddress::new(path_id, membership))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum RouteTargetMembershipParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Route Target membership address parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, u8, LocatedRouteTargetMembershipParsingError<'a>>
-    for RouteTargetMembership
-{
-    fn from_wire(
-        buf: Span<'a>,
-        prefix_len: u8,
-    ) -> IResult<Span<'a>, Self, LocatedRouteTargetMembershipParsingError<'a>> {
-        let (buf, origin_as) = be_u32(buf)?;
-        let (buf, route_target) = nom::multi::count(be_u8, ((prefix_len - 32) / 8) as usize)(buf)?;
-        Ok((buf, RouteTargetMembership::new(origin_as, route_target)))
+impl<'a> ParseFromWithOneInput<'a, u8> for RouteTargetMembership {
+    type Error = RouteTargetMembershipParsingError;
+    fn parse(cur: &mut BytesReader, prefix_len: u8) -> Result<Self, Self::Error> {
+        let origin_as = cur.read_u32_be()?;
+        let route_target = cur.read_bytes(((prefix_len - 32) / 8) as usize)?;
+        Ok(RouteTargetMembership::new(origin_as, route_target.to_vec()))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv4NlriMplsLabelsAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
-    Ipv4PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError),
-    InvalidIpv4NlriMplsLabelsAddress(InvalidIpv4NlriMplsLabelsAddress),
-    InvalidPrefixLength(u8),
+    #[error("IPv4 NLRI MPLS Labels Address parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("IPv4 NLRI MPLS Labels Address error: {0}")]
+    MplsLabelError(#[from] MplsLabelParsingError),
+    #[error("IPv4 NLRI MPLS Labels Address error: {0}")]
+    Ipv4PrefixError(#[from] Ipv4PrefixParsingError),
+    #[error("Invalid IPv4 NLRI MPLS Labels Address {error} at offset {offset}")]
+    InvalidIpv4NlriMplsLabelsAddress {
+        offset: usize,
+        error: InvalidIpv4NlriMplsLabelsAddress,
+    },
+    #[error("Invalid IPv4 NLRI MPLS Labels Address length {len} at offset {offset}")]
+    InvalidLength { offset: usize, len: u8 },
 }
 
-impl<'a>
-    ReadablePduWithThreeInputs<'a, bool, bool, u8, LocatedIpv4NlriMplsLabelsAddressParsingError<'a>>
-    for Ipv4NlriMplsLabelsAddress
-{
-    fn from_wire(
-        buf: Span<'a>,
+impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv4NlriMplsLabelsAddress {
+    type Error = Ipv4NlriMplsLabelsAddressParsingError;
+    fn parse(
+        cur: &mut BytesReader,
         add_path: bool,
         is_unreach: bool,
         multiple_labels_limit: u8,
-    ) -> IResult<Span<'a>, Self, LocatedIpv4NlriMplsLabelsAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+    ) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let input = buf;
-        let (buf, mut prefix_len) = be_u8(buf)?;
+        let offset = cur.offset();
+        let mut prefix_len = cur.read_u8()?;
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
             u8::MAX
         } else {
             prefix_len.div_ceil(8)
         };
-        let (buf, nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
-        let (nlri_buf, label_stack) =
-            parse_mpls_label_stack(nlri_buf, is_unreach, multiple_labels_limit).map_err(|err| {
-                match err {
-                    nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
-                    nom::Err::Error(error) => nom::Err::Error(error.into()),
-                    nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
-                }
-            })?;
+        let mut nlri_buf = cur.take_slice(prefix_bytes as usize)?;
+        let label_stack = parse_mpls_label_stack(&mut nlri_buf, is_unreach, multiple_labels_limit)?;
         if prefix_len < MPLS_LABEL_LEN_BITS * label_stack.len() as u8 {
-            return Err(nom::Err::Error(
-                LocatedIpv4NlriMplsLabelsAddressParsingError::new(
-                    input,
-                    Ipv4NlriMplsLabelsAddressParsingError::InvalidPrefixLength(prefix_len),
-                ),
-            ));
+            return Err(Ipv4NlriMplsLabelsAddressParsingError::InvalidLength {
+                offset,
+                len: prefix_len,
+            });
         }
         prefix_len -= MPLS_LABEL_LEN_BITS * label_stack.len() as u8;
-        let (_buf, prefix) = parse_into_located_two_inputs(nlri_buf, prefix_len, input)?;
+        let offset = cur.offset();
+        let prefix = <Ipv4Net as ParseFromWithTwoInputs<'_, _, _>>::parse(
+            &mut nlri_buf,
+            prefix_len,
+            offset,
+        )?;
         match Ipv4NlriMplsLabelsAddress::from(path_id, label_stack, prefix) {
-            Ok(address) => Ok((buf, address)),
-            Err(err) => Err(nom::Err::Error(
-                LocatedIpv4NlriMplsLabelsAddressParsingError::new(
-                    input,
-                    Ipv4NlriMplsLabelsAddressParsingError::InvalidIpv4NlriMplsLabelsAddress(err),
-                ),
-            )),
+            Ok(address) => Ok(address),
+            Err(error) => Err(
+                Ipv4NlriMplsLabelsAddressParsingError::InvalidIpv4NlriMplsLabelsAddress {
+                    offset,
+                    error,
+                },
+            ),
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum Ipv6NlriMplsLabelsAddressParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
-    Ipv6PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv6PrefixParsingError),
-    InvalidIpv6NlriMplsLabelsAddress(InvalidIpv6NlriMplsLabelsAddress),
-    InvalidPrefixLength(u8),
+    #[error("IPv6 NLRI MPLS Labels Address parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("IPv6 NLRI MPLS Labels Address error: {0}")]
+    MplsLabelError(#[from] MplsLabelParsingError),
+    #[error("IPv6 NLRI MPLS Labels Address error: {0}")]
+    Ipv6PrefixError(#[from] Ipv6PrefixParsingError),
+    #[error("IPv6 NLRI MPLS Labels Address error {error} at offset {offset}")]
+    InvalidIpv6NlriMplsLabelsAddress {
+        offset: usize,
+        error: InvalidIpv6NlriMplsLabelsAddress,
+    },
+    #[error("IPv6 NLRI MPLS Labels Address length {len} at offset {offset}")]
+    InvalidLength { offset: usize, len: u8 },
 }
 
-impl<'a>
-    ReadablePduWithThreeInputs<'a, bool, bool, u8, LocatedIpv6NlriMplsLabelsAddressParsingError<'a>>
-    for Ipv6NlriMplsLabelsAddress
-{
-    fn from_wire(
-        buf: Span<'a>,
+impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv6NlriMplsLabelsAddress {
+    type Error = Ipv6NlriMplsLabelsAddressParsingError;
+
+    fn parse(
+        cur: &mut BytesReader,
         add_path: bool,
         is_unreach: bool,
         multiple_labels_limit: u8,
-    ) -> IResult<Span<'a>, Self, LocatedIpv6NlriMplsLabelsAddressParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+    ) -> Result<Self, Self::Error> {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let input = buf;
-        let (buf, mut prefix_len) = be_u8(buf)?;
+        let offset = cur.offset();
+        let mut prefix_len = cur.read_u8()?;
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
             u8::MAX
         } else {
             prefix_len.div_ceil(8)
         };
-        let (buf, nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
-        let (nlri_buf, label_stack) =
-            parse_mpls_label_stack(nlri_buf, is_unreach, multiple_labels_limit).map_err(|err| {
-                match err {
-                    nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
-                    nom::Err::Error(error) => nom::Err::Error(error.into()),
-                    nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
-                }
-            })?;
+        let mut nlri_buf = cur.take_slice(prefix_bytes as usize)?;
+        let label_stack = parse_mpls_label_stack(&mut nlri_buf, is_unreach, multiple_labels_limit)?;
         if prefix_len < MPLS_LABEL_LEN_BITS * label_stack.len() as u8 {
-            return Err(nom::Err::Error(
-                LocatedIpv6NlriMplsLabelsAddressParsingError::new(
-                    input,
-                    Ipv6NlriMplsLabelsAddressParsingError::InvalidPrefixLength(prefix_len),
-                ),
-            ));
+            return Err(Ipv6NlriMplsLabelsAddressParsingError::InvalidLength {
+                offset,
+                len: prefix_len,
+            });
         }
         prefix_len -= MPLS_LABEL_LEN_BITS * label_stack.len() as u8;
-        let (_buf, prefix) = parse_into_located_two_inputs(nlri_buf, prefix_len, input)?;
+        let prefix = <Ipv6Net as ParseFromWithTwoInputs<'_, _, _>>::parse(
+            &mut nlri_buf,
+            prefix_len,
+            offset,
+        )?;
         match Ipv6NlriMplsLabelsAddress::from(path_id, label_stack, prefix) {
-            Ok(address) => Ok((buf, address)),
-            Err(err) => Err(nom::Err::Error(
-                LocatedIpv6NlriMplsLabelsAddressParsingError::new(
-                    input,
-                    Ipv6NlriMplsLabelsAddressParsingError::InvalidIpv6NlriMplsLabelsAddress(err),
-                ),
-            )),
+            Ok(address) => Ok(address),
+            Err(error) => Err(
+                Ipv6NlriMplsLabelsAddressParsingError::InvalidIpv6NlriMplsLabelsAddress {
+                    offset,
+                    error,
+                },
+            ),
         }
     }
 }
 
 #[inline]
 fn parse_mpls_label_stack(
-    buf: Span<'_>,
+    cur: &mut BytesReader,
     is_unreach: bool,
     mut multiple_labels_limit: u8,
-) -> IResult<Span<'_>, Vec<MplsLabel>, LocatedMplsLabelParsingError<'_>> {
-    let mut buf = buf;
+) -> Result<Vec<MplsLabel>, MplsLabelParsingError> {
     let mut label_stack = Vec::<MplsLabel>::new();
     let mut is_bottom = false;
     while !is_bottom && multiple_labels_limit > 0 {
-        let (t, label): (Span<'_>, MplsLabel) = parse_into_located(buf)?;
-        buf = t;
+        let label = MplsLabel::parse(cur)?;
         if multiple_labels_limit != u8::MAX {
             multiple_labels_limit -= 1;
         }
         is_bottom = label.is_bottom() || is_unreach && label.is_unreach_compatibility();
         label_stack.push(label);
     }
-    Ok((buf, label_stack))
+    Ok(label_stack)
 }

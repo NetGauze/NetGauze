@@ -48,11 +48,14 @@ pub trait PathAttributeValueProperties {
     fn can_be_partial() -> Option<bool>;
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, thiserror::Error, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InvalidPathAttribute {
+    #[error("Invalid optional flag value {0}")]
     InvalidOptionalFlagValue(bool),
+    #[error("Invalid transitive flag value {0}")]
     InvalidTransitiveFlagValue(bool),
+    #[error("Invalid partial flag value {0}")]
     InvalidPartialFlagValue(bool),
 }
 
@@ -743,6 +746,15 @@ impl PathAttributeValueProperties for Aggregator {
 pub enum PathAttributeLength {
     U8(u8),
     U16(u16),
+}
+
+impl std::fmt::Display for PathAttributeLength {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::U8(v) => write!(f, "PathAttributeLength({v})"),
+            Self::U16(v) => write!(f, "PathAttributeLength({v})"),
+        }
+    }
 }
 
 impl From<PathAttributeLength> for u16 {

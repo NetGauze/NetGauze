@@ -17,10 +17,10 @@ use crate::nlri::*;
 use crate::wire::deserializer::nlri::*;
 use crate::wire::serializer::nlri::*;
 use ipnet::{Ipv4Net, Ipv6Net};
-use netgauze_parse_utils::Span;
 use netgauze_parse_utils::test_helpers::{
-    test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input,
-    test_parsed_completely_with_three_inputs, test_write,
+    test_parse_error_bytes_reader, test_parsed_completely_bytes_reader,
+    test_parsed_completely_with_one_input_bytes_reader,
+    test_parsed_completely_with_three_inputs_bytes_reader, test_write,
 };
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
@@ -33,13 +33,13 @@ fn test_ipv6_unicast() -> Result<(), Ipv6UnicastWritingError> {
     let unicast_net = Ipv6Net::from_str("2001:db8:2::/64").unwrap();
     let multicast_net = Ipv6Net::from_str("ff00:db8:2::/64").unwrap();
     let good = Ipv6Unicast::from_net(unicast_net).unwrap();
-    let bad_multicast = LocatedIpv6UnicastParsingError::new(
-        Span::new(&bad_multicast_wire),
-        Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(multicast_net)),
-    );
+    let bad_multicast = Ipv6UnicastParsingError::InvalidUnicastNetwork {
+        offset: 0,
+        network: multicast_net,
+    };
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<Ipv6Unicast, LocatedIpv6UnicastParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<Ipv6Unicast, Ipv6UnicastParsingError>(
         &bad_multicast_wire,
         &bad_multicast,
     );
@@ -55,15 +55,13 @@ fn test_ipv6_multicast() -> Result<(), Ipv6MulticastWritingError> {
     let unicast_net = Ipv6Net::from_str("2001:db8:2::/64").unwrap();
     let multicast_net = Ipv6Net::from_str("ff00:db8:2::/64").unwrap();
     let good = Ipv6Multicast::from_net(multicast_net).unwrap();
-    let bad_unicast = LocatedIpv6MulticastParsingError::new(
-        Span::new(&bad_unicast_wire),
-        Ipv6MulticastParsingError::InvalidMulticastNetwork(InvalidIpv6MulticastNetwork(
-            unicast_net,
-        )),
-    );
+    let bad_unicast = Ipv6MulticastParsingError::InvalidMulticastNetwork {
+        offset: 0,
+        network: unicast_net,
+    };
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<Ipv6Multicast, LocatedIpv6MulticastParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<Ipv6Multicast, Ipv6MulticastParsingError>(
         &bad_unicast_wire,
         &bad_unicast,
     );
@@ -79,13 +77,13 @@ fn test_ipv4_unicast() -> Result<(), Ipv4UnicastWritingError> {
     let unicast_net = Ipv4Net::from_str("192.168.56.0/24").unwrap();
     let multi_net = Ipv4Net::from_str("224.0.0.0/24").unwrap();
     let good = Ipv4Unicast::from_net(unicast_net).unwrap();
-    let bad_multicast = LocatedIpv4UnicastParsingError::new(
-        Span::new(&bad_multicast_wire),
-        Ipv4UnicastParsingError::InvalidUnicastNetwork(InvalidIpv4UnicastNetwork(multi_net)),
-    );
+    let bad_multicast = Ipv4UnicastParsingError::InvalidUnicastNetwork {
+        offset: 0,
+        network: multi_net,
+    };
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<Ipv4Unicast, LocatedIpv4UnicastParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<Ipv4Unicast, Ipv4UnicastParsingError>(
         &bad_multicast_wire,
         &bad_multicast,
     );
@@ -101,15 +99,13 @@ fn test_ipv4_multicast() -> Result<(), Ipv4MulticastWritingError> {
     let unicast_net = Ipv4Net::from_str("192.168.56.0/24").unwrap();
     let multicast_net = Ipv4Net::from_str("224.0.0.0/24").unwrap();
     let good = Ipv4Multicast::from_net(multicast_net).unwrap();
-    let bad_unicast = LocatedIpv4MulticastParsingError::new(
-        Span::new(&bad_unicast_wire),
-        Ipv4MulticastParsingError::InvalidMulticastNetwork(InvalidIpv4MulticastNetwork(
-            unicast_net,
-        )),
-    );
+    let bad_unicast = Ipv4MulticastParsingError::InvalidMulticastNetwork {
+        offset: 0,
+        network: unicast_net,
+    };
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<Ipv4Multicast, LocatedIpv4MulticastParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<Ipv4Multicast, Ipv4MulticastParsingError>(
         &bad_unicast_wire,
         &bad_unicast,
     );
@@ -136,10 +132,10 @@ fn test_route_distinguisher() -> Result<(), RouteDistinguisherWritingError> {
         number: 0xffff,
     };
     let good_leaf = RouteDistinguisher::LeafAdRoutes;
-    test_parsed_completely(&good_asn2_wire, &good_asn2);
-    test_parsed_completely(&good_ipv4_wire, &good_ipv4);
-    test_parsed_completely(&good_asn4_wire, &good_asn4);
-    test_parsed_completely(&good_leaf_wire, &good_leaf);
+    test_parsed_completely_bytes_reader(&good_asn2_wire, &good_asn2);
+    test_parsed_completely_bytes_reader(&good_ipv4_wire, &good_ipv4);
+    test_parsed_completely_bytes_reader(&good_asn4_wire, &good_asn4);
+    test_parsed_completely_bytes_reader(&good_leaf_wire, &good_leaf);
 
     test_write(&good_leaf, &good_leaf_wire)?;
 
@@ -162,7 +158,7 @@ fn test_labeled_ipv6_next_hop() -> Result<(), LabeledNextHopWritingError> {
         Ipv6Addr::from_str("fc00::1").unwrap(),
         None,
     ));
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -178,7 +174,7 @@ fn test_ipv4_mpls_vpn_unicast() -> Result<(), Ipv4MplsVpnUnicastAddressWritingEr
         vec![MplsLabel::new([0x00, 0x41, 0x01])],
         Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
     );
-    test_parsed_completely_with_three_inputs(&good_wire, false, false, 1, &good);
+    test_parsed_completely_with_three_inputs_bytes_reader(&good_wire, false, false, 1, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -196,7 +192,7 @@ fn test_ipv4_mpls_vpn_unicast_add_path() -> Result<(), Ipv4MplsVpnUnicastAddress
         vec![MplsLabel::new([0x00, 0x41, 0x01])],
         Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
     );
-    test_parsed_completely_with_three_inputs(&good_wire, true, false, 1, &good);
+    test_parsed_completely_with_three_inputs_bytes_reader(&good_wire, true, false, 1, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -216,7 +212,7 @@ fn test_ipv6_mpls_vpn_unicast() -> Result<(), Ipv6MplsVpnUnicastAddressWritingEr
         vec![MplsLabel::new([0xe0, 0x08, 0x01])],
         Ipv6Unicast::from_net(Ipv6Net::from_str("fd00:2::4/126").unwrap()).unwrap(),
     );
-    test_parsed_completely_with_three_inputs(&good_wire, false, false, 1, &good);
+    test_parsed_completely_with_three_inputs_bytes_reader(&good_wire, false, false, 1, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -238,7 +234,7 @@ fn test_ipv6_mpls_vpn_unicast_add_path() -> Result<(), Ipv6MplsVpnUnicastAddress
         vec![MplsLabel::new([0x00, 0x00, 0x31])],
         Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8::28/128").unwrap()).unwrap(),
     );
-    test_parsed_completely_with_three_inputs(&good_wire, true, false, 1, &good);
+    test_parsed_completely_with_three_inputs_bytes_reader(&good_wire, true, false, 1, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -248,7 +244,7 @@ fn test_mac_address() -> Result<(), MacAddressWritingError> {
     let good_wire = [0x00, 0x0c, 0x29, 0xde, 0xe3, 0x64];
 
     let good = MacAddress([0x00, 0x0c, 0x29, 0xde, 0xe3, 0x64]);
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -258,7 +254,7 @@ fn test_ethernet_tag() -> Result<(), EthernetTagWritingError> {
     let good_wire = [0x01, 0x02, 0x03, 0x04];
 
     let good = EthernetTag(16909060);
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -269,7 +265,7 @@ fn test_ethernet_segment_id() -> Result<(), EthernetSegmentIdentifierWritingErro
 
     let good =
         EthernetSegmentIdentifier([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a]);
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -290,7 +286,7 @@ fn test_ethernet_auto_discovery() -> Result<(), EthernetAutoDiscoveryWritingErro
         EthernetTag(0),
         MplsLabel::new([0x49, 0x35, 0x01]),
     );
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -315,7 +311,7 @@ fn test_mac_ip_advertisement() -> Result<(), MacIpAdvertisementWritingError> {
         MplsLabel::new([0x49, 0x30, 0x01]),
         None,
     );
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -336,7 +332,7 @@ fn test_inclusive_multicast_ethernet_tag_route()
         EthernetTag(0),
         IpAddr::V4(Ipv4Addr::new(172, 16, 0, 200)),
     );
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -356,7 +352,7 @@ fn test_ethernet_segment_route() -> Result<(), EthernetSegmentRouteWritingError>
         EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x05]),
         IpAddr::V4(Ipv4Addr::new(120, 0, 2, 5)),
     );
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -396,8 +392,8 @@ fn test_l2_evpn_route() -> Result<(), L2EvpnRouteWritingError> {
             Ipv4Addr::from(0),
             MplsLabel::new([0, 0, 100]),
         )));
-    test_parsed_completely(&good_ad_wire, &good_ad);
-    test_parsed_completely(&good_ip_prefix_wire, &good_ip_prefix);
+    test_parsed_completely_bytes_reader(&good_ad_wire, &good_ad);
+    test_parsed_completely_bytes_reader(&good_ip_prefix_wire, &good_ip_prefix);
     test_write(&good_ad, &good_ad_wire)?;
     test_write(&good_ip_prefix, &good_ip_prefix_wire)?;
     Ok(())
@@ -410,7 +406,7 @@ fn test_route_target_membership() -> Result<(), RouteTargetMembershipWritingErro
     ];
     let good =
         RouteTargetMembership::new(64969, vec![0x00, 0x02, 0xfd, 0xc9, 0x00, 0x00, 0x0f, 0xb2]);
-    test_parsed_completely_with_one_input(&good_wire, 96, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, 96, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -438,8 +434,8 @@ fn test_route_target_membership_address() -> Result<(), RouteTargetMembershipAdd
             vec![0x00, 0x02, 0xfd, 0xc9, 0x00, 0x00, 0x0f],
         )),
     );
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_short_wire, false, &good_short);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_short_wire, false, &good_short);
     test_write(&good, &good_wire)?;
     test_write(&good_short, &good_short_wire)?;
     Ok(())
@@ -454,7 +450,7 @@ fn test_ipv4_nlri_mpls_labels_address() -> Result<(), Ipv4NlriMplsLabelsAddressW
         Ipv4Net::from_str("203.0.113.254/31").unwrap(),
     )
     .unwrap();
-    test_parsed_completely_with_three_inputs(&good_wire, false, false, 1, &good);
+    test_parsed_completely_with_three_inputs_bytes_reader(&good_wire, false, false, 1, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }

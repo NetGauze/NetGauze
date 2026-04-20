@@ -26,7 +26,6 @@ pub mod update;
 
 use byteorder::{NetworkEndian, WriteBytesExt};
 use std::io::Write;
-use std::net::IpAddr;
 
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
@@ -34,7 +33,6 @@ use netgauze_serde_macros::WritingError;
 use crate::BgpMessage;
 use crate::nlri::{MultiTopologyId, MultiTopologyIdData};
 use crate::wire::deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH};
-use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
 use crate::wire::serializer::notification::BgpNotificationMessageWritingError;
 use crate::wire::serializer::open::BgpOpenMessageWritingError;
 use crate::wire::serializer::route_refresh::BgpRouteRefreshMessageWritingError;
@@ -109,37 +107,6 @@ impl WritablePdu<BgpMessageWritingError> for BgpMessage {
             Self::RouteRefresh(route_refresh) => {
                 writer.write_u8(self.get_type().into())?;
                 route_refresh.write(writer)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum IpAddrWritingError {
-    StdIOError(#[from_std_io_error] String),
-}
-
-impl WritablePdu<IpAddrWritingError> for IpAddr {
-    const BASE_LENGTH: usize = 0;
-
-    fn len(&self) -> usize {
-        Self::BASE_LENGTH
-            + match self {
-                IpAddr::V4(_) => IPV4_LEN,
-                IpAddr::V6(_) => IPV6_LEN,
-            } as usize
-    }
-
-    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), IpAddrWritingError> {
-        match self {
-            IpAddr::V4(value) => {
-                writer.write_u8(IPV4_LEN)?;
-                writer.write_all(&value.octets())?;
-            }
-            IpAddr::V6(value) => {
-                writer.write_u8(IPV6_LEN)?;
-                writer.write_all(&value.octets())?;
             }
         }
         Ok(())

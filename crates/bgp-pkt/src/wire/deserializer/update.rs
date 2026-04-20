@@ -17,60 +17,65 @@
 
 use crate::BgpUpdateMessage;
 use crate::wire::deserializer::path_attribute::{
-    LocatedPathAttributeParsingError, PathAttributeParsingError,
+    AS2_AGGREGATOR_LEN, AS4_AGGREGATOR_LEN, ATOMIC_AGGREGATE_LEN, AggregatorParsingError,
+    AsPathParsingError, AtomicAggregateParsingError, CommunitiesParsingError,
+    ExtendedCommunitiesIpv6ParsingError, ExtendedCommunitiesParsingError, LOCAL_PREFERENCE_LEN,
+    LocalPreferenceParsingError, MULTI_EXIT_DISCRIMINATOR_LEN, MultiExitDiscriminatorParsingError,
+    NEXT_HOP_LEN, NextHopParsingError, PathAttributeParsingError,
 };
 use ipnet::Ipv4Net;
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{
-    LocatedParsingError, ReadablePduWithOneInput, Span, parse_into_located,
-};
-use nom::IResult;
-use nom::number::complete::{be_u8, be_u16, be_u32};
-use serde::{Deserialize, Serialize};
 
-use crate::nlri::{InvalidIpv4UnicastNetwork, Ipv4Unicast, Ipv4UnicastAddress};
+use crate::nlri::{Ipv4Unicast, Ipv4UnicastAddress};
 use crate::notification::UpdateMessageError;
 use crate::path_attribute::PathAttribute;
+use crate::wire::deserializer::BgpParsingContext;
+use crate::wire::deserializer::community::{
+    CommunityParsingError, ExtendedCommunityIpv6ParsingError, ExtendedCommunityParsingError,
+};
 use crate::wire::deserializer::path_attribute::{
     EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK, OriginParsingError,
 };
-use crate::wire::deserializer::{BgpParsingContext, Ipv4PrefixParsingError};
-use netgauze_parse_utils::ErrorKindSerdeDeref;
-use netgauze_serde_macros::LocatedError;
+use netgauze_parse_utils::common::Ipv4PrefixParsingError;
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
+use serde::{Deserialize, Serialize};
 
 /// BGP Open Message Parsing errors
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpUpdateMessageParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] nom::error::ErrorKind),
-    PathAttributeError(
-        #[from_located(module = "crate::wire::deserializer::path_attribute")]
-        PathAttributeParsingError,
-    ),
-    Ipv4PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError),
-    InvalidIpv4UnicastNetwork(InvalidIpv4UnicastNetwork),
+    #[error("BGP update message Parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("BGP update message error: {0}")]
+    PathAttributeError(#[from] PathAttributeParsingError),
+
+    #[error("BGP update message error: {0}")]
+    Ipv4PrefixError(#[from] Ipv4PrefixParsingError),
+
+    #[error(
+        "BGP update message invalid IPv4 unicast network in NLRI at offset {offset}: {network}"
+    )]
+    InvalidIpv4UnicastNetwork { offset: usize, network: Ipv4Net },
 }
 
 #[inline]
-fn parse_nlri<'a>(
-    buf: Span<'a>,
+fn parse_nlri(
+    cur: &mut BytesReader,
     add_path: bool,
     is_update: bool,
     ctx: &mut BgpParsingContext,
-) -> IResult<Span<'a>, Vec<Ipv4UnicastAddress>, LocatedBgpUpdateMessageParsingError<'a>> {
-    let mut buf = buf;
+) -> Result<Vec<Ipv4UnicastAddress>, BgpUpdateMessageParsingError> {
     let mut nlri_vec = Vec::new();
-    while !buf.is_empty() {
-        let (tmp, path_id) = if add_path {
-            let (tmp, add_path) = be_u32(buf)?;
-            (tmp, Some(add_path))
+    while !cur.is_empty() {
+        let path_id = if add_path {
+            Some(cur.read_u32_be()?)
         } else {
-            (buf, None)
+            None
         };
-        let buf_begin = tmp;
-        let (tmp, ipv4_net): (Span<'a>, Ipv4Net) = parse_into_located(tmp)?;
+        let offset = cur.offset();
+        let ipv4_net = Ipv4Net::parse(cur)?;
         match Ipv4Unicast::from_net(ipv4_net) {
             Ok(unicast) => {
                 let address = Ipv4UnicastAddress::new(path_id, unicast);
@@ -88,34 +93,33 @@ fn parse_nlri<'a>(
                 } else if is_update && !ctx.fail_on_non_unicast_update_nlri {
                     ctx.parsing_errors.non_unicast_update_nlri.push(ipv4_net);
                 } else {
-                    return Err(nom::Err::Error(LocatedBgpUpdateMessageParsingError::new(
-                        buf_begin,
-                        BgpUpdateMessageParsingError::InvalidIpv4UnicastNetwork(err),
-                    )));
+                    return Err(BgpUpdateMessageParsingError::InvalidIpv4UnicastNetwork {
+                        offset,
+                        network: err.0,
+                    });
                 }
             }
         };
-        buf = tmp;
     }
-    Ok((buf, nlri_vec))
+    Ok(nlri_vec)
 }
 
 #[inline]
 fn advance_attr_buffer(
-    path_attributes_buf: Span<'_>,
-) -> IResult<Span<'_>, Span<'_>, LocatedBgpUpdateMessageParsingError<'_>> {
-    let (buf, attributes) = be_u8(path_attributes_buf)?;
-    let (buf, _code) = be_u8(buf)?;
+    path_attributes_buf: &mut BytesReader,
+) -> Result<BytesReader, BgpUpdateMessageParsingError> {
+    let attributes = path_attributes_buf.read_u8()?;
+    let _code = path_attributes_buf.read_u8()?;
     let extended_length =
         attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
-    let (buf, length) = if extended_length {
-        let (buf, length) = be_u16(buf)?;
-        (buf, length as usize)
+    let buf = if extended_length {
+        let len = path_attributes_buf.read_u16_be()?;
+        path_attributes_buf.take_slice(len as usize)?
     } else {
-        let (buf, length) = be_u8(buf)?;
-        (buf, length as usize)
+        let len = path_attributes_buf.read_u8()?;
+        path_attributes_buf.take_slice(len as usize)?
     };
-    nom::bytes::complete::take(length)(buf)
+    Ok(buf)
 }
 
 /// Length is for value length only (not counting attribute type and extra byte
@@ -123,175 +127,170 @@ fn advance_attr_buffer(
 #[inline]
 fn advance_attr_buffer_fixed(
     length: usize,
-    path_attributes_buf: Span<'_>,
-) -> IResult<Span<'_>, Span<'_>, LocatedBgpUpdateMessageParsingError<'_>> {
-    let (buf, attributes) = be_u8(path_attributes_buf)?;
+    path_attributes_buf: &mut BytesReader,
+) -> Result<BytesReader, BgpUpdateMessageParsingError> {
+    let attributes = path_attributes_buf.read_u8()?;
     let extended_length =
         attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
     if extended_length {
         // extra one for path attribute type
         // extra two for extended length
-        nom::bytes::complete::take(length + 3)(buf)
+        let buf = path_attributes_buf.take_slice(length + 3)?;
+        Ok(buf)
     } else {
         // extra one for path attribute type
         // extra one for length
-        nom::bytes::complete::take(length + 2)(buf)
+        let buf = path_attributes_buf.take_slice(length + 2)?;
+        Ok(buf)
     }
 }
 
-impl<'a>
-    ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpUpdateMessageParsingError<'a>>
-    for BgpUpdateMessage
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BgpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedBgpUpdateMessageParsingError<'a>> {
+impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpUpdateMessage {
+    type Error = BgpUpdateMessageParsingError;
+    fn parse(cur: &mut BytesReader, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
         let add_path = ctx
             .add_path
             .get(&AddressType::Ipv4Unicast)
             .is_some_and(|x| *x);
-        let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (_, withdrawn_routes) = parse_nlri(withdrawn_buf, add_path, false, ctx)?;
-        let (buf, mut path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
+        let len = cur.read_u16_be()?;
+        let mut withdrawn_buf = cur.take_slice(len as usize)?;
+        let withdrawn_routes = parse_nlri(&mut withdrawn_buf, add_path, false, ctx)?;
+        let len = cur.read_u16_be()?;
+        let mut path_attributes_buf = cur.take_slice(len as usize)?;
         let mut path_attributes = Vec::new();
         while !path_attributes_buf.is_empty() {
-            match PathAttribute::from_wire(path_attributes_buf, &mut *ctx) {
-                Ok((tmp, element)) => {
+            match PathAttribute::parse(&mut path_attributes_buf, &mut *ctx) {
+                Ok(element) => {
                     path_attributes.push(element);
-                    path_attributes_buf = tmp;
                 }
-                Err(nom_err) => match nom_err {
-                    nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed))?,
-                    nom::Err::Error(located_path_attr_error) => {
-                        if ctx.fail_on_malformed_path_attr {
-                            return Err(nom::Err::Error(located_path_attr_error.into()));
-                        }
-                        let (tmp, _) =
-                            handle_path_error(path_attributes_buf, ctx, &located_path_attr_error)?;
-                        path_attributes_buf = tmp;
-                        ctx.parsing_errors
-                            .path_attr_errors
-                            .push(located_path_attr_error.error().clone());
+                Err(error) => match error {
+                    PathAttributeParsingError::Parse(parse_error) => {
+                        return Err(BgpUpdateMessageParsingError::Parse(parse_error));
                     }
-                    nom::Err::Failure(located_path_attr_error) => {
+                    err => {
                         if ctx.fail_on_malformed_path_attr {
-                            return Err(nom::Err::Error(located_path_attr_error.into()));
+                            return Err(BgpUpdateMessageParsingError::PathAttributeError(err));
+                        } else {
+                            handle_path_error(&mut path_attributes_buf, ctx, &err)?;
+                            ctx.parsing_errors.path_attr_errors.push(err);
                         }
-                        let (tmp, _) =
-                            handle_path_error(path_attributes_buf, ctx, &located_path_attr_error)?;
-                        path_attributes_buf = tmp;
-                        ctx.parsing_errors
-                            .path_attr_errors
-                            .push(located_path_attr_error.error().clone());
                     }
                 },
             };
         }
-        let (buf, nlri_vec) = parse_nlri(buf, add_path, true, ctx)?;
-        Ok((
-            buf,
-            BgpUpdateMessage::new(withdrawn_routes, path_attributes, nlri_vec),
+        let nlri_vec = parse_nlri(cur, add_path, true, ctx)?;
+        Ok(BgpUpdateMessage::new(
+            withdrawn_routes,
+            path_attributes,
+            nlri_vec,
         ))
     }
 }
 
-fn handle_path_error<'a>(
-    path_attributes_buf: Span<'a>,
+fn handle_path_error(
+    path_attributes_buf: &mut BytesReader,
     ctx: &mut BgpParsingContext,
-    located_path_attr_error: &LocatedPathAttributeParsingError<'a>,
-) -> IResult<Span<'a>, (), LocatedBgpUpdateMessageParsingError<'a>> {
-    let buf = match located_path_attr_error.error() {
-        PathAttributeParsingError::NomError(_) => {
-            return Err(nom::Err::Error(located_path_attr_error.clone().into()));
+    path_attr_error: &PathAttributeParsingError,
+) -> Result<BytesReader, BgpUpdateMessageParsingError> {
+    let buf = match path_attr_error {
+        PathAttributeParsingError::Parse(error)
+        | PathAttributeParsingError::OriginError(OriginParsingError::Parse(error))
+        | PathAttributeParsingError::AsPathError(AsPathParsingError::Parse(error))
+        | PathAttributeParsingError::NextHopError(NextHopParsingError::Parse(error))
+        | PathAttributeParsingError::MultiExitDiscriminatorError(
+            MultiExitDiscriminatorParsingError::Parse(error),
+        )
+        | PathAttributeParsingError::LocalPreferenceError(LocalPreferenceParsingError::Parse(
+            error,
+        ))
+        | PathAttributeParsingError::AtomicAggregateError(AtomicAggregateParsingError::Parse(
+            error,
+        ))
+        | PathAttributeParsingError::AggregatorError(AggregatorParsingError::Parse(error))
+        | PathAttributeParsingError::CommunitiesError(CommunitiesParsingError::Parse(error))
+        | PathAttributeParsingError::CommunitiesError(CommunitiesParsingError::CommunityError(
+            CommunityParsingError::Parse(error),
+        ))
+        | PathAttributeParsingError::ExtendedCommunitiesError(
+            ExtendedCommunitiesParsingError::Parse(error),
+        )
+        | PathAttributeParsingError::ExtendedCommunitiesError(
+            ExtendedCommunitiesParsingError::ExtendedCommunityError(
+                ExtendedCommunityParsingError::Parse(error),
+            ),
+        )
+        | PathAttributeParsingError::ExtendedCommunitiesErrorIpv6(
+            ExtendedCommunitiesIpv6ParsingError::Parse(error),
+        )
+        | PathAttributeParsingError::ExtendedCommunitiesErrorIpv6(
+            ExtendedCommunitiesIpv6ParsingError::ExtendedCommunityIpv6Error(
+                ExtendedCommunityIpv6ParsingError::Parse(error),
+            ),
+        ) => {
+            return Err(BgpUpdateMessageParsingError::Parse(error.clone()));
         }
-        PathAttributeParsingError::OriginError(_) => {
-            let (buf, _) = advance_attr_buffer_fixed(1usize, path_attributes_buf)?;
-            buf
+        PathAttributeParsingError::OriginError(_) => path_attributes_buf.take_slice(0)?,
+        PathAttributeParsingError::AsPathError(_) => path_attributes_buf.take_slice(0)?,
+        PathAttributeParsingError::NextHopError(NextHopParsingError::InvalidNextHopLength {
+            ..
+        }) => path_attributes_buf.take_slice(NEXT_HOP_LEN as usize)?,
+        PathAttributeParsingError::MultiExitDiscriminatorError(
+            MultiExitDiscriminatorParsingError::InvalidLength { .. },
+        ) => path_attributes_buf.take_slice(MULTI_EXIT_DISCRIMINATOR_LEN as usize)?,
+        PathAttributeParsingError::LocalPreferenceError(
+            LocalPreferenceParsingError::InvalidLength { .. },
+        ) => path_attributes_buf.take_slice(LOCAL_PREFERENCE_LEN as usize)?,
+        PathAttributeParsingError::AtomicAggregateError(
+            AtomicAggregateParsingError::InvalidLength { .. },
+        ) => path_attributes_buf.take_slice(ATOMIC_AGGREGATE_LEN as usize)?,
+        PathAttributeParsingError::AggregatorError(AggregatorParsingError::InvalidLength {
+            ..
+        }) => {
+            let size = if ctx.asn4 {
+                AS4_AGGREGATOR_LEN
+            } else {
+                AS2_AGGREGATOR_LEN
+            };
+            path_attributes_buf.take_slice(size as usize)?
         }
-        PathAttributeParsingError::AsPathError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
-        }
-        PathAttributeParsingError::NextHopError(_) => {
-            let (buf, _) = advance_attr_buffer_fixed(4usize, path_attributes_buf)?;
-            buf
-        }
-        PathAttributeParsingError::MultiExitDiscriminatorError(_) => {
-            let (buf, _) = advance_attr_buffer_fixed(4usize, path_attributes_buf)?;
-            buf
-        }
-        PathAttributeParsingError::LocalPreferenceError(_) => {
-            let (buf, _) = advance_attr_buffer_fixed(4usize, path_attributes_buf)?;
-            buf
-        }
-        PathAttributeParsingError::AtomicAggregateError(_) => {
-            let (buf, _) = advance_attr_buffer_fixed(0usize, path_attributes_buf)?;
-            buf
-        }
-        PathAttributeParsingError::AggregatorError(_) => {
-            let size = if ctx.asn4 { 8usize } else { 6usize };
-            let (buf, _) = advance_attr_buffer_fixed(size, path_attributes_buf)?;
-            buf
-        }
-        PathAttributeParsingError::CommunitiesError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
-        }
+        // we cannot skip communities parsing errors
+        // PathAttributeParsingError::CommunitiesError(_) => {
+        // }
         PathAttributeParsingError::ExtendedCommunitiesError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
+            advance_attr_buffer(path_attributes_buf)?
         }
         PathAttributeParsingError::ExtendedCommunitiesErrorIpv6(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
+            advance_attr_buffer(path_attributes_buf)?
         }
         PathAttributeParsingError::LargeCommunitiesError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
+            advance_attr_buffer(path_attributes_buf)?
         }
         PathAttributeParsingError::OriginatorError(_) => {
-            let (buf, _) = advance_attr_buffer_fixed(4usize, path_attributes_buf)?;
-            buf
+            advance_attr_buffer_fixed(4usize, path_attributes_buf)?
         }
-        PathAttributeParsingError::ClusterListError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
-        }
+        PathAttributeParsingError::ClusterListError(_) => advance_attr_buffer(path_attributes_buf)?,
         PathAttributeParsingError::MpReachErrorError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
+            advance_attr_buffer(path_attributes_buf)?
         }
         PathAttributeParsingError::MpUnreachErrorError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
+            advance_attr_buffer(path_attributes_buf)?
         }
         PathAttributeParsingError::OnlyToCustomerError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
+            advance_attr_buffer(path_attributes_buf)?
         }
-        PathAttributeParsingError::AigpError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
-        }
+        PathAttributeParsingError::AigpError(_) => advance_attr_buffer(path_attributes_buf)?,
         PathAttributeParsingError::UnknownAttributeError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
+            advance_attr_buffer(path_attributes_buf)?
         }
-        PathAttributeParsingError::InvalidPathAttribute(_, _) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
+        PathAttributeParsingError::InvalidPathAttribute { .. } => {
+            advance_attr_buffer(path_attributes_buf)?
         }
-        PathAttributeParsingError::BgpLsError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
-        }
+        PathAttributeParsingError::BgpLsError(_) => advance_attr_buffer(path_attributes_buf)?,
         PathAttributeParsingError::SegmentIdentifierParsingError(_) => {
-            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
-            buf
+            advance_attr_buffer(path_attributes_buf)?
         }
     };
-    Ok((buf, ()))
+    Ok(buf)
 }
 
 impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
@@ -302,27 +301,26 @@ impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
         // + Total Attribute Length + 23 exceeds the message Length), then the
         // Error Subcode MUST be set to Malformed Attribute List.
         match value {
-            BgpUpdateMessageParsingError::NomError(err) => {
-                if err == nom::error::ErrorKind::Eof {
+            BgpUpdateMessageParsingError::Parse(err) => match err {
+                ParseError::UnexpectedEof { .. } => {
                     UpdateMessageError::MalformedAttributeList { value: vec![] }
-                } else {
-                    UpdateMessageError::Unspecific { value: vec![] }
                 }
-            }
+                ParseError::InvalidValue { .. } => UpdateMessageError::Unspecific { value: vec![] },
+            },
             BgpUpdateMessageParsingError::PathAttributeError(attr_err) => {
                 // TODO need to be refined in accordance with RFC 7606
                 match attr_err {
-                    PathAttributeParsingError::NomError(_) => {
+                    PathAttributeParsingError::Parse(_) => {
                         UpdateMessageError::MalformedAttributeList { value: vec![] }
                     }
                     PathAttributeParsingError::OriginError(err) => match err {
-                        OriginParsingError::NomError(_) => {
+                        OriginParsingError::Parse(_) => {
                             UpdateMessageError::InvalidOriginAttribute { value: vec![] }
                         }
-                        OriginParsingError::InvalidOriginLength(_) => {
+                        OriginParsingError::InvalidOriginLength { .. } => {
                             UpdateMessageError::InvalidOriginAttribute { value: vec![] }
                         }
-                        OriginParsingError::UndefinedOrigin(_) => {
+                        OriginParsingError::UndefinedOrigin { .. } => {
                             UpdateMessageError::InvalidOriginAttribute { value: vec![] }
                         }
                     },
@@ -377,7 +375,7 @@ impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
                     PathAttributeParsingError::UnknownAttributeError(_) => {
                         UpdateMessageError::Unspecific { value: vec![] }
                     }
-                    PathAttributeParsingError::InvalidPathAttribute(_, _) => {
+                    PathAttributeParsingError::InvalidPathAttribute { .. } => {
                         UpdateMessageError::AttributeFlagsError { value: vec![] }
                     }
                     PathAttributeParsingError::BgpLsError(_) => {
@@ -390,12 +388,12 @@ impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
                 }
             }
             BgpUpdateMessageParsingError::Ipv4PrefixError(prefix_err) => {
-                if Ipv4PrefixParsingError::NomError(nom::error::ErrorKind::Eof) == prefix_err {
+                if matches!(prefix_err, Ipv4PrefixParsingError::Parse(_)) {
                     return UpdateMessageError::MalformedAttributeList { value: vec![] };
                 }
                 UpdateMessageError::InvalidNetworkField { value: vec![] }
             }
-            BgpUpdateMessageParsingError::InvalidIpv4UnicastNetwork(_) => {
+            BgpUpdateMessageParsingError::InvalidIpv4UnicastNetwork { .. } => {
                 // RFC 4271: If a prefix in the NLRI field is semantically incorrect (e.g., an
                 // unexpected multicast IP address), an error SHOULD be logged locally, and the
                 // prefix SHOULD be ignored.

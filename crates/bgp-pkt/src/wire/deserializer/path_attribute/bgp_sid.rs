@@ -1,19 +1,16 @@
-use nom::IResult;
-use nom::number::complete::{be_u8, be_u16, be_u32, be_u128};
 use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
 
-use netgauze_parse_utils::{
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
-    parse_till_empty_into_located,
-};
-use netgauze_serde_macros::LocatedError;
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 
 use crate::iana::{
     BgpSidAttributeType, BgpSidAttributeTypeError, BgpSrv6ServiceSubSubTlvType,
     BgpSrv6ServiceSubSubTlvTypeError, BgpSrv6ServiceSubTlvType, BgpSrv6ServiceSubTlvTypeError,
     IanaValueError,
 };
+use crate::nlri::MplsLabel;
 use crate::path_attribute::{
     BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv,
     SegmentRoutingGlobalBlock,
@@ -21,144 +18,170 @@ use crate::path_attribute::{
 use crate::wire::deserializer::nlri::MplsLabelParsingError;
 use crate::wire::deserializer::read_tlv_header_t8_l16;
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum SegmentIdentifierParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] nom::error::ErrorKind),
-    BgpPrefixSidTlvError(#[from_located(module = "self")] BgpPrefixSidTlvParsingError),
+    #[error("Segment Identifier parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("Segment Identifier error: {0}")]
+    BgpPrefixSidTlvError(#[from] BgpPrefixSidTlvParsingError),
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpPrefixSidTlvParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] nom::error::ErrorKind),
-    BadBgpPrefixSidTlvType(#[from_external] BgpSidAttributeTypeError),
-    BgpSRv6SRGBError(#[from_located(module = "self")] BgpSRv6SRGBParsingError),
-    SRv6ServiceSubTlvError(#[from_located(module = "self")] BgpPrefixSidSubTlvParsingError),
+    #[error("BGP Prefix SID TLV parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("BGP Prefix SID TLV error: {error} at offset {offset}")]
+    BadBgpPrefixSidTlvType {
+        offset: usize,
+        error: BgpSidAttributeTypeError,
+    },
+
+    #[error("BGP Prefix SID TLV error: {0}")]
+    BgpSRv6SRGBError(#[from] BgpSRv6SRGBParsingError),
+
+    #[error("BGP Prefix SID TLV error: {0}")]
+    SRv6ServiceSubTlvError(#[from] BgpPrefixSidSubTlvParsingError),
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpPrefixSidSubTlvParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] nom::error::ErrorKind),
-    BadBgpPrefixSidSubTlvType(#[from_external] BgpSrv6ServiceSubTlvTypeError),
-    SRv6ServiceSubTlvError(#[from_located(module = "self")] BgpPrefixSidSubSubTlvParsingError),
+    #[error("BGP Prefix SID Sub TLV parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("BGP Prefix SID Sub TLV error: {error} at offset {offset}")]
+    BadBgpPrefixSidSubTlvType {
+        offset: usize,
+        error: BgpSrv6ServiceSubTlvTypeError,
+    },
+    #[error("BGP Prefix SID Sub TLV error: {0}")]
+    SRv6ServiceSubTlvError(#[from] BgpPrefixSidSubSubTlvParsingError),
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpPrefixSidSubSubTlvParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] nom::error::ErrorKind),
-    BadBgpPrefixSidSubSubTlvType(#[from_external] BgpSrv6ServiceSubSubTlvTypeError),
+    #[error("BGP Prefix SID Sub Sub TLV parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("BGP Prefix SID Sub Sub TLV error: {error} at offset {offset}")]
+    BadBgpPrefixSidSubSubTlvType {
+        offset: usize,
+        error: BgpSrv6ServiceSubSubTlvTypeError,
+    },
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedSegmentIdentifierParsingError<'a>>
-    for PrefixSegmentIdentifier
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>> {
-        let (buf, segment_id_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for PrefixSegmentIdentifier {
+    type Error = SegmentIdentifierParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let segment_id_len = if extended_length {
+            cur.read_u16_be()? as usize
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            cur.read_u8()? as usize
         };
-
-        let (_, tlvs) = parse_till_empty_into_located(segment_id_buf)?;
-
-        Ok((buf, PrefixSegmentIdentifier::new(tlvs)))
+        let mut segment_id_buf = cur.take_slice(segment_id_len)?;
+        let mut tlvs = Vec::new();
+        while !segment_id_buf.is_empty() {
+            let tlv = BgpSidAttribute::parse(&mut segment_id_buf)?;
+            tlvs.push(tlv);
+        }
+        Ok(PrefixSegmentIdentifier::new(tlvs))
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidTlvParsingError<'a>> for BgpSidAttribute {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidTlvParsingError<'a>> {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t8_l16(buf)?;
+impl<'a> ParseFrom<'a> for BgpSidAttribute {
+    type Error = BgpPrefixSidTlvParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let (tlv_type, _tlv_length, mut data) =
+            read_tlv_header_t8_l16::<BgpPrefixSidTlvParsingError>(cur)?;
 
         let tlv_type = match BgpSidAttributeType::try_from(tlv_type) {
             Ok(value) => value,
             Err(BgpSidAttributeTypeError(IanaValueError::Unknown(code))) => {
-                return Ok((
-                    remainder,
-                    BgpSidAttribute::Unknown {
-                        code,
-                        value: data.to_vec(),
-                    },
-                ));
+                return Ok(BgpSidAttribute::Unknown {
+                    code,
+                    value: data.read_bytes(data.remaining())?.to_vec(),
+                });
             }
             Err(error) => {
-                return Err(nom::Err::Error(LocatedBgpPrefixSidTlvParsingError::new(
-                    buf,
-                    BgpPrefixSidTlvParsingError::BadBgpPrefixSidTlvType(error),
-                )));
+                return Err(BgpPrefixSidTlvParsingError::BadBgpPrefixSidTlvType { offset, error });
             }
         };
 
         let attribute = match tlv_type {
             BgpSidAttributeType::LabelIndex => {
-                let (data, _reserved) = be_u8(data)?;
-                let (data, flags) = be_u16(data)?;
-                let (_data, label_index) = be_u32(data)?;
-
+                let _reserved = data.read_u8()?;
+                let flags = data.read_u16_be()?;
+                let label_index = data.read_u32_be()?;
                 BgpSidAttribute::LabelIndex { flags, label_index }
             }
             BgpSidAttributeType::Originator => {
-                let (data, flags) = be_u16(data)?;
-                let (_data, srgbs) = parse_till_empty_into_located(data)?;
+                let flags = data.read_u16_be()?;
+                let mut srgbs = Vec::new();
+                while !data.is_empty() {
+                    let v = SegmentRoutingGlobalBlock::parse(&mut data)?;
+                    srgbs.push(v);
+                }
                 BgpSidAttribute::Originator { flags, srgbs }
             }
             BgpSidAttributeType::SRv6ServiceL3 => {
-                let (data, reserved) = be_u8(data)?;
-                let (_data, subtlvs) = parse_till_empty_into_located(data)?;
-
+                let reserved = data.read_u8()?;
+                let mut subtlvs = Vec::new();
+                while !data.is_empty() {
+                    let v = SRv6ServiceSubTlv::parse(&mut data)?;
+                    subtlvs.push(v);
+                }
                 BgpSidAttribute::SRv6ServiceL3 { reserved, subtlvs }
             }
             BgpSidAttributeType::SRv6ServiceL2 => {
-                let (data, reserved) = be_u8(data)?;
-                let (_data, subtlvs) = parse_till_empty_into_located(data)?;
-
+                let reserved = data.read_u8()?;
+                let mut subtlvs = Vec::new();
+                while !data.is_empty() {
+                    let v = SRv6ServiceSubTlv::parse(&mut data)?;
+                    subtlvs.push(v);
+                }
                 BgpSidAttribute::SRv6ServiceL2 { reserved, subtlvs }
             }
         };
 
-        Ok((remainder, attribute))
+        Ok(attribute)
     }
 }
-impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubTlvParsingError<'a>> for SRv6ServiceSubTlv {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidSubTlvParsingError<'a>> {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t8_l16(buf)?;
+impl<'a> ParseFrom<'a> for SRv6ServiceSubTlv {
+    type Error = BgpPrefixSidSubTlvParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let (tlv_type, _tlv_length, mut data) =
+            read_tlv_header_t8_l16::<BgpPrefixSidSubTlvParsingError>(cur)?;
 
         let tlv_type = match BgpSrv6ServiceSubTlvType::try_from(tlv_type) {
             Ok(value) => value,
             Err(BgpSrv6ServiceSubTlvTypeError(IanaValueError::Unknown(code))) => {
-                return Ok((
-                    remainder,
-                    SRv6ServiceSubTlv::Unknown {
-                        code,
-                        value: data.to_vec(),
-                    },
-                ));
+                return Ok(SRv6ServiceSubTlv::Unknown {
+                    code,
+                    value: data.read_bytes(data.remaining())?.to_vec(),
+                });
             }
             Err(error) => {
-                return Err(nom::Err::Error(LocatedBgpPrefixSidSubTlvParsingError::new(
-                    buf,
-                    BgpPrefixSidSubTlvParsingError::BadBgpPrefixSidSubTlvType(error),
-                )));
+                return Err(BgpPrefixSidSubTlvParsingError::BadBgpPrefixSidSubTlvType {
+                    offset,
+                    error,
+                });
             }
         };
 
         let subtlv = match tlv_type {
             BgpSrv6ServiceSubTlvType::SRv6SIDInformation => {
-                let (data, reserved1) = be_u8(data)?;
-                let (data, sid) = be_u128(data)?;
-                let (data, service_sid_flags) = be_u8(data)?;
-                let (data, endpoint_behaviour) = be_u16(data)?;
-                let (data, reserved2) = be_u8(data)?;
-                let (_data, subsubtlvs) = parse_till_empty_into_located(data)?;
+                let reserved1 = data.read_u8()?;
+                let sid = data.read_u128_be()?;
+                let service_sid_flags = data.read_u8()?;
+                let endpoint_behaviour = data.read_u16_be()?;
+                let reserved2 = data.read_u8()?;
+                let mut subsubtlvs = Vec::new();
+                while !data.is_empty() {
+                    let subsubtlv = SRv6ServiceSubSubTlv::parse(&mut data)?;
+                    subsubtlvs.push(subsubtlv);
+                }
 
                 SRv6ServiceSubTlv::SRv6SIDInformation {
                     reserved1,
@@ -171,45 +194,44 @@ impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubTlvParsingError<'a>> for SRv6Serv
             }
         };
 
-        Ok((remainder, subtlv))
+        Ok(subtlv)
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubSubTlvParsingError<'a>> for SRv6ServiceSubSubTlv {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidSubSubTlvParsingError<'a>> {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t8_l16(buf)?;
+impl<'a> ParseFrom<'a> for SRv6ServiceSubSubTlv {
+    type Error = BgpPrefixSidSubSubTlvParsingError;
+
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let (tlv_type, _tlv_length, mut data) =
+            read_tlv_header_t8_l16::<BgpPrefixSidSubSubTlvParsingError>(cur)?;
 
         let tlv_type = match BgpSrv6ServiceSubSubTlvType::try_from(tlv_type) {
             Ok(value) => value,
             Err(BgpSrv6ServiceSubSubTlvTypeError(IanaValueError::Unknown(code))) => {
-                return Ok((
-                    remainder,
-                    SRv6ServiceSubSubTlv::Unknown {
-                        code,
-                        value: data.to_vec(),
-                    },
-                ));
+                return Ok(SRv6ServiceSubSubTlv::Unknown {
+                    code,
+                    value: data.read_bytes(data.offset())?.to_vec(),
+                });
             }
             Err(error) => {
-                return Err(nom::Err::Error(
-                    LocatedBgpPrefixSidSubSubTlvParsingError::new(
-                        buf,
-                        BgpPrefixSidSubSubTlvParsingError::BadBgpPrefixSidSubSubTlvType(error),
-                    ),
-                ));
+                return Err(
+                    BgpPrefixSidSubSubTlvParsingError::BadBgpPrefixSidSubSubTlvType {
+                        offset,
+                        error,
+                    },
+                );
             }
         };
 
         let subsubtlv = match tlv_type {
             BgpSrv6ServiceSubSubTlvType::SRv6SIDStructure => {
-                let (data, locator_block_len) = be_u8(data)?;
-                let (data, locator_node_len) = be_u8(data)?;
-                let (data, function_len) = be_u8(data)?;
-                let (data, arg_len) = be_u8(data)?;
-                let (data, transposition_len) = be_u8(data)?;
-                let (_data, transposition_offset) = be_u8(data)?;
+                let locator_block_len = data.read_u8()?;
+                let locator_node_len = data.read_u8()?;
+                let function_len = data.read_u8()?;
+                let arg_len = data.read_u8()?;
+                let transposition_len = data.read_u8()?;
+                let transposition_offset = data.read_u8()?;
 
                 SRv6ServiceSubSubTlv::SRv6SIDStructure {
                     locator_block_len,
@@ -222,33 +244,28 @@ impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubSubTlvParsingError<'a>> for SRv6S
             }
         };
 
-        Ok((remainder, subsubtlv))
+        Ok(subsubtlv)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpSRv6SRGBParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] nom::error::ErrorKind),
-    MplsLabelParsingError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] MplsLabelParsingError,
-    ),
+    #[error("BGP SRv6 SRGB parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("BGP SRv6 SRGB error: {0}")]
+    MplsLabelParsingError(#[from] MplsLabelParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpSRv6SRGBParsingError<'a>> for SegmentRoutingGlobalBlock {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpSRv6SRGBParsingError<'a>> {
-        let (span, first_label) = parse_into_located(buf)?;
-        let (span, range_size_0) = be_u8(span)?;
-        let (span, range_size_1) = be_u8(span)?;
-        let (span, range_size_2) = be_u8(span)?;
+impl<'a> ParseFrom<'a> for SegmentRoutingGlobalBlock {
+    type Error = BgpSRv6SRGBParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let first_label = MplsLabel::parse(cur)?;
+        let range_size = cur.read_array()?;
 
-        Ok((
-            span,
-            SegmentRoutingGlobalBlock {
-                first_label,
-                range_size: [range_size_0, range_size_1, range_size_2],
-            },
-        ))
+        Ok(SegmentRoutingGlobalBlock {
+            first_label,
+            range_size,
+        })
     }
 }
 
@@ -258,7 +275,9 @@ pub mod tests {
 
     use ipnet::Ipv4Net;
 
-    use netgauze_parse_utils::test_helpers::{test_parsed_completely_with_one_input, test_write};
+    use netgauze_parse_utils::test_helpers::{
+        test_parsed_completely_with_one_input_bytes_reader, test_write,
+    };
 
     use crate::community::{
         Community, ExtendedCommunity, LargeCommunity, TransitiveTwoOctetExtendedCommunity,
@@ -417,7 +436,11 @@ pub mod tests {
             vec![],
         ));
 
-        test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
+        test_parsed_completely_with_one_input_bytes_reader(
+            &good_wire,
+            &mut BgpParsingContext::default(),
+            &good,
+        );
         test_write(&good, &good_wire)?;
 
         Ok(())
@@ -514,7 +537,11 @@ pub mod tests {
         ));
 
         test_write(&good, &good_wire)?;
-        test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
+        test_parsed_completely_with_one_input_bytes_reader(
+            &good_wire,
+            &mut BgpParsingContext::default(),
+            &good,
+        );
 
         Ok(())
     }

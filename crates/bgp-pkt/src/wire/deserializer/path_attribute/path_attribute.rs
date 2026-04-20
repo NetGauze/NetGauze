@@ -16,34 +16,30 @@
 
 //! Deserializer for BGP Path Attributes
 
-use crate::iana::{
-    AigpAttributeType, PathAttributeType, UndefinedAigpAttributeType, UndefinedPathAttributeType,
+use crate::community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity};
+use crate::iana::{AigpAttributeType, PathAttributeType, UndefinedPathAttributeType};
+use crate::nlri::{
+    BgpLsNlri, BgpLsVpnNlri, Ipv4MplsVpnUnicastAddress, Ipv4MulticastAddress,
+    Ipv4NlriMplsLabelsAddress, Ipv4UnicastAddress, Ipv6MplsVpnUnicastAddress, Ipv6MulticastAddress,
+    Ipv6NlriMplsLabelsAddress, Ipv6UnicastAddress, L2EvpnAddress, LabeledNextHop,
+    RouteTargetMembershipAddress,
 };
-use crate::nlri::LabeledNextHop;
 use crate::path_attribute::*;
 use crate::wire::ACCUMULATED_IGP_METRIC;
+use crate::wire::deserializer::BgpParsingContext;
 use crate::wire::deserializer::community::*;
 use crate::wire::deserializer::nlri::*;
 use crate::wire::deserializer::path_attribute::{
     BgpLsAttributeParsingError, SegmentIdentifierParsingError,
 };
-use crate::wire::deserializer::{BgpParsingContext, IpAddrParsingError};
 use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN, IPV6_WITH_LINK_LOCAL_LEN};
-use netgauze_iana::address_family::{
-    AddressFamily, AddressType, SubsequentAddressFamily, UndefinedAddressFamily,
-    UndefinedSubsequentAddressFamily,
+use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
+use netgauze_parse_utils::common::IpAddrParsingError;
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::traits::{
+    ParseFrom, ParseFromWithOneInput, ParseFromWithThreeInputs, ParseFromWithTwoInputs,
 };
-use netgauze_parse_utils::{
-    ErrorKindSerdeDeref, LocatedParsingError, ReadablePdu, ReadablePduWithOneInput,
-    ReadablePduWithThreeInputs, ReadablePduWithTwoInputs, Span, parse_into_located_one_input,
-    parse_into_located_three_inputs, parse_into_located_two_inputs, parse_till_empty,
-    parse_till_empty_into_located, parse_till_empty_into_with_one_input_located,
-    parse_till_empty_into_with_three_inputs_located,
-};
-use netgauze_serde_macros::LocatedError;
-use nom::IResult;
-use nom::error::ErrorKind;
-use nom::number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -52,13 +48,13 @@ const OPTIONAL_PATH_ATTRIBUTE_MASK: u8 = 0x80;
 const TRANSITIVE_PATH_ATTRIBUTE_MASK: u8 = 0x40;
 const PARTIAL_PATH_ATTRIBUTE_MASK: u8 = 0x20;
 pub(crate) const EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK: u8 = 0x10;
-const ORIGIN_LEN: u16 = 1;
-const NEXT_HOP_LEN: u16 = 4;
-const MULTI_EXIT_DISCRIMINATOR_LEN: u16 = 4;
-const LOCAL_PREFERENCE_LEN: u16 = 4;
-const ATOMIC_AGGREGATE_LEN: u16 = 0;
-const AS2_AGGREGATOR_LEN: u16 = 6;
-const AS4_AGGREGATOR_LEN: u16 = 8;
+pub(crate) const ORIGIN_LEN: u16 = 1;
+pub(crate) const NEXT_HOP_LEN: u16 = 4;
+pub(crate) const MULTI_EXIT_DISCRIMINATOR_LEN: u16 = 4;
+pub(crate) const LOCAL_PREFERENCE_LEN: u16 = 4;
+pub(crate) const ATOMIC_AGGREGATE_LEN: u16 = 0;
+pub(crate) const AS2_AGGREGATOR_LEN: u16 = 6;
+pub(crate) const AS4_AGGREGATOR_LEN: u16 = 8;
 
 #[inline]
 const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
@@ -68,1342 +64,1365 @@ const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, thiserror::Error, Serialize, Deserialize)]
 pub enum PathAttributeParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    OriginError(#[from_located(module = "self")] OriginParsingError),
-    AsPathError(#[from_located(module = "self")] AsPathParsingError),
-    NextHopError(#[from_located(module = "self")] NextHopParsingError),
-    MultiExitDiscriminatorError(
-        #[from_located(module = "self")] MultiExitDiscriminatorParsingError,
-    ),
-    LocalPreferenceError(#[from_located(module = "self")] LocalPreferenceParsingError),
-    AtomicAggregateError(#[from_located(module = "self")] AtomicAggregateParsingError),
-    AggregatorError(#[from_located(module = "self")] AggregatorParsingError),
-    CommunitiesError(#[from_located(module = "self")] CommunitiesParsingError),
-    ExtendedCommunitiesError(#[from_located(module = "self")] ExtendedCommunitiesParsingError),
-    ExtendedCommunitiesErrorIpv6(
-        #[from_located(module = "self")] ExtendedCommunitiesIpv6ParsingError,
-    ),
-    LargeCommunitiesError(#[from_located(module = "self")] LargeCommunitiesParsingError),
-    OriginatorError(#[from_located(module = "self")] OriginatorParsingError),
-    ClusterListError(#[from_located(module = "self")] ClusterListParsingError),
-    MpReachErrorError(#[from_located(module = "self")] MpReachParsingError),
-    MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
-    OnlyToCustomerError(#[from_located(module = "self")] OnlyToCustomerParsingError),
-    AigpError(#[from_located(module = "self")] AigpParsingError),
-    BgpLsError(
-        #[from_located(module = "crate::wire::deserializer::path_attribute")]
-        BgpLsAttributeParsingError,
-    ),
-    SegmentIdentifierParsingError(
-        #[from_located(module = "crate::wire::deserializer::path_attribute")]
-        SegmentIdentifierParsingError,
-    ),
-    UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
-    InvalidPathAttribute(InvalidPathAttribute, PathAttributeValue),
+    #[error("Path attribute parsing error {0}")]
+    Parse(#[from] ParseError),
+    #[error("Path attribute error {0}")]
+    OriginError(#[from] OriginParsingError),
+    #[error("Path attribute error {0}")]
+    AsPathError(#[from] AsPathParsingError),
+    #[error("Path attribute error {0}")]
+    NextHopError(#[from] NextHopParsingError),
+    #[error("Path attribute error {0}")]
+    MultiExitDiscriminatorError(#[from] MultiExitDiscriminatorParsingError),
+    #[error("Path attribute error {0}")]
+    LocalPreferenceError(#[from] LocalPreferenceParsingError),
+    #[error("Path attribute error {0}")]
+    AtomicAggregateError(#[from] AtomicAggregateParsingError),
+    #[error("Path attribute error {0}")]
+    AggregatorError(#[from] AggregatorParsingError),
+    #[error("Path attribute error {0}")]
+    CommunitiesError(#[from] CommunitiesParsingError),
+    #[error("Path attribute error {0}")]
+    ExtendedCommunitiesError(#[from] ExtendedCommunitiesParsingError),
+    #[error("Path attribute error {0}")]
+    ExtendedCommunitiesErrorIpv6(#[from] ExtendedCommunitiesIpv6ParsingError),
+    #[error("Path attribute error {0}")]
+    LargeCommunitiesError(#[from] LargeCommunitiesParsingError),
+    #[error("Path attribute error {0}")]
+    OriginatorError(#[from] OriginatorParsingError),
+    #[error("Path attribute error {0}")]
+    ClusterListError(#[from] ClusterListParsingError),
+    #[error("Path attribute error {0}")]
+    MpReachErrorError(#[from] MpReachParsingError),
+    #[error("Path attribute error {0}")]
+    MpUnreachErrorError(#[from] MpUnreachParsingError),
+    #[error("Path attribute error {0}")]
+    OnlyToCustomerError(#[from] OnlyToCustomerParsingError),
+    #[error("Path attribute error {0}")]
+    AigpError(#[from] AigpParsingError),
+    #[error("Path attribute error {0}")]
+    BgpLsError(#[from] BgpLsAttributeParsingError),
+    #[error("Path attribute error {0}")]
+    SegmentIdentifierParsingError(#[from] SegmentIdentifierParsingError),
+    #[error("Path attribute error {0}")]
+    UnknownAttributeError(#[from] UnknownAttributeParsingError),
+    #[error("Path attribute {invalid_attribute} for path attribute {value:?} at offset {offset}")]
+    InvalidPathAttribute {
+        offset: usize,
+        invalid_attribute: InvalidPathAttribute,
+        value: Result<PathAttributeType, u8>,
+    },
 }
 
-pub trait IntoLocatedPathAttributeParsingError<'a> {
-    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a>;
-}
-
-impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedPathAttributeParsingError<'a>>
-    for PathAttribute
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BgpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedPathAttributeParsingError<'a>> {
+impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for PathAttribute {
+    type Error = PathAttributeParsingError;
+    fn parse(cur: &mut BytesReader, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
         let (asn4, multiple_labels, add_path_map) = (ctx.asn4, &ctx.multiple_labels, &ctx.add_path);
-        let (buf, attributes) = be_u8(buf)?;
-        let buf_before_code = buf;
-        let (buf, code) = be_u8(buf)?;
+        let attributes = cur.read_u8()?;
+        let code = cur.read_u8()?;
         let optional = attributes & OPTIONAL_PATH_ATTRIBUTE_MASK == OPTIONAL_PATH_ATTRIBUTE_MASK;
         let transitive =
             attributes & TRANSITIVE_PATH_ATTRIBUTE_MASK == TRANSITIVE_PATH_ATTRIBUTE_MASK;
         let partial = attributes & PARTIAL_PATH_ATTRIBUTE_MASK == PARTIAL_PATH_ATTRIBUTE_MASK;
         let extended_length =
             attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
-        let (buf, value) = match PathAttributeType::try_from(code) {
+        let value = match PathAttributeType::try_from(code) {
             Ok(PathAttributeType::Origin) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::Origin(value);
-                (buf, value)
+                let value = Origin::parse(cur, extended_length)?;
+                PathAttributeValue::Origin(value)
             }
             Ok(PathAttributeType::AsPath) => {
-                let (buf, value) = parse_into_located_two_inputs(buf, extended_length, asn4)?;
-                let value = PathAttributeValue::AsPath(value);
-                (buf, value)
+                let value = AsPath::parse(cur, extended_length, asn4)?;
+                PathAttributeValue::AsPath(value)
             }
             Ok(PathAttributeType::As4Path) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::As4Path(value);
-                (buf, value)
+                let value = As4Path::parse(cur, extended_length)?;
+                PathAttributeValue::As4Path(value)
             }
             Ok(PathAttributeType::NextHop) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::NextHop(value);
-                (buf, value)
+                let value = NextHop::parse(cur, extended_length)?;
+                PathAttributeValue::NextHop(value)
             }
             Ok(PathAttributeType::MultiExitDiscriminator) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::MultiExitDiscriminator(value);
-                (buf, value)
+                let value = MultiExitDiscriminator::parse(cur, extended_length)?;
+                PathAttributeValue::MultiExitDiscriminator(value)
             }
             Ok(PathAttributeType::LocalPreference) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::LocalPreference(value);
-                (buf, value)
+                let value = LocalPreference::parse(cur, extended_length)?;
+                PathAttributeValue::LocalPreference(value)
             }
             Ok(PathAttributeType::AtomicAggregate) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::AtomicAggregate(value);
-                (buf, value)
+                let value = AtomicAggregate::parse(cur, extended_length)?;
+                PathAttributeValue::AtomicAggregate(value)
             }
             Ok(PathAttributeType::Aggregator) => {
-                let (buf, value) = parse_into_located_two_inputs(buf, extended_length, asn4)?;
-                let value = PathAttributeValue::Aggregator(value);
-                (buf, value)
+                let value = Aggregator::parse(cur, extended_length, asn4)?;
+                PathAttributeValue::Aggregator(value)
             }
             Ok(PathAttributeType::Communities) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::Communities(value);
-                (buf, value)
+                let value = Communities::parse(cur, extended_length)?;
+                PathAttributeValue::Communities(value)
             }
             Ok(PathAttributeType::ExtendedCommunities) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::ExtendedCommunities(value);
-                (buf, value)
+                let value = ExtendedCommunities::parse(cur, extended_length)?;
+                PathAttributeValue::ExtendedCommunities(value)
             }
             Ok(PathAttributeType::ExtendedCommunitiesIpv6) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::ExtendedCommunitiesIpv6(value);
-                (buf, value)
+                let value = ExtendedCommunitiesIpv6::parse(cur, extended_length)?;
+                PathAttributeValue::ExtendedCommunitiesIpv6(value)
             }
             Ok(PathAttributeType::LargeCommunities) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::LargeCommunities(value);
-                (buf, value)
+                let value = LargeCommunities::parse(cur, extended_length)?;
+                PathAttributeValue::LargeCommunities(value)
             }
             Ok(PathAttributeType::OriginatorId) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::Originator(value);
-                (buf, value)
+                let value = Originator::parse(cur, extended_length)?;
+                PathAttributeValue::Originator(value)
             }
             Ok(PathAttributeType::ClusterList) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::ClusterList(value);
-                (buf, value)
+                let value = ClusterList::parse(cur, extended_length)?;
+                PathAttributeValue::ClusterList(value)
             }
             Ok(PathAttributeType::MpReachNlri) => {
-                let (buf, value) = parse_into_located_three_inputs(
-                    buf,
-                    extended_length,
-                    multiple_labels,
-                    add_path_map,
-                )?;
-                let value = PathAttributeValue::MpReach(value);
-                (buf, value)
+                let value = MpReach::parse(cur, extended_length, multiple_labels, add_path_map)?;
+                PathAttributeValue::MpReach(value)
             }
             Ok(PathAttributeType::MpUnreachNlri) => {
-                let (buf, value) = parse_into_located_three_inputs(
-                    buf,
-                    extended_length,
-                    multiple_labels,
-                    add_path_map,
-                )?;
-                let value = PathAttributeValue::MpUnreach(value);
-                (buf, value)
+                let value = MpUnreach::parse(cur, extended_length, multiple_labels, add_path_map)?;
+                PathAttributeValue::MpUnreach(value)
             }
             Ok(PathAttributeType::OnlyToCustomer) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::OnlyToCustomer(value);
-                (buf, value)
+                let value = OnlyToCustomer::parse(cur, extended_length)?;
+                PathAttributeValue::OnlyToCustomer(value)
             }
             Ok(PathAttributeType::AccumulatedIgp) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::Aigp(value);
-                (buf, value)
+                let value = Aigp::parse(cur, extended_length)?;
+                PathAttributeValue::Aigp(value)
             }
             Ok(PathAttributeType::BgpLsAttribute) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::BgpLs(value);
-                (buf, value)
+                let value = BgpLsAttribute::parse(cur, extended_length)?;
+                PathAttributeValue::BgpLs(value)
             }
             Ok(PathAttributeType::BgpPrefixSid) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::PrefixSegmentIdentifier(value);
-                (buf, value)
+                let value = PrefixSegmentIdentifier::parse(cur, extended_length)?;
+                PathAttributeValue::PrefixSegmentIdentifier(value)
             }
             Ok(_code) => {
-                let (buf, value) = parse_into_located_one_input(buf_before_code, extended_length)?;
-                let value = PathAttributeValue::UnknownAttribute(value);
-                (buf, value)
+                let value = UnknownAttribute::parse(cur, code, extended_length)?;
+                PathAttributeValue::UnknownAttribute(value)
             }
             Err(UndefinedPathAttributeType(_code)) => {
-                let (buf, value) = parse_into_located_one_input(buf_before_code, extended_length)?;
-                let value = PathAttributeValue::UnknownAttribute(value);
-                (buf, value)
+                let value = UnknownAttribute::parse(cur, code, extended_length)?;
+                PathAttributeValue::UnknownAttribute(value)
             }
         };
         let attr = match PathAttribute::from(optional, transitive, partial, extended_length, value)
         {
             Ok(attr) => attr,
             Err((value, err)) => {
-                return Err(nom::Err::Error(LocatedPathAttributeParsingError::new(
-                    buf,
-                    PathAttributeParsingError::InvalidPathAttribute(err, value),
-                )));
+                return Err(PathAttributeParsingError::InvalidPathAttribute {
+                    offset,
+                    invalid_attribute: err,
+                    value: value.path_attribute_type(),
+                });
             }
         };
-        Ok((buf, attr))
+        Ok(attr)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum OriginParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidOriginLength(#[from_external] PathAttributeLength),
-    UndefinedOrigin(#[from_external] UndefinedOrigin),
+    #[error("Origin parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Invalid origin length {length} at offset {offset}")]
+    InvalidOriginLength {
+        offset: usize,
+        length: PathAttributeLength,
+    },
+    #[error("Undefined origin {code} at offset {offset}")]
+    UndefinedOrigin { offset: usize, code: u8 },
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedOriginParsingError<'a>> for Origin {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedOriginParsingError<'a>> {
-        let input = buf;
-        let (buf, length) = if extended_length {
-            let (buf, raw) = be_u16(buf)?;
-            (buf, PathAttributeLength::U16(raw))
+impl<'a> ParseFromWithOneInput<'a, bool> for Origin {
+    type Error = OriginParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let length = if extended_length {
+            let raw = cur.read_u16_be()?;
+            PathAttributeLength::U16(raw)
         } else {
-            let (buf, raw) = be_u8(buf)?;
-            (buf, PathAttributeLength::U8(raw))
+            let raw = cur.read_u8()?;
+            PathAttributeLength::U8(raw)
         };
         if !check_length(length, ORIGIN_LEN) {
-            return Err(nom::Err::Error(LocatedOriginParsingError::new(
-                input,
-                OriginParsingError::InvalidOriginLength(length),
-            )));
+            return Err(OriginParsingError::InvalidOriginLength { offset, length });
         }
-        let (buf, origin) = nom::combinator::map_res(be_u8, Origin::try_from)(buf)?;
-        Ok((buf, origin))
+        let offset = cur.offset();
+        let code = cur.read_u8()?;
+        let origin = Origin::try_from(code)
+            .map_err(|_| OriginParsingError::UndefinedOrigin { offset, code })?;
+        Ok(origin)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum AsPathParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("AS Path parsing error: {0}")]
+    Parse(#[from] ParseError),
     /// RFC 7606: An AS_PATH is considered malformed, if it has a Path Segment
     /// Length field of zero.
-    ZeroSegmentLength,
+    #[error("AS Path zero segment length offset {offset}")]
+    ZeroSegmentLength { offset: usize },
     /// Invalid Length
+    #[error(
+        "AS Path invalid path length found {found} while excepting {expecting} at offset {offset}"
+    )]
     InvalidAsPathLength {
+        offset: usize,
         expecting: usize,
         found: usize,
     },
-    UndefinedAsPathSegmentType(#[from_external] UndefinedAsPathSegmentType),
+    #[error("AS Path undefined segment type {code} at offset {offset}")]
+    UndefinedAsPathSegmentType { offset: usize, code: u8 },
 }
 
-impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedAsPathParsingError<'a>> for AsPath {
-    fn from_wire(
-        buf: Span<'a>,
+impl<'a> ParseFromWithTwoInputs<'a, bool, bool> for AsPath {
+    type Error = AsPathParsingError;
+    fn parse(
+        cur: &mut BytesReader,
         extended_length: bool,
         asn4: bool,
-    ) -> IResult<Span<'a>, Self, LocatedAsPathParsingError<'a>> {
-        let (buf, segments_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+    ) -> Result<Self, Self::Error> {
+        let mut segments_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
         if asn4 {
-            let (_, segments) = parse_till_empty(segments_buf)?;
-            Ok((buf, Self::As4PathSegments(segments)))
+            let mut segments = Vec::new();
+            while !segments_buf.is_empty() {
+                let segment = As4PathSegment::parse(&mut segments_buf)?;
+                segments.push(segment);
+            }
+            Ok(Self::As4PathSegments(segments))
         } else {
-            let (_, segments) = parse_till_empty(segments_buf)?;
-            Ok((buf, Self::As2PathSegments(segments)))
+            let mut segments = Vec::new();
+            while !segments_buf.is_empty() {
+                let segment = As2PathSegment::parse(&mut segments_buf)?;
+                segments.push(segment);
+            }
+            Ok(Self::As2PathSegments(segments))
         }
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedAsPathParsingError<'a>> for As2PathSegment {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedAsPathParsingError<'a>> {
-        let (buf, segment_type) =
-            nom::combinator::map_res(be_u8, AsPathSegmentType::try_from)(buf)?;
-        let before = buf;
-        let (buf, count) = be_u8(buf)?;
+impl<'a> ParseFrom<'a> for As2PathSegment {
+    type Error = AsPathParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let code = cur.read_u8()?;
+        let segment_type = AsPathSegmentType::try_from(code)
+            .map_err(|_| AsPathParsingError::UndefinedAsPathSegmentType { offset, code })?;
+        let offset = cur.offset();
+        let count = cur.read_u8()?;
         if count == 0 {
-            return Err(nom::Err::Error(LocatedAsPathParsingError::new(
-                before,
-                AsPathParsingError::ZeroSegmentLength,
-            )));
+            return Err(AsPathParsingError::ZeroSegmentLength { offset });
         }
         let count = count as usize;
         let expecting = count * 2;
-        if buf.len() < expecting {
-            return Err(nom::Err::Error(LocatedAsPathParsingError::new(
-                buf,
-                AsPathParsingError::InvalidAsPathLength {
-                    expecting,
-                    found: buf.len(),
-                },
-            )));
+        if cur.remaining() < expecting {
+            return Err(AsPathParsingError::InvalidAsPathLength {
+                offset,
+                expecting,
+                found: cur.remaining(),
+            });
         }
-        let (buf, as_numbers) = nom::multi::many_m_n(count, count, be_u16)(buf)?;
-        Ok((buf, As2PathSegment::new(segment_type, as_numbers)))
+        let mut as_numbers = Vec::new();
+        for _ in 0..count {
+            let asnum = cur.read_u16_be()?;
+            as_numbers.push(asnum);
+        }
+        Ok(As2PathSegment::new(segment_type, as_numbers))
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedAsPathParsingError<'a>> for As4PathSegment {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedAsPathParsingError<'a>> {
-        let (buf, segment_type) =
-            nom::combinator::map_res(be_u8, AsPathSegmentType::try_from)(buf)?;
-        let before = buf;
-        let (buf, count) = be_u8(buf)?;
+impl<'a> ParseFrom<'a> for As4PathSegment {
+    type Error = AsPathParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let code = cur.read_u8()?;
+        let segment_type = AsPathSegmentType::try_from(code)
+            .map_err(|_| AsPathParsingError::UndefinedAsPathSegmentType { offset, code })?;
+        let offset = cur.offset();
+        let count = cur.read_u8()?;
         if count == 0 {
-            return Err(nom::Err::Error(LocatedAsPathParsingError::new(
-                before,
-                AsPathParsingError::ZeroSegmentLength,
-            )));
+            return Err(AsPathParsingError::ZeroSegmentLength { offset });
         }
         let count = count as usize;
         let expecting = count * 4;
-        if buf.len() < expecting {
-            return Err(nom::Err::Error(LocatedAsPathParsingError::new(
-                buf,
-                AsPathParsingError::InvalidAsPathLength {
-                    expecting,
-                    found: buf.len(),
-                },
-            )));
+        if cur.remaining() < expecting {
+            return Err(AsPathParsingError::InvalidAsPathLength {
+                offset,
+                expecting,
+                found: cur.remaining(),
+            });
         }
-        let (buf, as_numbers) = nom::multi::many_m_n(count, count, be_u32)(buf)?;
-        Ok((buf, As4PathSegment::new(segment_type, as_numbers)))
+        let mut as_numbers = Vec::new();
+        for _ in 0..count {
+            let asnum = cur.read_u32_be()?;
+            as_numbers.push(asnum);
+        }
+        Ok(As4PathSegment::new(segment_type, as_numbers))
     }
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAsPathParsingError<'a>> for As4Path {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedAsPathParsingError<'a>> {
-        let (buf, segments_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for As4Path {
+    type Error = AsPathParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut segments_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (_, segments) = parse_till_empty(segments_buf)?;
-        Ok((buf, Self::new(segments)))
+        let mut segments = Vec::new();
+        while !segments_buf.is_empty() {
+            let segment = As4PathSegment::parse(&mut segments_buf)?;
+            segments.push(segment);
+        }
+        Ok(Self::new(segments))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum NextHopParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidNextHopLength(PathAttributeLength),
+    #[error("Next Hop parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Next Hop invalid length {length} at offset {offset}")]
+    InvalidNextHopLength {
+        offset: usize,
+        length: PathAttributeLength,
+    },
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedNextHopParsingError<'a>> for NextHop {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedNextHopParsingError<'a>> {
-        let input = buf;
-        let (buf, length) = if extended_length {
-            let (buf, raw) = be_u16(buf)?;
-            (buf, PathAttributeLength::U16(raw))
+impl<'a> ParseFromWithOneInput<'a, bool> for NextHop {
+    type Error = NextHopParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let length = if extended_length {
+            let raw = cur.read_u16_be()?;
+            PathAttributeLength::U16(raw)
         } else {
-            let (buf, raw) = be_u8(buf)?;
-            (buf, PathAttributeLength::U8(raw))
+            let raw = cur.read_u8()?;
+            PathAttributeLength::U8(raw)
         };
         if !check_length(length, NEXT_HOP_LEN) {
-            return Err(nom::Err::Error(LocatedNextHopParsingError::new(
-                input,
-                NextHopParsingError::InvalidNextHopLength(length),
-            )));
+            return Err(NextHopParsingError::InvalidNextHopLength { offset, length });
         }
-        let (buf, address) = be_u32(buf)?;
+        let address = cur.read_u32_be()?;
         let address = Ipv4Addr::from(address);
-
-        Ok((buf, NextHop::new(address)))
+        Ok(NextHop::new(address))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum MultiExitDiscriminatorParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidLength(PathAttributeLength),
+    #[error("MultiExit discriminator parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("MultiExit discriminator invalid length {length} at offset {offset}")]
+    InvalidLength {
+        offset: usize,
+        length: PathAttributeLength,
+    },
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMultiExitDiscriminatorParsingError<'a>>
-    for MultiExitDiscriminator
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedMultiExitDiscriminatorParsingError<'a>> {
-        let input = buf;
-        let (buf, length) = if extended_length {
-            let (buf, raw) = be_u16(buf)?;
-            (buf, PathAttributeLength::U16(raw))
+impl<'a> ParseFromWithOneInput<'a, bool> for MultiExitDiscriminator {
+    type Error = MultiExitDiscriminatorParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let length = if extended_length {
+            let raw = cur.read_u16_be()?;
+            PathAttributeLength::U16(raw)
         } else {
-            let (buf, raw) = be_u8(buf)?;
-            (buf, PathAttributeLength::U8(raw))
+            let raw = cur.read_u8()?;
+            PathAttributeLength::U8(raw)
         };
         if !check_length(length, MULTI_EXIT_DISCRIMINATOR_LEN) {
-            return Err(nom::Err::Error(
-                LocatedMultiExitDiscriminatorParsingError::new(
-                    input,
-                    MultiExitDiscriminatorParsingError::InvalidLength(length),
-                ),
-            ));
+            return Err(MultiExitDiscriminatorParsingError::InvalidLength { offset, length });
         }
 
-        let (buf, metric) = be_u32(buf)?;
-        Ok((buf, MultiExitDiscriminator::new(metric)))
+        let metric = cur.read_u32_be()?;
+        Ok(MultiExitDiscriminator::new(metric))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum LocalPreferenceParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidLength(PathAttributeLength),
+    #[error("Local Preference parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Local Preference invalid length {length} at offset {offset}")]
+    InvalidLength {
+        offset: usize,
+        length: PathAttributeLength,
+    },
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedLocalPreferenceParsingError<'a>>
-    for LocalPreference
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedLocalPreferenceParsingError<'a>> {
-        let input = buf;
-        let (buf, length) = if extended_length {
-            let (buf, raw) = be_u16(buf)?;
-            (buf, PathAttributeLength::U16(raw))
+impl<'a> ParseFromWithOneInput<'a, bool> for LocalPreference {
+    type Error = LocalPreferenceParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let length = if extended_length {
+            let raw = cur.read_u16_be()?;
+            PathAttributeLength::U16(raw)
         } else {
-            let (buf, raw) = be_u8(buf)?;
-            (buf, PathAttributeLength::U8(raw))
+            let raw = cur.read_u8()?;
+            PathAttributeLength::U8(raw)
         };
         if !check_length(length, LOCAL_PREFERENCE_LEN) {
-            return Err(nom::Err::Error(LocatedLocalPreferenceParsingError::new(
-                input,
-                LocalPreferenceParsingError::InvalidLength(length),
-            )));
+            return Err(LocalPreferenceParsingError::InvalidLength { offset, length });
         }
 
-        let (buf, pref) = be_u32(buf)?;
-        Ok((buf, LocalPreference::new(pref)))
+        let pref = cur.read_u32_be()?;
+        Ok(LocalPreference::new(pref))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum AtomicAggregateParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidLength(PathAttributeLength),
+    #[error("Atomic Aggregate parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Atomic aggregate invalid length {length} at offset {offset}")]
+    InvalidLength {
+        offset: usize,
+        length: PathAttributeLength,
+    },
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAtomicAggregateParsingError<'a>>
-    for AtomicAggregate
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedAtomicAggregateParsingError<'a>> {
-        let input = buf;
-        let (buf, length) = if extended_length {
-            let (buf, raw) = be_u16(buf)?;
-            (buf, PathAttributeLength::U16(raw))
+impl<'a> ParseFromWithOneInput<'a, bool> for AtomicAggregate {
+    type Error = AtomicAggregateParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let length = if extended_length {
+            let raw = cur.read_u16_be()?;
+            PathAttributeLength::U16(raw)
         } else {
-            let (buf, raw) = be_u8(buf)?;
-            (buf, PathAttributeLength::U8(raw))
+            let raw = cur.read_u8()?;
+            PathAttributeLength::U8(raw)
         };
         if !check_length(length, ATOMIC_AGGREGATE_LEN) {
-            return Err(nom::Err::Error(LocatedAtomicAggregateParsingError::new(
-                input,
-                AtomicAggregateParsingError::InvalidLength(length),
-            )));
+            return Err(AtomicAggregateParsingError::InvalidLength { offset, length });
         }
-        Ok((buf, AtomicAggregate))
+        Ok(AtomicAggregate)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum AggregatorParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidLength(PathAttributeLength),
+    #[error("Aggregator parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("Aggregator aggregator invalid length {length} at offset {offset}")]
+    InvalidLength {
+        offset: usize,
+        length: PathAttributeLength,
+    },
 }
 
-impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedAggregatorParsingError<'a>>
-    for Aggregator
-{
-    fn from_wire(
-        buf: Span<'a>,
+impl<'a> ParseFromWithTwoInputs<'a, bool, bool> for Aggregator {
+    type Error = AggregatorParsingError;
+    fn parse(
+        cur: &mut BytesReader,
         extended_length: bool,
         asn4: bool,
-    ) -> IResult<Span<'a>, Self, LocatedAggregatorParsingError<'a>> {
+    ) -> Result<Self, Self::Error> {
         if asn4 {
-            let (buf, as4_agg) = As4Aggregator::from_wire(buf, extended_length)?;
-            Ok((buf, Aggregator::As4Aggregator(as4_agg)))
+            let as4_agg = As4Aggregator::parse(cur, extended_length)?;
+            Ok(Aggregator::As4Aggregator(as4_agg))
         } else {
-            let (buf, as2_agg) = As2Aggregator::from_wire(buf, extended_length)?;
-            Ok((buf, Aggregator::As2Aggregator(as2_agg)))
+            let as2_agg = As2Aggregator::parse(cur, extended_length)?;
+            Ok(Aggregator::As2Aggregator(as2_agg))
         }
     }
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> for As2Aggregator {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedAggregatorParsingError<'a>> {
-        let input = buf;
-        let (buf, length) = if extended_length {
-            let (buf, raw) = be_u16(buf)?;
-            (buf, PathAttributeLength::U16(raw))
+impl<'a> ParseFromWithOneInput<'a, bool> for As2Aggregator {
+    type Error = AggregatorParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let length = if extended_length {
+            let raw = cur.read_u16_be()?;
+            PathAttributeLength::U16(raw)
         } else {
-            let (buf, raw) = be_u8(buf)?;
-            (buf, PathAttributeLength::U8(raw))
+            let raw = cur.read_u8()?;
+            PathAttributeLength::U8(raw)
         };
         if !check_length(length, AS2_AGGREGATOR_LEN) {
-            return Err(nom::Err::Error(LocatedAggregatorParsingError::new(
-                input,
-                AggregatorParsingError::InvalidLength(length),
-            )));
+            return Err(AggregatorParsingError::InvalidLength { offset, length });
         }
-        let (buf, asn) = be_u16(buf)?;
-        let (buf, origin) = be_u32(buf)?;
+        let asn = cur.read_u16_be()?;
+        let origin = cur.read_u32_be()?;
 
-        Ok((buf, As2Aggregator::new(asn, Ipv4Addr::from(origin))))
+        Ok(As2Aggregator::new(asn, Ipv4Addr::from(origin)))
     }
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> for As4Aggregator {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedAggregatorParsingError<'a>> {
-        let input = buf;
-        let (buf, length) = if extended_length {
-            let (buf, raw) = be_u16(buf)?;
-            (buf, PathAttributeLength::U16(raw))
+impl<'a> ParseFromWithOneInput<'a, bool> for As4Aggregator {
+    type Error = AggregatorParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let length = if extended_length {
+            let raw = cur.read_u16_be()?;
+            PathAttributeLength::U16(raw)
         } else {
-            let (buf, raw) = be_u8(buf)?;
-            (buf, PathAttributeLength::U8(raw))
+            let raw = cur.read_u8()?;
+            PathAttributeLength::U8(raw)
         };
         if !check_length(length, AS4_AGGREGATOR_LEN) {
-            return Err(nom::Err::Error(LocatedAggregatorParsingError::new(
-                input,
-                AggregatorParsingError::InvalidLength(length),
-            )));
+            return Err(AggregatorParsingError::InvalidLength { offset, length });
         }
-        let (buf, asn) = be_u32(buf)?;
-        let (buf, origin) = be_u32(buf)?;
+        let asn = cur.read_u32_be()?;
+        let origin = cur.read_u32_be()?;
 
-        Ok((buf, As4Aggregator::new(asn, Ipv4Addr::from(origin))))
+        Ok(As4Aggregator::new(asn, Ipv4Addr::from(origin)))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum MpReachParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
-    UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
-    IpAddrError(AddressType, IpAddrParsingError),
-    LabeledNextHopError(AddressType, LabeledNextHopParsingError),
-    Ipv4UnicastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastAddressParsingError,
-    ),
-    Ipv4MulticastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv4MulticastAddressParsingError,
-    ),
-    Ipv4NlriMplsLabelsAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv4NlriMplsLabelsAddressParsingError,
-    ),
-    Ipv4MplsVpnUnicastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv4MplsVpnUnicastAddressParsingError,
-    ),
-    Ipv6UnicastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastAddressParsingError,
-    ),
-    Ipv6NlriMplsLabelsAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv6NlriMplsLabelsAddressParsingError,
-    ),
-    Ipv6MulticastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv6MulticastAddressParsingError,
-    ),
-    Ipv6MplsVpnUnicastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv6MplsVpnUnicastAddressParsingError,
-    ),
-    L2EvpnAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] L2EvpnAddressParsingError,
-    ),
-    RouteTargetMembershipAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        RouteTargetMembershipAddressParsingError,
-    ),
-    BgpLsNlriParsingError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] BgpLsNlriParsingError,
-    ),
+    #[error("BGP-MP reach parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error("BGP-MP reach undefined address family (AFI) {afi} at offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+    #[error("BGP-MP reach undefined subsequent address family (SAFI) {safi} at offset {offset}")]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+    #[error("BGP-MP reach IP address error for address type {address_type}: {error}")]
+    IpAddrError {
+        address_type: AddressType,
+        error: IpAddrParsingError,
+    },
+    #[error("BGP-MP reach labeled next hop error for address type {address_type}: {error}")]
+    LabeledNextHopError {
+        address_type: AddressType,
+        error: LabeledNextHopParsingError,
+    },
+    #[error("BGP-MP reach error: {0}")]
+    Ipv4UnicastAddressError(#[from] Ipv4UnicastAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    Ipv4MulticastAddressError(#[from] Ipv4MulticastAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    Ipv4NlriMplsLabelsAddressError(#[from] Ipv4NlriMplsLabelsAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    Ipv4MplsVpnUnicastAddressError(#[from] Ipv4MplsVpnUnicastAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    Ipv6UnicastAddressError(#[from] Ipv6UnicastAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    Ipv6NlriMplsLabelsAddressError(#[from] Ipv6NlriMplsLabelsAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    Ipv6MulticastAddressError(#[from] Ipv6MulticastAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    L2EvpnAddressError(#[from] L2EvpnAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressParsingError),
+    #[error("BGP-MP reach error: {0}")]
+    BgpLsNlriParsingError(#[from] BgpLsNlriParsingError),
 }
 
-impl<'a>
-    ReadablePduWithThreeInputs<
-        'a,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
-        LocatedMpReachParsingError<'a>,
-    > for MpReach
+impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<AddressType, bool>>
+    for MpReach
 {
-    fn from_wire(
-        buf: Span<'a>,
+    type Error = MpReachParsingError;
+    fn parse(
+        cur: &mut BytesReader,
         extended_length: bool,
         multiple_labels: &HashMap<AddressType, u8>,
         add_path_map: &HashMap<AddressType, bool>,
-    ) -> IResult<Span<'a>, Self, LocatedMpReachParsingError<'a>> {
-        let (buf, mp_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+    ) -> Result<Self, Self::Error> {
+        let mut mp_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (mp_buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(mp_buf)?;
-        let (mp_buf, safi) =
-            nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(mp_buf)?;
+
+        let afi = AddressFamily::try_from(mp_buf.read_u16_be()?).map_err(|err| {
+            MpReachParsingError::UndefinedAddressFamily {
+                offset: mp_buf.offset() - 2,
+                afi: err.0,
+            }
+        })?;
+        let safi = SubsequentAddressFamily::try_from(mp_buf.read_u8()?).map_err(|err| {
+            MpReachParsingError::UndefinedSubsequentAddressFamily {
+                offset: mp_buf.offset() - 1,
+                safi: err.0,
+            }
+        })?;
         match AddressType::from_afi_safi(afi, safi) {
             Ok(addr_type @ AddressType::Ipv4Unicast) => {
-                let (mp_buf, (next_hop, next_hop_local)) =
-                    parse_ip4_or_ipv6_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let (next_hop, next_hop_local) =
+                    parse_ip4_or_ipv6_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((
-                    buf,
-                    MpReach::Ipv4Unicast {
-                        next_hop,
-                        next_hop_local,
-                        nlri,
-                    },
-                ))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv4UnicastAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::Ipv4Unicast {
+                    next_hop,
+                    next_hop_local,
+                    nlri,
+                })
             }
             Ok(addr_type @ AddressType::Ipv4Multicast) => {
-                let (mp_buf, (next_hop, next_hop_local)) =
-                    parse_ip4_or_ipv6_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let (next_hop, next_hop_local) =
+                    parse_ip4_or_ipv6_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((
-                    buf,
-                    MpReach::Ipv4Multicast {
-                        next_hop,
-                        next_hop_local,
-                        nlri,
-                    },
-                ))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv4MulticastAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::Ipv4Multicast {
+                    next_hop,
+                    next_hop_local,
+                    nlri,
+                })
             }
             Ok(addr_type @ AddressType::Ipv4NlriMplsLabels) => {
-                let (mp_buf, (next_hop, next_hop_local)) =
-                    parse_ip4_or_ipv6_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let (next_hop, next_hop_local) =
+                    parse_ip4_or_ipv6_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
-                    mp_buf,
-                    add_path,
-                    false,
-                    *multiple_labels.get(&addr_type).unwrap_or(&1),
-                )?;
-                Ok((
-                    buf,
-                    MpReach::Ipv4NlriMplsLabels {
-                        next_hop,
-                        next_hop_local,
-                        nlri,
-                    },
-                ))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv4NlriMplsLabelsAddress::parse(
+                        &mut mp_buf,
+                        add_path,
+                        false,
+                        *multiple_labels.get(&addr_type).unwrap_or(&1),
+                    )?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::Ipv4NlriMplsLabels {
+                    next_hop,
+                    next_hop_local,
+                    nlri,
+                })
             }
             Ok(addr_type @ AddressType::Ipv4MplsLabeledVpn) => {
-                let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let next_hop = parse_labeled_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
-                    mp_buf,
-                    add_path,
-                    false,
-                    *multiple_labels.get(&addr_type).unwrap_or(&1),
-                )?;
-                Ok((buf, MpReach::Ipv4MplsVpnUnicast { next_hop, nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv4MplsVpnUnicastAddress::parse(
+                        &mut mp_buf,
+                        add_path,
+                        false,
+                        *multiple_labels.get(&addr_type).unwrap_or(&1),
+                    )?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::Ipv4MplsVpnUnicast { next_hop, nlri })
             }
             Ok(addr_type @ AddressType::Ipv6Unicast) => {
-                let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
-                let (mp_buf, global) = be_u128(mp_buf)?;
+                let next_hop_len = mp_buf.read_u8()?;
+                let global = mp_buf.read_u128_be()?;
                 let next_hop_global = Ipv6Addr::from(global);
-                let (mp_buf, next_hop_local) = if next_hop_len == 32 {
-                    let (mp_buf, local) = be_u128(mp_buf)?;
-                    (mp_buf, Some(Ipv6Addr::from(local)))
+                let next_hop_local = if next_hop_len == 32 {
+                    let local = mp_buf.read_u128_be()?;
+                    Some(Ipv6Addr::from(local))
                 } else {
-                    (mp_buf, None)
+                    None
                 };
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((
-                    buf,
-                    MpReach::Ipv6Unicast {
-                        next_hop_global,
-                        next_hop_local,
-                        nlri,
-                    },
-                ))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv6UnicastAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::Ipv6Unicast {
+                    next_hop_global,
+                    next_hop_local,
+                    nlri,
+                })
             }
             Ok(addr_type @ AddressType::Ipv6Multicast) => {
-                let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
-                let (mp_buf, global) = be_u128(mp_buf)?;
+                let next_hop_len = mp_buf.read_u8()?;
+                let global = mp_buf.read_u128_be()?;
                 let next_hop_global = Ipv6Addr::from(global);
-                let (mp_buf, next_hop_local) = if next_hop_len == 32 {
-                    let (mp_buf, local) = be_u128(mp_buf)?;
-                    (mp_buf, Some(Ipv6Addr::from(local)))
+                let next_hop_local = if next_hop_len == 32 {
+                    let local = mp_buf.read_u128_be()?;
+                    Some(Ipv6Addr::from(local))
                 } else {
-                    (mp_buf, None)
+                    None
                 };
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((
-                    buf,
-                    MpReach::Ipv6Multicast {
-                        next_hop_global,
-                        next_hop_local,
-                        nlri,
-                    },
-                ))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv6MulticastAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::Ipv6Multicast {
+                    next_hop_global,
+                    next_hop_local,
+                    nlri,
+                })
             }
             Ok(addr_type @ AddressType::Ipv6NlriMplsLabels) => {
-                let (mp_buf, (next_hop, next_hop_local)) =
-                    parse_ip4_or_ipv6_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let (next_hop, next_hop_local) =
+                    parse_ip4_or_ipv6_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
-                    mp_buf,
-                    add_path,
-                    false,
-                    *multiple_labels.get(&addr_type).unwrap_or(&1),
-                )?;
-                Ok((
-                    buf,
-                    MpReach::Ipv6NlriMplsLabels {
-                        next_hop,
-                        next_hop_local,
-                        nlri,
-                    },
-                ))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv6NlriMplsLabelsAddress::parse(
+                        &mut mp_buf,
+                        add_path,
+                        false,
+                        *multiple_labels.get(&addr_type).unwrap_or(&1),
+                    )?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::Ipv6NlriMplsLabels {
+                    next_hop,
+                    next_hop_local,
+                    nlri,
+                })
             }
             Ok(addr_type @ AddressType::Ipv6MplsLabeledVpn) => {
-                let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let next_hop = parse_labeled_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
-                    mp_buf,
-                    add_path,
-                    false,
-                    *multiple_labels.get(&addr_type).unwrap_or(&1),
-                )?;
-                Ok((buf, MpReach::Ipv6MplsVpnUnicast { next_hop, nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv6MplsVpnUnicastAddress::parse(
+                        &mut mp_buf,
+                        add_path,
+                        false,
+                        *multiple_labels.get(&addr_type).unwrap_or(&1),
+                    )?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::Ipv6MplsVpnUnicast { next_hop, nlri })
             }
             Ok(addr_type @ AddressType::L2VpnBgpEvpn) => {
-                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let next_hop = parse_ip_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpReach::L2Evpn { next_hop, nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = L2EvpnAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::L2Evpn { next_hop, nlri })
             }
             Ok(addr_type @ AddressType::RouteTargetConstrains) => {
-                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let next_hop = parse_ip_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpReach::RouteTargetMembership { next_hop, nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = RouteTargetMembershipAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::RouteTargetMembership { next_hop, nlri })
             }
             Ok(addr_type @ AddressType::BgpLs) => {
-                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let next_hop = parse_ip_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpReach::BgpLs { next_hop, nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = BgpLsNlri::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::BgpLs { next_hop, nlri })
             }
             Ok(addr_type @ AddressType::BgpLsVpn) => {
-                let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, addr_type)?;
-                let (mp_buf, _) = be_u8(mp_buf)?;
+                let next_hop = parse_labeled_next_hop(&mut mp_buf, addr_type)?;
+                let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpReach::BgpLsVpn { next_hop, nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = BgpLsVpnNlri::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpReach::BgpLsVpn { next_hop, nlri })
             }
-            Ok(_) | Err(_) => Ok((
-                buf,
-                MpReach::Unknown {
-                    afi,
-                    safi,
-                    value: mp_buf.to_vec(),
-                },
-            )),
+            Ok(_) | Err(_) => Ok(MpReach::Unknown {
+                afi,
+                safi,
+                value: mp_buf.read_bytes(mp_buf.remaining())?.to_vec(),
+            }),
         }
     }
 }
 
 #[inline]
 fn parse_ip_next_hop(
-    mp_buf: Span<'_>,
+    mp_buf: &mut BytesReader,
     address_type: AddressType,
-) -> IResult<Span<'_>, IpAddr, LocatedMpReachParsingError<'_>> {
-    let (mp_buf, next_hop) = match IpAddr::from_wire(mp_buf) {
-        Ok((mp_buf, next_hop)) => (mp_buf, next_hop),
-        Err(err) => {
-            return Err(match err {
-                nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
-                nom::Err::Error(error) => {
-                    let (e, s) = (error.error, error.span);
-                    nom::Err::Error(LocatedMpReachParsingError::new(
-                        s,
-                        MpReachParsingError::IpAddrError(address_type, e),
-                    ))
-                }
-                nom::Err::Failure(failure) => {
-                    let (e, s) = (failure.error, failure.span);
-                    nom::Err::Failure(LocatedMpReachParsingError::new(
-                        s,
-                        MpReachParsingError::IpAddrError(address_type, e),
-                    ))
-                }
+) -> Result<IpAddr, MpReachParsingError> {
+    let next_hop = match IpAddr::parse(mp_buf) {
+        Ok(next_hop) => next_hop,
+        Err(error) => {
+            return Err(MpReachParsingError::IpAddrError {
+                address_type,
+                error,
             });
         }
     };
-    Ok((mp_buf, next_hop))
+    Ok(next_hop)
 }
 
 #[inline]
 fn parse_ip4_or_ipv6_next_hop(
-    mp_buf: Span<'_>,
+    mp_buf: &mut BytesReader,
     address_type: AddressType,
-) -> IResult<Span<'_>, (IpAddr, Option<Ipv6Addr>), LocatedMpReachParsingError<'_>> {
-    let begin_buf = mp_buf;
-    let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
+) -> Result<(IpAddr, Option<Ipv6Addr>), MpReachParsingError> {
+    let offset = mp_buf.offset();
+    let next_hop_len = mp_buf.read_u8()?;
     match next_hop_len {
         IPV4_LEN => {
-            let (mp_buf, next_hop) = be_u32(mp_buf)?;
+            let next_hop = mp_buf.read_u32_be()?;
             let next_hop = Ipv4Addr::from(next_hop);
-            Ok((mp_buf, (IpAddr::V4(next_hop), None)))
+            Ok((IpAddr::V4(next_hop), None))
         }
         IPV6_LEN => {
-            let (mp_buf, next_hop) = be_u128(mp_buf)?;
+            let next_hop = mp_buf.read_u128_be()?;
             let next_hop = Ipv6Addr::from(next_hop);
-            Ok((mp_buf, (IpAddr::V6(next_hop), None)))
+            Ok((IpAddr::V6(next_hop), None))
         }
         IPV6_WITH_LINK_LOCAL_LEN => {
-            let (mp_buf, next_hop) = be_u128(mp_buf)?;
-            let (mp_buf, next_hop_local) = be_u128(mp_buf)?;
+            let next_hop = mp_buf.read_u128_be()?;
+            let next_hop_local = mp_buf.read_u128_be()?;
             let next_hop = Ipv6Addr::from(next_hop);
             let next_hop_local = Ipv6Addr::from(next_hop_local);
-            Ok((mp_buf, (IpAddr::V6(next_hop), Some(next_hop_local))))
+            Ok((IpAddr::V6(next_hop), Some(next_hop_local)))
         }
-        _ => Err(nom::Err::Error(LocatedMpReachParsingError::new(
-            begin_buf,
-            MpReachParsingError::IpAddrError(
-                address_type,
-                IpAddrParsingError::InvalidIpAddressLength(next_hop_len),
-            ),
-        ))),
+        _ => Err(MpReachParsingError::IpAddrError {
+            address_type,
+            error: IpAddrParsingError::InvalidIpAddressLength {
+                offset,
+                length: next_hop_len,
+            },
+        }),
     }
 }
 
 #[inline]
 fn parse_labeled_next_hop(
-    mp_buf: Span<'_>,
+    mp_buf: &mut BytesReader,
     address_type: AddressType,
-) -> IResult<Span<'_>, LabeledNextHop, LocatedMpReachParsingError<'_>> {
-    let (mp_buf, next_hop) = match LabeledNextHop::from_wire(mp_buf) {
-        Ok((mp_buf, next_hop)) => (mp_buf, next_hop),
-        Err(err) => {
-            return Err(match err {
-                nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
-                nom::Err::Error(error) => {
-                    let (e, s) = (error.error().clone(), *error.span());
-                    nom::Err::Error(LocatedMpReachParsingError::new(
-                        s,
-                        MpReachParsingError::LabeledNextHopError(address_type, e),
-                    ))
-                }
-                nom::Err::Failure(failure) => {
-                    let (e, s) = (failure.error().clone(), *failure.span());
-                    nom::Err::Failure(LocatedMpReachParsingError::new(
-                        s,
-                        MpReachParsingError::LabeledNextHopError(address_type, e),
-                    ))
-                }
+) -> Result<LabeledNextHop, MpReachParsingError> {
+    let next_hop = match LabeledNextHop::parse(mp_buf) {
+        Ok(next_hop) => next_hop,
+        Err(error) => {
+            return Err(MpReachParsingError::LabeledNextHopError {
+                address_type,
+                error,
             });
         }
     };
-    Ok((mp_buf, next_hop))
+    Ok(next_hop)
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum MpUnreachParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
-    UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
-    Ipv4UnicastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastAddressParsingError,
-    ),
-    Ipv4MulticastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv4MulticastAddressParsingError,
-    ),
-    Ipv4NlriMplsLabelsAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv4NlriMplsLabelsAddressParsingError,
-    ),
-    Ipv4MplsVpnUnicastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv4MplsVpnUnicastAddressParsingError,
-    ),
-    Ipv6UnicastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastAddressParsingError,
-    ),
-    Ipv6MulticastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv6MulticastAddressParsingError,
-    ),
-    Ipv6NlriMplsLabelsAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv6NlriMplsLabelsAddressParsingError,
-    ),
-    Ipv6MplsVpnUnicastAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        Ipv6MplsVpnUnicastAddressParsingError,
-    ),
-    L2EvpnAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] L2EvpnAddressParsingError,
-    ),
-    RouteTargetMembershipAddressError(
-        #[from_located(module = "crate::wire::deserializer::nlri")]
-        RouteTargetMembershipAddressParsingError,
-    ),
-    BgpLsError(#[from_located(module = "crate::wire::deserializer::nlri")] BgpLsNlriParsingError),
+    #[error("BGP-MP unreach parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("BGP-MP unreach undefined address family (AFI) {afi} at offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error("BGP-MP unreach undefined subsequent address family (SAFI) {safi} at offset {offset}")]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error("BGP-MP unreach error: {0}")]
+    Ipv4UnicastAddressError(#[from] Ipv4UnicastAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    Ipv4MulticastAddressError(#[from] Ipv4MulticastAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    Ipv4NlriMplsLabelsAddressError(#[from] Ipv4NlriMplsLabelsAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    Ipv4MplsVpnUnicastAddressError(#[from] Ipv4MplsVpnUnicastAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    Ipv6UnicastAddressError(#[from] Ipv6UnicastAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    Ipv6MulticastAddressError(#[from] Ipv6MulticastAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    Ipv6NlriMplsLabelsAddressError(#[from] Ipv6NlriMplsLabelsAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    L2EvpnAddressError(#[from] L2EvpnAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressParsingError),
+
+    #[error("BGP-MP unreach error: {0}")]
+    BgpLsError(#[from] BgpLsNlriParsingError),
 }
 
-impl<'a>
-    ReadablePduWithThreeInputs<
-        'a,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
-        LocatedMpUnreachParsingError<'a>,
-    > for MpUnreach
+impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<AddressType, bool>>
+    for MpUnreach
 {
-    fn from_wire(
-        buf: Span<'a>,
+    type Error = MpUnreachParsingError;
+
+    fn parse(
+        cur: &mut BytesReader,
         extended_length: bool,
         multiple_labels: &HashMap<AddressType, u8>,
         add_path_map: &HashMap<AddressType, bool>,
-    ) -> IResult<Span<'a>, Self, LocatedMpUnreachParsingError<'a>> {
-        let (buf, mp_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+    ) -> Result<Self, Self::Error> {
+        let mut mp_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (mp_buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(mp_buf)?;
-        let (mp_buf, safi) =
-            nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(mp_buf)?;
+        let offset = cur.offset();
+        let afi = AddressFamily::try_from(mp_buf.read_u16_be()?)
+            .map_err(|err| MpUnreachParsingError::UndefinedAddressFamily { offset, afi: err.0 })?;
+        let safi = SubsequentAddressFamily::try_from(mp_buf.read_u8()?).map_err(|err| {
+            MpUnreachParsingError::UndefinedSubsequentAddressFamily {
+                offset,
+                safi: err.0,
+            }
+        })?;
         match AddressType::from_afi_safi(afi, safi) {
             Ok(addr_type @ AddressType::Ipv4Unicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::Ipv4Unicast { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv4UnicastAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::Ipv4Unicast { nlri })
             }
             Ok(addr_type @ AddressType::Ipv4Multicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::Ipv4Multicast { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv4MulticastAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::Ipv4Multicast { nlri })
             }
             Ok(addr_type @ AddressType::Ipv4NlriMplsLabels) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
-                    mp_buf,
-                    add_path,
-                    true,
-                    *multiple_labels.get(&addr_type).unwrap_or(&1),
-                )?;
-                Ok((buf, MpUnreach::Ipv4NlriMplsLabels { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv4NlriMplsLabelsAddress::parse(
+                        &mut mp_buf,
+                        add_path,
+                        false,
+                        *multiple_labels.get(&addr_type).unwrap_or(&1),
+                    )?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::Ipv4NlriMplsLabels { nlri })
             }
             Ok(addr_type @ AddressType::Ipv4MplsLabeledVpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
-                    mp_buf,
-                    add_path,
-                    true,
-                    *multiple_labels.get(&addr_type).unwrap_or(&1),
-                )?;
-                Ok((buf, MpUnreach::Ipv4MplsVpnUnicast { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv4MplsVpnUnicastAddress::parse(
+                        &mut mp_buf,
+                        add_path,
+                        false,
+                        *multiple_labels.get(&addr_type).unwrap_or(&1),
+                    )?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::Ipv4MplsVpnUnicast { nlri })
             }
             Ok(addr_type @ AddressType::Ipv6Unicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::Ipv6Unicast { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv6UnicastAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::Ipv6Unicast { nlri })
             }
             Ok(addr_type @ AddressType::Ipv6Multicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::Ipv6Multicast { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv6MulticastAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::Ipv6Multicast { nlri })
             }
             Ok(addr_type @ AddressType::Ipv6NlriMplsLabels) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
-                    mp_buf,
-                    add_path,
-                    true,
-                    *multiple_labels.get(&addr_type).unwrap_or(&1),
-                )?;
-                Ok((buf, MpUnreach::Ipv6NlriMplsLabels { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv6NlriMplsLabelsAddress::parse(
+                        &mut mp_buf,
+                        add_path,
+                        false,
+                        *multiple_labels.get(&addr_type).unwrap_or(&1),
+                    )?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::Ipv6NlriMplsLabels { nlri })
             }
             Ok(addr_type @ AddressType::Ipv6MplsLabeledVpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
-                    mp_buf,
-                    add_path,
-                    true,
-                    *multiple_labels.get(&addr_type).unwrap_or(&1),
-                )?;
-                Ok((buf, MpUnreach::Ipv6MplsVpnUnicast { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = Ipv6MplsVpnUnicastAddress::parse(
+                        &mut mp_buf,
+                        add_path,
+                        false,
+                        *multiple_labels.get(&addr_type).unwrap_or(&1),
+                    )?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::Ipv6MplsVpnUnicast { nlri })
             }
             Ok(addr_type @ AddressType::L2VpnBgpEvpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::L2Evpn { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = L2EvpnAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::L2Evpn { nlri })
             }
             Ok(addr_type @ AddressType::RouteTargetConstrains) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::L2Evpn { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = RouteTargetMembershipAddress::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::RouteTargetMembership { nlri })
             }
             Ok(addr_type @ AddressType::BgpLs) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::BgpLs { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = BgpLsNlri::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::BgpLs { nlri })
             }
             Ok(addr_type @ AddressType::BgpLsVpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::BgpLsVpn { nlri }))
+                let mut nlri = Vec::new();
+                while !mp_buf.is_empty() {
+                    let v = BgpLsVpnNlri::parse(&mut mp_buf, add_path)?;
+                    nlri.push(v);
+                }
+                Ok(MpUnreach::BgpLsVpn { nlri })
             }
-            Ok(_) | Err(_) => Ok((
-                buf,
-                MpUnreach::Unknown {
-                    afi,
-                    safi,
-                    nlri: mp_buf.to_vec(),
-                },
-            )),
+            Ok(_) | Err(_) => Ok(MpUnreach::Unknown {
+                afi,
+                safi,
+                nlri: mp_buf.read_bytes(mp_buf.remaining())?.to_vec(),
+            }),
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum UnknownAttributeParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Unknown attribute parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error(
+        "Unknown attribute unexpected length {actual} while expecting {expecting} at offset {offset}"
+    )]
     InvalidLength {
+        offset: usize,
         expecting: usize,
         actual: usize,
     },
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedUnknownAttributeParsingError<'a>>
-    for UnknownAttribute
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedUnknownAttributeParsingError<'a>> {
-        let (buf, code) = be_u8(buf)?;
-        let input = buf;
-        let (buf, len) = if extended_length {
-            let (buf, len) = be_u16(buf)?;
-            (buf, PathAttributeLength::U16(len))
+impl<'a> ParseFromWithTwoInputs<'a, u8, bool> for UnknownAttribute {
+    type Error = UnknownAttributeParsingError;
+    fn parse(cur: &mut BytesReader, code: u8, extended_length: bool) -> Result<Self, Self::Error> {
+        let length = if extended_length {
+            cur.read_u16_be()? as usize
         } else {
-            let (buf, len) = be_u8(buf)?;
-            (buf, PathAttributeLength::U8(len))
+            cur.read_u8()? as usize
         };
-        let length: u16 = len.into();
-        if length as usize > buf.len() {
-            return Err(nom::Err::Error(LocatedUnknownAttributeParsingError::new(
-                input,
-                UnknownAttributeParsingError::InvalidLength {
-                    expecting: length as usize,
-                    actual: buf.len(),
-                },
-            )));
+
+        if length > cur.remaining() {
+            return Err(UnknownAttributeParsingError::InvalidLength {
+                offset: cur.offset() - 2,
+                expecting: length,
+                actual: cur.remaining(),
+            });
         }
-        let (buf, value) = nom::bytes::complete::take(length)(buf)?;
-
-        Ok((buf, UnknownAttribute::new(code, (*value.fragment()).into())))
+        let value = cur.read_bytes(length)?;
+        Ok(UnknownAttribute::new(code, value.to_vec()))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum CommunitiesParsingError {
-    /// Errors triggered by the nom parser, see [ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    CommunityError(
-        #[from_located(module = "crate::wire::deserializer::community")] CommunityParsingError,
-    ),
+    #[error("Communities parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error(transparent)]
+    CommunityError(#[from] CommunityParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedCommunitiesParsingError<'a>> for Communities {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedCommunitiesParsingError<'a>> {
-        let (buf, communities_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for Communities {
+    type Error = CommunitiesParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut communities_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (_, communities) = parse_till_empty_into_located(communities_buf)?;
-        Ok((buf, Communities::new(communities)))
+        let mut communities = Vec::new();
+        while !communities_buf.is_empty() {
+            let v = Community::parse(&mut communities_buf)?;
+            communities.push(v);
+        }
+        Ok(Communities::new(communities))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ExtendedCommunitiesParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    ExtendedCommunityError(
-        #[from_located(module = "crate::wire::deserializer::community")]
-        ExtendedCommunityParsingError,
-    ),
+    #[error("Extended communities parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error(transparent)]
+    ExtendedCommunityError(#[from] ExtendedCommunityParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedExtendedCommunitiesParsingError<'a>>
-    for ExtendedCommunities
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedExtendedCommunitiesParsingError<'a>> {
-        let (buf, communities_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for ExtendedCommunities {
+    type Error = ExtendedCommunitiesParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut communities_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (_, communities) = parse_till_empty_into_located(communities_buf)?;
-        Ok((buf, ExtendedCommunities::new(communities)))
+        let mut communities = Vec::new();
+        while !communities_buf.is_empty() {
+            let v = ExtendedCommunity::parse(&mut communities_buf)?;
+            communities.push(v);
+        }
+        Ok(ExtendedCommunities::new(communities))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ExtendedCommunitiesIpv6ParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    ExtendedCommunityIpv6Error(
-        #[from_located(module = "crate::wire::deserializer::community")]
-        ExtendedCommunityIpv6ParsingError,
-    ),
+    #[error("Extended communities ipv6 parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error(transparent)]
+    ExtendedCommunityIpv6Error(#[from] ExtendedCommunityIpv6ParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedExtendedCommunitiesIpv6ParsingError<'a>>
-    for ExtendedCommunitiesIpv6
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedExtendedCommunitiesIpv6ParsingError<'a>> {
-        let (buf, communities_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for ExtendedCommunitiesIpv6 {
+    type Error = ExtendedCommunitiesIpv6ParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut communities_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (_, communities) = parse_till_empty_into_located(communities_buf)?;
-        Ok((buf, ExtendedCommunitiesIpv6::new(communities)))
+        let mut communities = Vec::new();
+        while !communities_buf.is_empty() {
+            let v = ExtendedCommunityIpv6::parse(&mut communities_buf)?;
+            communities.push(v);
+        }
+        Ok(ExtendedCommunitiesIpv6::new(communities))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum LargeCommunitiesParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    LargeCommunityError(
-        #[from_located(module = "crate::wire::deserializer::community")] LargeCommunityParsingError,
-    ),
+    #[error("Large communities parsing error: {0}")]
+    Parse(#[from] ParseError),
+    #[error(transparent)]
+    LargeCommunityError(#[from] LargeCommunityParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedLargeCommunitiesParsingError<'a>>
-    for LargeCommunities
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedLargeCommunitiesParsingError<'a>> {
-        let (buf, communities_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for LargeCommunities {
+    type Error = LargeCommunitiesParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut communities_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (_, communities) = parse_till_empty_into_located(communities_buf)?;
-        Ok((buf, LargeCommunities::new(communities)))
+        let mut communities = Vec::new();
+        while !communities_buf.is_empty() {
+            let v = LargeCommunity::parse(&mut communities_buf)?;
+            communities.push(v);
+        }
+        Ok(LargeCommunities::new(communities))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum OriginatorParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Originator parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedOriginatorParsingError<'a>> for Originator {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedOriginatorParsingError<'a>> {
-        let (buf, data_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for Originator {
+    type Error = OriginatorParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut data_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (_buf, id) = be_u32(data_buf)?;
-        Ok((buf, Originator::new(Ipv4Addr::from(id))))
+        let id = data_buf.read_u32_be()?;
+        Ok(Originator::new(Ipv4Addr::from(id)))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ClusterIdParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Cluster id parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedClusterIdParsingError<'a>> for ClusterId {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedClusterIdParsingError<'a>> {
-        let (buf, id) = be_u32(buf)?;
-        Ok((buf, ClusterId::new(Ipv4Addr::from(id))))
+impl<'a> ParseFrom<'a> for ClusterId {
+    type Error = ClusterIdParsingError;
+    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+        let id = cur.read_u32_be()?;
+        Ok(ClusterId::new(Ipv4Addr::from(id)))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum ClusterListParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    ClusterIdError(#[from_located(module = "self")] ClusterIdParsingError),
+    #[error("Cluster list parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error(transparent)]
+    ClusterIdError(#[from] ClusterIdParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedClusterListParsingError<'a>> for ClusterList {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedClusterListParsingError<'a>> {
-        let (buf, data_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for ClusterList {
+    type Error = ClusterListParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut data_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (_, cluster_ids) = parse_till_empty_into_located(data_buf)?;
-        Ok((buf, ClusterList::new(cluster_ids)))
+        let mut cluster_ids = Vec::new();
+        while !data_buf.is_empty() {
+            let v = ClusterId::parse(&mut data_buf)?;
+            cluster_ids.push(v);
+        }
+        Ok(ClusterList::new(cluster_ids))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum AigpParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedAigpAttributeType(#[from_external] UndefinedAigpAttributeType),
-    InvalidLength(u16),
+    #[error("AIGP parsing error: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("AIGP attribute type {aigp_attribute_type} is undefined at offset {offset}")]
+    UndefinedAigpAttributeType {
+        offset: usize,
+        aigp_attribute_type: u8,
+    },
+
+    #[error("AIGP attribute with invalid length {length} at offset {offset}")]
+    InvalidLength { offset: usize, length: u16 },
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAigpParsingError<'a>> for Aigp {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedAigpParsingError<'a>> {
-        let (buf, data_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for Aigp {
+    type Error = AigpParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut data_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (data_buf, aigp_type) =
-            nom::combinator::map_res(be_u8, AigpAttributeType::try_from)(data_buf)?;
+
+        let aigp_type = AigpAttributeType::try_from(data_buf.read_u8()?).map_err(|error| {
+            AigpParsingError::UndefinedAigpAttributeType {
+                offset: data_buf.offset() - 1,
+                aigp_attribute_type: error.0,
+            }
+        })?;
         match aigp_type {
             AigpAttributeType::AccumulatedIgpMetric => {
-                let input = data_buf;
-                let (data_buf, length) = be_u16(data_buf)?;
+                let length = data_buf.read_u16_be()?;
                 if length != ACCUMULATED_IGP_METRIC {
-                    return Err(nom::Err::Error(LocatedAigpParsingError::new(
-                        input,
-                        AigpParsingError::InvalidLength(length),
-                    )));
+                    return Err(AigpParsingError::InvalidLength {
+                        offset: data_buf.offset() - 2,
+                        length,
+                    });
                 }
-                let (_buf, metric) = be_u64(data_buf)?;
-                Ok((buf, Aigp::AccumulatedIgpMetric(metric)))
+                let metric = data_buf.read_u64_be()?;
+                Ok(Aigp::AccumulatedIgpMetric(metric))
             }
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum OnlyToCustomerParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
+    #[error("Only to customer parsing error: {0}")]
+    Parse(#[from] ParseError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedOnlyToCustomerParsingError<'a>>
-    for OnlyToCustomer
-{
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedOnlyToCustomerParsingError<'a>> {
-        let (buf, data_buf) = if extended_length {
-            nom::multi::length_data(be_u16)(buf)?
+impl<'a> ParseFromWithOneInput<'a, bool> for OnlyToCustomer {
+    type Error = OnlyToCustomerParsingError;
+    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+        let mut data_buf = if extended_length {
+            let len = cur.read_u16_be()?;
+            cur.take_slice(len as usize)?
         } else {
-            nom::multi::length_data(be_u8)(buf)?
+            let len = cur.read_u8()?;
+            cur.take_slice(len as usize)?
         };
-        let (_buf, asn) = be_u32(data_buf)?;
-        Ok((buf, OnlyToCustomer::new(asn)))
+        let asn = data_buf.read_u32_be()?;
+        Ok(OnlyToCustomer::new(asn))
     }
 }

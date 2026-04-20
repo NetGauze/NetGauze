@@ -14,21 +14,16 @@
 // limitations under the License.
 
 use crate::BgpNotificationMessage;
-use crate::iana::{
-    UndefinedBgpErrorNotificationCode, UndefinedCeaseErrorSubCode,
-    UndefinedFiniteStateMachineErrorSubCode, UndefinedMessageHeaderErrorSubCode,
-    UndefinedOpenMessageErrorSubCode, UndefinedRouteRefreshMessageError,
-    UndefinedUpdateMessageErrorSubCode,
-};
 use crate::notification::{
     CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
     OpenMessageError, RouteRefreshError, UpdateMessageError,
 };
 use crate::wire::deserializer::notification::*;
 use crate::wire::serializer::notification::*;
-use netgauze_parse_utils::Span;
-use netgauze_parse_utils::test_helpers::{test_parse_error, test_parsed_completely, test_write};
-use nom::error::ErrorKind;
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::test_helpers::{
+    test_parse_error_bytes_reader, test_parsed_completely_bytes_reader, test_write,
+};
 
 #[test]
 fn test_message_header_error() -> Result<(), MessageHeaderErrorWritingError> {
@@ -51,25 +46,25 @@ fn test_message_header_error() -> Result<(), MessageHeaderErrorWritingError> {
     let good_type = MessageHeaderError::BadMessageType {
         value: good_type_wire[1..].to_vec(),
     };
-    let bad_undefined = LocatedMessageHeaderErrorParsingError::new(
-        Span::new(&bad_undefined_wire),
-        MessageHeaderErrorParsingError::UndefinedMessageHeaderErrorType(
-            UndefinedMessageHeaderErrorSubCode(0xff),
-        ),
-    );
-    let bad_incomplete = LocatedMessageHeaderErrorParsingError::new(
-        Span::new(&bad_incomplete_wire),
-        MessageHeaderErrorParsingError::NomError(ErrorKind::Eof),
-    );
-    test_parsed_completely(&good_unspecific_wire, &good_unspecific);
-    test_parsed_completely(&good_synchronized_wire, &good_synchronized);
-    test_parsed_completely(&good_length_wire, &good_length);
-    test_parsed_completely(&good_type_wire, &good_type);
-    test_parse_error::<MessageHeaderError, LocatedMessageHeaderErrorParsingError<'_>>(
+    let bad_undefined = MessageHeaderErrorParsingError::UndefinedMessageHeaderErrorType {
+        offset: 0,
+        code: 0xff,
+    };
+    let bad_incomplete = MessageHeaderErrorParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
+
+    test_parsed_completely_bytes_reader(&good_unspecific_wire, &good_unspecific);
+    test_parsed_completely_bytes_reader(&good_synchronized_wire, &good_synchronized);
+    test_parsed_completely_bytes_reader(&good_length_wire, &good_length);
+    test_parsed_completely_bytes_reader(&good_type_wire, &good_type);
+    test_parse_error_bytes_reader::<MessageHeaderError, MessageHeaderErrorParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<MessageHeaderError, LocatedMessageHeaderErrorParsingError<'_>>(
+    test_parse_error_bytes_reader::<MessageHeaderError, MessageHeaderErrorParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -92,37 +87,35 @@ fn test_bgp_notification_message_header() -> Result<(), BgpNotificationMessageWr
         BgpNotificationMessage::MessageHeaderError(MessageHeaderError::ConnectionNotSynchronized {
             value: good_header_wire[2..].to_vec(),
         });
-    let bad_undefined_code = LocatedBgpNotificationMessageParsingError::new(
-        Span::new(&bad_undefined_code_wire),
-        BgpNotificationMessageParsingError::UndefinedBgpErrorNotificationCode(
-            UndefinedBgpErrorNotificationCode(0xff),
-        ),
+    let bad_undefined_code =
+        BgpNotificationMessageParsingError::UndefinedBgpErrorNotificationCode {
+            offset: 0,
+            code: 0xff,
+        };
+    let bad_undefined_sub_code = BgpNotificationMessageParsingError::MessageHeaderError(
+        MessageHeaderErrorParsingError::UndefinedMessageHeaderErrorType {
+            offset: 1,
+            code: 0xff,
+        },
     );
-    let bad_undefined_sub_code = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_undefined_sub_code_wire[1..]) },
-        BgpNotificationMessageParsingError::MessageHeaderError(
-            MessageHeaderErrorParsingError::UndefinedMessageHeaderErrorType(
-                UndefinedMessageHeaderErrorSubCode(0xff),
-            ),
-        ),
-    );
-    let bad_incomplete = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
-        BgpNotificationMessageParsingError::MessageHeaderError(
-            MessageHeaderErrorParsingError::NomError(ErrorKind::Eof),
-        ),
+    let bad_incomplete = BgpNotificationMessageParsingError::MessageHeaderError(
+        MessageHeaderErrorParsingError::Parse(ParseError::UnexpectedEof {
+            offset: 1,
+            needed: 1,
+            available: 0,
+        }),
     );
 
-    test_parsed_completely(&good_header_wire, &good_header);
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_header_wire, &good_header);
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_undefined_code_wire,
         &bad_undefined_code,
     );
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_undefined_sub_code_wire,
         &bad_undefined_sub_code,
     );
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -169,31 +162,29 @@ fn test_open_message_error() -> Result<(), OpenMessageErrorWritingError> {
         value: good_role_mismatch_wire[1..].to_vec(),
     };
 
-    let bad_undefined = LocatedOpenMessageErrorParsingError::new(
-        Span::new(&bad_undefined_wire),
-        OpenMessageErrorParsingError::UndefinedOpenMessageErrorSubCode(
-            UndefinedOpenMessageErrorSubCode(0xff),
-        ),
-    );
+    let bad_undefined = OpenMessageErrorParsingError::UndefinedOpenMessageErrorSubCode {
+        offset: 0,
+        code: 0xff,
+    };
+    let bad_incomplete = OpenMessageErrorParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    let bad_incomplete = LocatedOpenMessageErrorParsingError::new(
-        Span::new(&bad_incomplete_wire),
-        OpenMessageErrorParsingError::NomError(ErrorKind::Eof),
-    );
-
-    test_parsed_completely(&good_unspecific_wire, &good_unspecific);
-    test_parsed_completely(&good_version_wire, &good_version);
-    test_parsed_completely(&good_peer_wire, &good_peer);
-    test_parsed_completely(&good_bgp_id_wire, &good_bgp_id);
-    test_parsed_completely(&good_optional_wire, &good_optional);
-    test_parsed_completely(&good_hold_time_wire, &good_hold_time);
-    test_parsed_completely(&good_capability_wire, &good_capability);
-    test_parsed_completely(&good_role_mismatch_wire, &good_role_mismatch);
-    test_parse_error::<OpenMessageError, LocatedOpenMessageErrorParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_unspecific_wire, &good_unspecific);
+    test_parsed_completely_bytes_reader(&good_version_wire, &good_version);
+    test_parsed_completely_bytes_reader(&good_peer_wire, &good_peer);
+    test_parsed_completely_bytes_reader(&good_bgp_id_wire, &good_bgp_id);
+    test_parsed_completely_bytes_reader(&good_optional_wire, &good_optional);
+    test_parsed_completely_bytes_reader(&good_hold_time_wire, &good_hold_time);
+    test_parsed_completely_bytes_reader(&good_capability_wire, &good_capability);
+    test_parsed_completely_bytes_reader(&good_role_mismatch_wire, &good_role_mismatch);
+    test_parse_error_bytes_reader::<OpenMessageError, OpenMessageErrorParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<OpenMessageError, LocatedOpenMessageErrorParsingError<'_>>(
+    test_parse_error_bytes_reader::<OpenMessageError, OpenMessageErrorParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -218,27 +209,26 @@ fn test_bgp_notification_open_message() -> Result<(), BgpNotificationMessageWrit
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
             value: good_wire[2..].to_vec(),
         });
-    let bad_undefined = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_undefined_wire[1..]) },
-        BgpNotificationMessageParsingError::OpenMessageError(
-            OpenMessageErrorParsingError::UndefinedOpenMessageErrorSubCode(
-                UndefinedOpenMessageErrorSubCode(0xff),
-            ),
-        ),
+    let bad_undefined = BgpNotificationMessageParsingError::OpenMessageError(
+        OpenMessageErrorParsingError::UndefinedOpenMessageErrorSubCode {
+            offset: 1,
+            code: 0xff,
+        },
     );
-    let bad_incomplete = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
-        BgpNotificationMessageParsingError::OpenMessageError(
-            OpenMessageErrorParsingError::NomError(ErrorKind::Eof),
-        ),
+    let bad_incomplete = BgpNotificationMessageParsingError::OpenMessageError(
+        OpenMessageErrorParsingError::Parse(ParseError::UnexpectedEof {
+            offset: 1,
+            needed: 1,
+            available: 0,
+        }),
     );
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -298,39 +288,41 @@ fn test_update_message_error() -> Result<(), UpdateMessageErrorWritingError> {
         value: good_malformed_as_path_wire[1..].to_vec(),
     };
 
-    let bad_undefined = LocatedUpdateMessageErrorParsingError::new(
-        Span::new(&bad_undefined_wire),
-        UpdateMessageErrorParsingError::UndefinedUpdateMessageErrorSubCode(
-            UndefinedUpdateMessageErrorSubCode(0xff),
-        ),
-    );
-    let bad_incomplete = LocatedUpdateMessageErrorParsingError::new(
-        Span::new(&bad_incomplete_wire),
-        UpdateMessageErrorParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_undefined = UpdateMessageErrorParsingError::UndefinedUpdateMessageErrorSubCode {
+        offset: 0,
+        code: 0xff,
+    };
+    let bad_incomplete = UpdateMessageErrorParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    test_parsed_completely(&good_unspecific_wire, &good_unspecific);
-    test_parsed_completely(&good_malformed_attributes_wire, &good_malformed_attributes);
-    test_parsed_completely(
+    test_parsed_completely_bytes_reader(&good_unspecific_wire, &good_unspecific);
+    test_parsed_completely_bytes_reader(
+        &good_malformed_attributes_wire,
+        &good_malformed_attributes,
+    );
+    test_parsed_completely_bytes_reader(
         &good_unrecognized_well_known_attribute_wire,
         &good_unrecognized_well_known_attribute,
     );
-    test_parsed_completely(
+    test_parsed_completely_bytes_reader(
         &good_missing_well_know_attribute_wire,
         &good_missing_well_know_attribute,
     );
-    test_parsed_completely(&good_attribute_flags_wire, &good_attribute_flags);
-    test_parsed_completely(&good_attribute_length_wire, &good_attribute_length);
-    test_parsed_completely(&good_invalid_origin_wire, &good_invalid_origin);
-    test_parsed_completely(&good_next_hop_wire, &good_next_hop);
-    test_parsed_completely(&good_optional_attribute_wire, &good_optional_attribute);
-    test_parsed_completely(&good_network_field_wire, &good_network_field);
-    test_parsed_completely(&good_malformed_as_path_wire, &good_malformed_as_path);
-    test_parse_error::<UpdateMessageError, LocatedUpdateMessageErrorParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_attribute_flags_wire, &good_attribute_flags);
+    test_parsed_completely_bytes_reader(&good_attribute_length_wire, &good_attribute_length);
+    test_parsed_completely_bytes_reader(&good_invalid_origin_wire, &good_invalid_origin);
+    test_parsed_completely_bytes_reader(&good_next_hop_wire, &good_next_hop);
+    test_parsed_completely_bytes_reader(&good_optional_attribute_wire, &good_optional_attribute);
+    test_parsed_completely_bytes_reader(&good_network_field_wire, &good_network_field);
+    test_parsed_completely_bytes_reader(&good_malformed_as_path_wire, &good_malformed_as_path);
+    test_parse_error_bytes_reader::<UpdateMessageError, UpdateMessageErrorParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<UpdateMessageError, LocatedUpdateMessageErrorParsingError<'_>>(
+    test_parse_error_bytes_reader::<UpdateMessageError, UpdateMessageErrorParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -366,27 +358,26 @@ fn test_bgp_notification_update_message() -> Result<(), BgpNotificationMessageWr
             value: good_wire[2..].to_vec(),
         });
 
-    let bad_undefined = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_undefined_wire[1..]) },
-        BgpNotificationMessageParsingError::UpdateMessageError(
-            UpdateMessageErrorParsingError::UndefinedUpdateMessageErrorSubCode(
-                UndefinedUpdateMessageErrorSubCode(0xff),
-            ),
-        ),
+    let bad_undefined = BgpNotificationMessageParsingError::UpdateMessageError(
+        UpdateMessageErrorParsingError::UndefinedUpdateMessageErrorSubCode {
+            offset: 1,
+            code: 0xff,
+        },
     );
-    let bad_incomplete = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
-        BgpNotificationMessageParsingError::UpdateMessageError(
-            UpdateMessageErrorParsingError::NomError(ErrorKind::Eof),
-        ),
+    let bad_incomplete = BgpNotificationMessageParsingError::UpdateMessageError(
+        UpdateMessageErrorParsingError::Parse(ParseError::UnexpectedEof {
+            offset: 1,
+            needed: 1,
+            available: 0,
+        }),
     );
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -404,13 +395,14 @@ fn test_hold_timer_expired_error() -> Result<(), HoldTimerExpiredErrorWritingErr
         sub_code: good_wire[0],
         value: good_wire[1..].to_vec(),
     };
-    let bad_incomplete = LocatedHoldTimerExpiredErrorParsingError::new(
-        Span::new(&bad_incomplete_wire),
-        HoldTimerExpiredErrorParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_incomplete = HoldTimerExpiredErrorParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<HoldTimerExpiredError, LocatedHoldTimerExpiredErrorParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<HoldTimerExpiredError, HoldTimerExpiredErrorParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -429,15 +421,16 @@ fn test_bgp_notification_hold_timer_expired() -> Result<(), BgpNotificationMessa
         value: good_wire[2..].to_vec(),
     });
 
-    let bad_incomplete = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
-        BgpNotificationMessageParsingError::HoldTimerExpiredError(
-            HoldTimerExpiredErrorParsingError::NomError(ErrorKind::Eof),
-        ),
+    let bad_incomplete = BgpNotificationMessageParsingError::HoldTimerExpiredError(
+        HoldTimerExpiredErrorParsingError::Parse(ParseError::UnexpectedEof {
+            offset: 1,
+            needed: 1,
+            available: 0,
+        }),
     );
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -469,27 +462,26 @@ fn test_finite_state_machine_error() -> Result<(), FiniteStateMachineErrorWritin
         value: good_in_establish_wire[1..].to_vec(),
     };
 
-    let bad_undefined = LocatedFiniteStateMachineErrorParsingError::new(
-        Span::new(&bad_undefined_wire),
-        FiniteStateMachineErrorParsingError::Undefined(UndefinedFiniteStateMachineErrorSubCode(
-            0xff,
-        )),
-    );
-    let bad_incomplete = LocatedFiniteStateMachineErrorParsingError::new(
-        Span::new(&bad_incomplete_wire),
-        FiniteStateMachineErrorParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_undefined = FiniteStateMachineErrorParsingError::Undefined {
+        offset: 0,
+        code: 0xff,
+    };
+    let bad_incomplete = FiniteStateMachineErrorParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    test_parsed_completely(&good_unspecified_wire, &good_unspecified);
-    test_parsed_completely(&good_in_open_wire, &good_in_open);
-    test_parsed_completely(&good_in_open_confirm_wire, &good_in_open_confirm);
-    test_parsed_completely(&good_in_establish_wire, &good_in_establish);
+    test_parsed_completely_bytes_reader(&good_unspecified_wire, &good_unspecified);
+    test_parsed_completely_bytes_reader(&good_in_open_wire, &good_in_open);
+    test_parsed_completely_bytes_reader(&good_in_open_confirm_wire, &good_in_open_confirm);
+    test_parsed_completely_bytes_reader(&good_in_establish_wire, &good_in_establish);
 
-    test_parse_error::<FiniteStateMachineError, LocatedFiniteStateMachineErrorParsingError<'_>>(
+    test_parse_error_bytes_reader::<FiniteStateMachineError, FiniteStateMachineErrorParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<FiniteStateMachineError, LocatedFiniteStateMachineErrorParsingError<'_>>(
+    test_parse_error_bytes_reader::<FiniteStateMachineError, FiniteStateMachineErrorParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -512,27 +504,26 @@ fn test_bgp_notification_finite_state_machine() -> Result<(), BgpNotificationMes
         },
     );
 
-    let bad_undefined = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_undefined_wire[1..]) },
-        BgpNotificationMessageParsingError::FiniteStateMachineError(
-            FiniteStateMachineErrorParsingError::Undefined(
-                UndefinedFiniteStateMachineErrorSubCode(0xff),
-            ),
-        ),
+    let bad_undefined = BgpNotificationMessageParsingError::FiniteStateMachineError(
+        FiniteStateMachineErrorParsingError::Undefined {
+            offset: 1,
+            code: 0xff,
+        },
     );
-    let bad_incomplete = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
-        BgpNotificationMessageParsingError::FiniteStateMachineError(
-            FiniteStateMachineErrorParsingError::NomError(ErrorKind::Eof),
-        ),
+    let bad_incomplete = BgpNotificationMessageParsingError::FiniteStateMachineError(
+        FiniteStateMachineErrorParsingError::Parse(ParseError::UnexpectedEof {
+            offset: 1,
+            needed: 1,
+            available: 0,
+        }),
     );
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -587,31 +578,32 @@ fn test_cease_error() -> Result<(), CeaseErrorWritingError> {
         value: good_bfd_wire[1..].to_vec(),
     };
 
-    let bad_undefined = LocatedCeaseErrorParsingError::new(
-        Span::new(&bad_undefined_wire),
-        CeaseErrorParsingError::Undefined(UndefinedCeaseErrorSubCode(0xff)),
-    );
-    let bad_incomplete = LocatedCeaseErrorParsingError::new(
-        Span::new(&bad_incomplete_wire),
-        CeaseErrorParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_undefined = CeaseErrorParsingError::Undefined {
+        offset: 0,
+        code: 0xff,
+    };
+    let bad_incomplete = CeaseErrorParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    test_parsed_completely(&good_max_prefix_wire, &good_max_prefix);
-    test_parsed_completely(&good_admin_down_wire, &good_admin_down);
-    test_parsed_completely(&good_deconfig_wire, &good_deconfig);
-    test_parsed_completely(&good_admin_reset_wire, &good_admin_reset);
-    test_parsed_completely(&good_conn_reject_wire, &good_conn_reject);
-    test_parsed_completely(&good_config_chg_wire, &good_config_chg);
-    test_parsed_completely(&good_conn_collision_wire, &good_conn_collision);
-    test_parsed_completely(&good_out_wire, &good_out);
-    test_parsed_completely(&good_reset_wire, &good_reset);
-    test_parsed_completely(&good_bfd_wire, &good_bfd);
+    test_parsed_completely_bytes_reader(&good_max_prefix_wire, &good_max_prefix);
+    test_parsed_completely_bytes_reader(&good_admin_down_wire, &good_admin_down);
+    test_parsed_completely_bytes_reader(&good_deconfig_wire, &good_deconfig);
+    test_parsed_completely_bytes_reader(&good_admin_reset_wire, &good_admin_reset);
+    test_parsed_completely_bytes_reader(&good_conn_reject_wire, &good_conn_reject);
+    test_parsed_completely_bytes_reader(&good_config_chg_wire, &good_config_chg);
+    test_parsed_completely_bytes_reader(&good_conn_collision_wire, &good_conn_collision);
+    test_parsed_completely_bytes_reader(&good_out_wire, &good_out);
+    test_parsed_completely_bytes_reader(&good_reset_wire, &good_reset);
+    test_parsed_completely_bytes_reader(&good_bfd_wire, &good_bfd);
 
-    test_parse_error::<CeaseError, LocatedCeaseErrorParsingError<'_>>(
+    test_parse_error_bytes_reader::<CeaseError, CeaseErrorParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<CeaseError, LocatedCeaseErrorParsingError<'_>>(
+    test_parse_error_bytes_reader::<CeaseError, CeaseErrorParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -638,25 +630,25 @@ fn test_bgp_notification_cease() -> Result<(), BgpNotificationMessageWritingErro
         value: good_wire[2..].to_vec(),
     });
 
-    let bad_undefined = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_undefined_wire[1..]) },
-        BgpNotificationMessageParsingError::CeaseError(CeaseErrorParsingError::Undefined(
-            UndefinedCeaseErrorSubCode(0xff),
-        )),
-    );
-    let bad_incomplete = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
-        BgpNotificationMessageParsingError::CeaseError(CeaseErrorParsingError::NomError(
-            ErrorKind::Eof,
-        )),
+    let bad_undefined =
+        BgpNotificationMessageParsingError::CeaseError(CeaseErrorParsingError::Undefined {
+            offset: 1,
+            code: 0xff,
+        });
+    let bad_incomplete = BgpNotificationMessageParsingError::CeaseError(
+        CeaseErrorParsingError::Parse(ParseError::UnexpectedEof {
+            offset: 1,
+            needed: 1,
+            available: 0,
+        }),
     );
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -675,21 +667,22 @@ fn test_route_refresh_error() -> Result<(), RouteRefreshErrorWritingError> {
         value: good_wire[1..].to_vec(),
     };
 
-    let bad_undefined = LocatedRouteRefreshErrorParsingError::new(
-        Span::new(&bad_undefined_wire),
-        RouteRefreshErrorParsingError::Undefined(UndefinedRouteRefreshMessageError(0xff)),
-    );
-    let bad_incomplete = LocatedRouteRefreshErrorParsingError::new(
-        Span::new(&bad_incomplete_wire),
-        RouteRefreshErrorParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_undefined = RouteRefreshErrorParsingError::Undefined {
+        offset: 0,
+        code: 0xff,
+    };
+    let bad_incomplete = RouteRefreshErrorParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<RouteRefreshError, LocatedRouteRefreshErrorParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<RouteRefreshError, RouteRefreshErrorParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<RouteRefreshError, LocatedRouteRefreshErrorParsingError<'_>>(
+    test_parse_error_bytes_reader::<RouteRefreshError, RouteRefreshErrorParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -708,26 +701,26 @@ fn test_bgp_notification_route_refresh_error() -> Result<(), BgpNotificationMess
         value: good_wire[2..].to_vec(),
     });
 
-    let bad_undefined = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_undefined_wire[1..]) },
-        BgpNotificationMessageParsingError::RouteRefreshError(
-            RouteRefreshErrorParsingError::Undefined(UndefinedRouteRefreshMessageError(0xff)),
-        ),
+    let bad_undefined = BgpNotificationMessageParsingError::RouteRefreshError(
+        RouteRefreshErrorParsingError::Undefined {
+            offset: 1,
+            code: 0xff,
+        },
+    );
+    let bad_incomplete = BgpNotificationMessageParsingError::RouteRefreshError(
+        RouteRefreshErrorParsingError::Parse(ParseError::UnexpectedEof {
+            offset: 1,
+            needed: 1,
+            available: 0,
+        }),
     );
 
-    let bad_incomplete = LocatedBgpNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
-        BgpNotificationMessageParsingError::RouteRefreshError(
-            RouteRefreshErrorParsingError::NomError(ErrorKind::Eof),
-        ),
-    );
-
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<BgpNotificationMessage, LocatedBgpNotificationMessageParsingError<'_>>(
+    test_parse_error_bytes_reader::<BgpNotificationMessage, BgpNotificationMessageParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
