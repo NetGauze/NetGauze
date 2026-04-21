@@ -139,7 +139,8 @@ fn parse_capability_param<'a>(
 ) -> Result<BgpOpenMessageParameter, BgpParameterParsingError> {
     let len = cur.read_u8()?;
     let mut capabilities_buf = cur.take_slice(len as usize)?;
-    // Each capability has at least 2 bytes (code + length), so pre-size accordingly.
+    // Each capability has at least 2 bytes (code + length), so pre-size
+    // accordingly.
     let mut capabilities = Vec::with_capacity((len as usize) / 2);
     while !capabilities_buf.is_empty() {
         match BgpCapability::parse(&mut capabilities_buf) {

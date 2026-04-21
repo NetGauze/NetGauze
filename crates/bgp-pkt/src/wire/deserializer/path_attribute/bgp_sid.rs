@@ -79,7 +79,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for PrefixSegmentIdentifier {
             cur.read_u8()? as usize
         };
         let mut segment_id_buf = cur.take_slice(segment_id_len)?;
-        let mut tlvs = Vec::new();
+        let mut tlvs = Vec::with_capacity(segment_id_buf.remaining() / 4);
         while !segment_id_buf.is_empty() {
             let tlv = BgpSidAttribute::parse(&mut segment_id_buf)?;
             tlvs.push(tlv);
@@ -117,7 +117,7 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
             }
             BgpSidAttributeType::Originator => {
                 let flags = data.read_u16_be()?;
-                let mut srgbs = Vec::new();
+                let mut srgbs = Vec::with_capacity(data.remaining() / 6);
                 while !data.is_empty() {
                     let v = SegmentRoutingGlobalBlock::parse(&mut data)?;
                     srgbs.push(v);
@@ -126,7 +126,7 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
             }
             BgpSidAttributeType::SRv6ServiceL3 => {
                 let reserved = data.read_u8()?;
-                let mut subtlvs = Vec::new();
+                let mut subtlvs = Vec::with_capacity(data.remaining() / 4);
                 while !data.is_empty() {
                     let v = SRv6ServiceSubTlv::parse(&mut data)?;
                     subtlvs.push(v);
@@ -135,7 +135,7 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
             }
             BgpSidAttributeType::SRv6ServiceL2 => {
                 let reserved = data.read_u8()?;
-                let mut subtlvs = Vec::new();
+                let mut subtlvs = Vec::with_capacity(data.remaining() / 4);
                 while !data.is_empty() {
                     let v = SRv6ServiceSubTlv::parse(&mut data)?;
                     subtlvs.push(v);
@@ -177,7 +177,8 @@ impl<'a> ParseFrom<'a> for SRv6ServiceSubTlv {
                 let service_sid_flags = data.read_u8()?;
                 let endpoint_behaviour = data.read_u16_be()?;
                 let reserved2 = data.read_u8()?;
-                let mut subsubtlvs = Vec::new();
+                let mut subsubtlvs = Vec::with_capacity(data.remaining() / 4);
+
                 while !data.is_empty() {
                     let subsubtlv = SRv6ServiceSubSubTlv::parse(&mut data)?;
                     subsubtlvs.push(subsubtlv);

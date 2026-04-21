@@ -67,7 +67,7 @@ fn parse_nlri<'a>(
     is_update: bool,
     ctx: &mut BgpParsingContext,
 ) -> Result<Vec<Ipv4UnicastAddress>, BgpUpdateMessageParsingError> {
-    let mut nlri_vec = Vec::new();
+    let mut nlri_vec = Vec::with_capacity(cur.remaining() / 2);
     while !cur.is_empty() {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)

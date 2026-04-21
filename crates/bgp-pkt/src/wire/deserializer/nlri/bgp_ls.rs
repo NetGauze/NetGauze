@@ -181,7 +181,7 @@ impl<'a> ParseFrom<'a> for BgpLsNlriLink {
         let identifier = cur.read_u64_be()?;
         let local_node_descriptors = BgpLsLocalNodeDescriptors::parse(cur)?;
         let remote_node_descriptors = BgpLsRemoteNodeDescriptors::parse(cur)?;
-        let mut link_descriptors = Vec::new();
+        let mut link_descriptors = Vec::with_capacity(cur.remaining() / 4);
         while cur.remaining() > 0 {
             let link_descriptor = BgpLsLinkDescriptor::parse(cur)?;
             link_descriptors.push(link_descriptor);
@@ -306,7 +306,7 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNodeDescriptorType> for BgpLsNodeDescrip
         let tlv_length = cur.read_u16_be()?;
         let mut data = cur.take_slice(tlv_length as usize)?;
 
-        let mut subtlvs = Vec::new();
+        let mut subtlvs = Vec::with_capacity(data.remaining() / 4);
         while !data.is_empty() {
             let subtlv = BgpLsNodeDescriptorSubTlv::parse(&mut data)?;
             subtlvs.push(subtlv);
@@ -380,7 +380,7 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for BgpLsNlriIpPrefix {
         })?;
         let identifier = cur.read_u64_be()?;
         let local_node_descriptors = BgpLsLocalNodeDescriptors::parse(cur)?;
-        let mut prefix_descriptors = Vec::new();
+        let mut prefix_descriptors = Vec::with_capacity(cur.remaining() / 4);
         while cur.remaining() > 0 {
             let descriptor = BgpLsPrefixDescriptor::parse(cur, nlri_type)?;
             prefix_descriptors.push(descriptor);
@@ -449,7 +449,7 @@ impl<'a> ParseFrom<'a> for MultiTopologyIdData {
     type Error = MultiTopologyIdDataParsingError;
 
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
-        let mut ids = Vec::new();
+        let mut ids = Vec::with_capacity(cur.remaining() / 2);
         while !cur.is_empty() {
             let id = MultiTopologyId::from(cur.read_u16_be()?);
             ids.push(id);

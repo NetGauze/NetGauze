@@ -66,7 +66,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsAttribute {
             cur.take_slice(len as usize)?
         };
 
-        let mut attributes = Vec::new();
+        let mut attributes = Vec::with_capacity(ls_buf.remaining() / 4);
         while !ls_buf.is_empty() {
             let attribute = BgpLsAttributeValue::parse(&mut ls_buf)?;
             attributes.push(attribute);
@@ -202,7 +202,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
                 BgpLsAttributeValue::IgpMetric(data.read_bytes(data.remaining())?.to_vec())
             }
             BgpLsAttributeType::SharedRiskLinkGroup => {
-                let mut values = Vec::new();
+                let mut values = Vec::with_capacity(data.remaining() / 4);
                 while !data.is_empty() {
                     let v = SharedRiskLinkGroupValue::parse(&mut data)?;
                     values.push(v);
@@ -236,7 +236,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
                 }
             }
             BgpLsAttributeType::IgpRouteTag => {
-                let mut vec = Vec::new();
+                let mut vec = Vec::with_capacity(data.remaining() / 4);
                 while !data.is_empty() {
                     let v = cur.read_u32_be()?;
                     vec.push(v);
@@ -244,7 +244,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
                 BgpLsAttributeValue::IgpRouteTag(vec)
             }
             BgpLsAttributeType::IgpExtendedRouteTag => {
-                let mut vec = Vec::new();
+                let mut vec = Vec::with_capacity(data.remaining() / 8);
                 while !data.is_empty() {
                     let v = cur.read_u64_be()?;
                     vec.push(v);

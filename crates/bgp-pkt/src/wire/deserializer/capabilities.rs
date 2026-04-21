@@ -174,7 +174,7 @@ impl<'a> ParseFrom<'a> for BgpCapability {
                     parse_unrecognized_capability(code.into(), cur)
                 }
                 BgpCapabilityCode::MultipleLabelsCapability => {
-                    let mut cap = Vec::new();
+                    let mut cap = Vec::with_capacity(cur.remaining() / 4);
                     while !cur.is_empty() {
                         let v = MultipleLabel::parse(cur)?;
                         cap.push(v);
@@ -382,7 +382,7 @@ impl<'a> ParseFrom<'a> for GracefulRestartCapability {
         let restart = header & 0x8000 == 0x8000;
         let graceful_notification = header & 0x4000 == 0x4000;
         let time = header & 0x0fff;
-        let mut address_families = Vec::new();
+        let mut address_families = Vec::with_capacity(params_buf.remaining() / 4);
         while !params_buf.is_empty() {
             let v = GracefulRestartAddressFamily::parse(&mut params_buf)?;
             address_families.push(v);
@@ -458,7 +458,7 @@ impl<'a> ParseFrom<'a> for AddPathCapability {
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let length = cur.read_u8()?;
         let mut params_buf = cur.take_slice(length as usize)?;
-        let mut address_families = Vec::new();
+        let mut address_families = Vec::with_capacity(params_buf.remaining() / 4);
         while !params_buf.is_empty() {
             let address_family = AddPathAddressFamily::parse(&mut params_buf)?;
             address_families.push(address_family);
@@ -536,7 +536,7 @@ impl<'a> ParseFrom<'a> for ExtendedNextHopEncodingCapability {
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let len = cur.read_u8()?;
         let mut encoding_buf = cur.take_slice(len as usize)?;
-        let mut encodings = Vec::new();
+        let mut encodings = Vec::with_capacity(encoding_buf.remaining() / 6);
         while !encoding_buf.is_empty() {
             let encoding = ExtendedNextHopEncoding::parse(&mut encoding_buf)?;
             encodings.push(encoding);
