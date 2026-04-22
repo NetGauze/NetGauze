@@ -1,18 +1,40 @@
 # BMP Monitoring Protocol Service to receive BMP packets
 
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-bmp-service.svg
+
+[crates-url]: https://crates.io/crates/netgauze-bmp-service
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-bmp-service/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-bmp-service
+
+
 This crate provides a scalable, actor-based architecture for handling BGP Monitoring Protocol (BMP) sessions.
 
 ## Components
 
 ### BmpActor
+
 The core unit of computation that handles TCP connections from one or more BMP routers.
+
 - **Concurrency**: Handles multiple TCP connections asynchronously.
 - **Subscriptions**: Supports push-based message delivery to subscribers (e.g., Kafka producers, loggers).
 - **Sharding**: Can distribute messages across multiple subscriber channels based on the peer's IP address hash.
 - **Management**: Provides commands to list connected peers and forcibly disconnect them.
 
 ### BmpSupervisor
+
 A management layer that orchestrates multiple `BmpActor` instances.
+
 - **Scaling**: Spawns multiple actors on the same listening port (using `SO_REUSEPORT`) to utilize multi-core systems.
 - **Aggregation**: Broadcasts commands (like subscriptions) to all managed actors and aggregates their responses.
 - **Lifecycle**: Manages the startup and shutdown of worker actors.
@@ -20,6 +42,7 @@ A management layer that orchestrates multiple `BmpActor` instances.
 ## Examples
 
 ### 1. Simple Print (Stateless)
+
 A basic example that listens for connections and prints decoded packets to the console.
 
 ```bash
@@ -27,7 +50,9 @@ cargo run --example print-bmp
 ```
 
 ### 2. BMP Actor with REST API
+
 Demonstrates how to run a single `BmpActor` integrated with a REST API for basic management.
+
 - Listens on port `1792`.
 - Exposes an HTTP API on port `31313`.
 - Supports disconnecting peers via `POST /api/disconnect`.
@@ -37,7 +62,9 @@ cargo run --example bmp-actor-example
 ```
 
 ### 3. BMP Supervisor
+
 Demonstrates the `BmpSupervisor` managing multiple actors for high availability and load balancing.
+
 - Spawns 2 workers on port `1790`.
 - Aggregates streams from all workers into a single subscriber.
 - Periodically logs connected peer statistics.

@@ -1,10 +1,29 @@
 # NetGauze collector daemon
 
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-collector.svg
+
+[crates-url]: https://crates.io/crates/netgauze-collector
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-collector/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-collector
+
+
 Work in progress for telemetry collection. Currently supports:
 
 1. IPFIX and NetFlow v9
 2. UDP Notif
 3. YANG Push
+4. BMP
 
 With publisher towards Kafka and HTTP endpoints.
 
@@ -50,11 +69,13 @@ To build from source, you need a Rust toolchain installed. We recommend using [r
    ```bash
    cargo run -p netgauze-collector --release -- crates/collector/config.yaml
    ```
-   *Note: You might need to install development libraries such as `libcurl-devel` (or `libcurl4-openssl-dev` on Debian/Ubuntu) depending on your OS.*
+   *Note: You might need to install development libraries such as `libcurl-devel` (or `libcurl4-openssl-dev` on
+   Debian/Ubuntu) depending on your OS.*
 
 ## Running the Collector
 
 Run the collector with a specific config file:
+
 ```bash
 netgauze-collector /path/to/config.yaml
 

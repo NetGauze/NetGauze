@@ -1,4 +1,21 @@
-# NetGauze BGP Pkt
+# NetGauze BGP Packet Library
+
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-bgp-pkt.svg
+
+[crates-url]: https://crates.io/crates/netgauze-bgp-pkt
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-bgp-pkt/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-bgp-pkt
 
 BGP-4 Protocol representation and wire format serialization/deserialization (serde)
 
@@ -133,7 +150,7 @@ pub fn main() {
 | BGP-LS (link-state)           | [RFC 7752](https://datatracker.ietf.org/doc/html/rfc7752)                                                               | No         | Yes      | No         |                                                                    |
 | Only To Customer (OTC)        | [RFC 9234](https://datatracker.ietf.org/doc/html/rfc9234)                                                               | No         | Yes      | Yes        |                                                                    |
 | Accumulated IGP Metric (AIGP) | [RFC 7311](https://datatracker.ietf.org/doc/html/rfc7311)                                                               | No         | Yes      | No         |                                                                    |
-| BGP Prefix-SID                | [RFC 8669](https://datatracker.ietf.org/doc/html/rfc8669) and [RFC 9252](https://datatracker.ietf.org/doc/html/rfc9252)                                                               | No         | Yes      | Yes        |                                                                    |
+| BGP Prefix-SID                | [RFC 8669](https://datatracker.ietf.org/doc/html/rfc8669) and [RFC 9252](https://datatracker.ietf.org/doc/html/rfc9252) | No         | Yes      | Yes        |                                                                    |
 | UnknownAttribute              |                                                                                                                         | N/A        | N/A      | N/A        | Catch all attribute that will read and keep the value as a Vec<u8> |
 
 ### MP-BGP supported address families

@@ -1,5 +1,23 @@
 # BMP Monitoring Protocol
 
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-bmp-pkt.svg
+
+[crates-url]: https://crates.io/crates/netgauze-bmp-pkt
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-bmp-pkt/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-bmp-pkt
+
+
 BMP-4 Protocol representation and wire format serialization/deserialization (serde)
 
 ## Example
