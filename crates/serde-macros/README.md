@@ -1,5 +1,23 @@
 # Helper macros to make ser/deser binary protocols easier
 
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-serde-macros.svg
+
+[crates-url]: https://crates.io/crates/netgauze-serde-macros
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-serde-macros/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-serde-macros
+
+
 *LocatedError*: For a given error enum {Name} generate a struct called Located{Name} that
 carries the `Span` (the error location in the input stream) info along the
 error. Additionally, generates [`From`] for `nom` library errors, external,

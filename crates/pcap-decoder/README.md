@@ -1,6 +1,25 @@
 # NetGauze PCAP Decoder
 
-A Rust library and CLI utility to decode network protocols (BGP, BMP, NetFlow/IPFIX, UDP-Notif) from PCAP files and convert them to JSON Lines format.
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-pcap-decoder.svg
+
+[crates-url]: https://crates.io/crates/netgauze-pcap-decoder
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-pcap-decoder/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-pcap-decoder
+
+
+A Rust library and CLI utility to decode network protocols (BGP, BMP, NetFlow/IPFIX, UDP-Notif) from PCAP files and
+convert them to JSON Lines format.
 
 ## Features
 
@@ -58,21 +77,25 @@ netgauze-pcap-decoder --input <PCAP_FILE> --protocol <PROTOCOL> --ports <PORTS> 
 ### Examples
 
 **Decode BGP packets from a PCAP file:**
+
 ```bash
 netgauze-pcap-decoder --input bgp_capture.pcap --protocol bgp --ports 179
 ```
 
 **Decode BMP packets and save to file:**
+
 ```bash
 netgauze-pcap-decoder --input bmp_capture.pcap --protocol bmp --ports 11019 --output bmp_messages.jsonl
 ```
 
 **Decode NetFlow packets with packet limit:**
+
 ```bash
 netgauze-pcap-decoder --input netflow_capture.pcap --protocol flow --ports 9995,2055 --input-count 1000
 ```
 
 **Decode UDP-Notif packets from multiple ports:**
+
 ```bash
 netgauze-pcap-decoder --input udp_notif_capture.pcap --protocol udp-notif --ports 9991,9992,9993
 ```

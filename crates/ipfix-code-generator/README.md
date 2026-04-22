@@ -1,5 +1,23 @@
 # Generate Rust code bindings for IPFIX Information Elements
 
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-ipfix-code-generator.svg
+
+[crates-url]: https://crates.io/crates/netgauze-ipfix-code-generator
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-ipfix-code-generator/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-ipfix-code-generator
+
+
 ## Example:
 
 To include the generated IANA and custom registry Information elements, in `build.rs` add the following code

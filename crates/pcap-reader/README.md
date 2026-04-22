@@ -1,5 +1,23 @@
 # PCAP and PCAPNG helper library
 
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-pcap-reader.svg
+
+[crates-url]: https://crates.io/crates/netgauze-pcap-reader
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-pcap-reader/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-pcap-reader
+
+
 Helper Reading pcap and pcap files for testing only
 See [parse](examples/parse.rs) for a simple code to parse BMP packets from a pcapng file.
 

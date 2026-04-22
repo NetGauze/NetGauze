@@ -1,5 +1,23 @@
 # NetGauze IANA package
 
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-iana.svg
+
+[crates-url]: https://crates.io/crates/netgauze-iana
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-iana/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-iana
+
+
 Collection of generic IANA definitions that are not specific to a single protocol.
 
 # Developer documentation
