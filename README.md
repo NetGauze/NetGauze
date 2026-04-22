@@ -190,10 +190,26 @@ cargo generate-rpm -p crates/collector
 
 ## License
 
-Licensed under Apache License, Version 2.0 ([LICENSE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0)
+Copyright (C) 2022-present The NetGauze Authors. All rights reserved.
+
+NetGauze is licensed under the Apache License, Version 2.0
+([LICENSE](LICENSE) or <http://www.apache.org/licenses/LICENSE-2.0>).
+Attribution notices are in [NOTICE](NOTICE).
+The author list is in [AUTHORS](AUTHORS).
+
+
+## Authors
+
+NetGauze was created by **Ahmed Elhassany** ([@ahassany](https://github.com/ahassany)),
+originally started in 2019 as a BGP library. It has since evolved into a full-fledged
+network telemetry toolkit with contributions from many individuals. The current author
+list is maintained in [AUTHORS](AUTHORS); see also the full
+[contributor graph](https://github.com/NetGauze/NetGauze/graphs/contributors).
+
 
 ## Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 licensed as above, without any additional terms or conditions.
+
