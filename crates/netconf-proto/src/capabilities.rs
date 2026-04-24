@@ -287,9 +287,9 @@ impl FromStr for Capability {
     }
 }
 
-impl XmlDeserialize<Capability> for Capability {
+impl<'a> XmlDeserialize<'a, Capability> for Capability {
     fn xml_deserialize(
-        parser: &mut XmlParser<impl io::BufRead>,
+        parser: &mut XmlParser<'a, impl io::BufRead>,
     ) -> Result<Capability, ParsingError> {
         parser.open(Some(NETCONF_NS), "capability")?;
         let body = parser.tag_string()?;

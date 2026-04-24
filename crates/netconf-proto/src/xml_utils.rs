@@ -20,6 +20,7 @@ use indexmap::IndexMap;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceError, ResolveResult};
 use quick_xml::reader::NsReader;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::{fmt, io};
 
@@ -29,8 +30,8 @@ pub trait XmlSerialize {
 }
 
 /// XML Deserialization trait
-pub trait XmlDeserialize<T: Sized> {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<T, ParsingError>;
+pub trait XmlDeserialize<'a, T: Sized> {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<T, ParsingError>;
 }
 
 #[derive(Debug, strum_macros::Display)]
@@ -60,14 +61,17 @@ impl From<XmlWriterError> for quick_xml::Error {
 pub struct XmlWriter<T: io::Write> {
     inner: quick_xml::writer::Writer<T>,
     // Stack of multiple namespace bindings since XML allows to overwrite the bindings
-    namespace_bindings: Vec<IndexMap<Namespace<'static>, String>>,
+    namespace_bindings: Vec<IndexMap<Cow<'static, [u8]>, String>>,
     // Namespaces has been appended to the xml element
     ns_applied: bool,
 }
 
 impl<T: io::Write> XmlWriter<T> {
     pub fn new(inner: quick_xml::writer::Writer<T>) -> Self {
-        let namespace_bindings = vec![IndexMap::from([(NETCONF_NS, "".to_string())])];
+        let namespace_bindings = vec![IndexMap::from([(
+            Cow::Borrowed(NETCONF_NS.as_ref()),
+            "".to_string(),
+        )])];
         let ns_applied = false;
         Self {
             inner,
@@ -78,11 +82,15 @@ impl<T: io::Write> XmlWriter<T> {
 
     pub fn new_with_custom_namespaces(
         inner: quick_xml::writer::Writer<T>,
-        namespace_binding: IndexMap<Namespace<'static>, String>,
+        namespace_binding: IndexMap<Namespace<'_>, String>,
     ) -> Result<Self, XmlWriterError> {
         Self::check_duplicate_prefixes(&namespace_binding)?;
         let ns_applied = false;
-        let namespace_bindings = vec![namespace_binding];
+        let mut cow_ns = IndexMap::with_capacity(namespace_binding.len());
+        for (ns, prefix) in namespace_binding {
+            cow_ns.insert(Cow::Owned(ns.as_ref().to_vec()), prefix);
+        }
+        let namespace_bindings = vec![cow_ns];
         Ok(Self {
             inner,
             namespace_bindings,
@@ -97,11 +105,11 @@ impl<T: io::Write> XmlWriter<T> {
         start
     }
 
-    pub fn get_namespace_prefix(&self, ns: Namespace<'static>) -> Option<&String> {
+    pub fn get_namespace_prefix(&self, ns: Namespace<'_>) -> Option<String> {
         self.namespace_bindings
             .iter()
             .rev()
-            .find_map(|map| map.get(&ns))
+            .find_map(|map| map.get(&Cow::Borrowed(ns.as_ref())).cloned())
     }
 
     /// Create a new element with specific namespace prefix
@@ -110,7 +118,7 @@ impl<T: io::Write> XmlWriter<T> {
     /// [XmlWriter::push_namespace_binding]
     pub fn create_ns_element(
         &mut self,
-        ns: Namespace<'static>,
+        ns: Namespace<'_>,
         name: &str,
     ) -> Result<BytesStart<'static>, XmlWriterError> {
         // the namespace must have been defined before
@@ -134,19 +142,23 @@ impl<T: io::Write> XmlWriter<T> {
 
     pub fn push_namespace_binding(
         &mut self,
-        namespace_binding: IndexMap<Namespace<'static>, String>,
+        namespace_binding: IndexMap<Namespace<'_>, String>,
     ) -> Result<(), XmlWriterError> {
         Self::check_duplicate_prefixes(&namespace_binding)?;
         self.ns_applied = false;
-        self.namespace_bindings.push(namespace_binding);
+        let mut cow_ns = IndexMap::with_capacity(namespace_binding.len());
+        for (ns, prefix) in namespace_binding {
+            cow_ns.insert(Cow::Owned(ns.as_ref().to_vec()), prefix);
+        }
+        self.namespace_bindings.push(cow_ns);
         Ok(())
     }
 
-    pub fn pop_namespace_binding(&mut self) -> Option<IndexMap<Namespace<'static>, String>> {
+    pub fn pop_namespace_binding(&mut self) -> Option<IndexMap<Cow<'static, [u8]>, String>> {
         self.namespace_bindings.pop()
     }
 
-    pub fn write_event<'a, E: Into<Event<'a>>>(&mut self, event: E) -> io::Result<()> {
+    pub fn write_event<'b, E: Into<Event<'b>>>(&mut self, event: E) -> io::Result<()> {
         self.inner.write_event(event.into())
     }
 
@@ -177,7 +189,7 @@ impl<T: io::Write> XmlWriter<T> {
     }
 
     fn check_duplicate_prefixes(
-        namespace_binding: &IndexMap<Namespace<'static>, String>,
+        namespace_binding: &IndexMap<Namespace<'_>, String>,
     ) -> Result<(), XmlWriterError> {
         // Check for duplicate prefix values in the new namespace binding
         let mut seen_prefixes = HashSet::new();
@@ -301,15 +313,15 @@ impl From<quick_xml::encoding::EncodingError> for ParsingError {
 }
 
 /// Transform an XML stream of characters into a Rust object
-pub struct XmlParser<R: Sized> {
+pub struct XmlParser<'a, R: Sized> {
     ns_reader: NsReader<R>,
-    current: Event<'static>,
-    previous: Event<'static>,
-    parents: Vec<Event<'static>>,
+    current: Event<'a>,
+    previous: Event<'a>,
+    parents: Vec<Event<'a>>,
     buf: Vec<u8>,
 }
 
-impl<R: io::BufRead> XmlParser<R> {
+impl<'a, R: io::BufRead> XmlParser<'a, R> {
     pub fn new(mut ns_reader: NsReader<R>) -> Result<Self, ParsingError> {
         let mut buf: Vec<u8> = vec![];
         let current = ns_reader.read_event_into(&mut buf)?.into_owned();
@@ -330,22 +342,22 @@ impl<R: io::BufRead> XmlParser<R> {
     }
 
     /// read one more tag
-    pub fn next_event(&mut self) -> Result<Event<'static>, ParsingError> {
+    pub fn next_event(&mut self) -> Result<Event<'a>, ParsingError> {
         self.buf.clear();
         let evt = self.ns_reader.read_event_into(&mut self.buf)?.into_owned();
         self.previous = std::mem::replace(&mut self.current, evt);
         Ok(self.previous.clone())
     }
 
-    pub const fn peek(&self) -> &Event<'static> {
+    pub const fn peek(&self) -> &Event<'a> {
         &self.current
     }
 
-    pub const fn previous(&self) -> &Event<'static> {
+    pub const fn previous(&self) -> &Event<'a> {
         &self.previous
     }
     /// skip a node at the current level
-    pub fn skip(&mut self) -> Result<Event<'static>, ParsingError> {
+    pub fn skip(&mut self) -> Result<Event<'a>, ParsingError> {
         match &self.current {
             Event::Start(b) => {
                 let _span = self
@@ -392,9 +404,9 @@ impl<R: io::BufRead> XmlParser<R> {
     /// if another XML element found, fail with a [ParsingError::WrongToken]`
     pub fn open(
         &mut self,
-        ns: Option<Namespace<'_>>,
+        ns: Option<Namespace<'a>>,
         key: &str,
-    ) -> Result<BytesStart<'static>, ParsingError> {
+    ) -> Result<BytesStart<'a>, ParsingError> {
         let evt = match self.peek() {
             Event::Empty(_) if self.is_tag(ns, key) => {
                 // hack to make `prev_attr` works
@@ -424,9 +436,9 @@ impl<R: io::BufRead> XmlParser<R> {
     /// otherwise return None.
     pub fn maybe_open(
         &mut self,
-        ns: Option<Namespace<'_>>,
+        ns: Option<Namespace<'a>>,
         key: &str,
-    ) -> Result<Option<BytesStart<'static>>, ParsingError> {
+    ) -> Result<Option<BytesStart<'a>>, ParsingError> {
         self.skip_text()?;
         match self.open(ns, key) {
             Ok(v) => Ok(Some(v)),
@@ -476,7 +488,7 @@ impl<R: io::BufRead> XmlParser<R> {
                     if accumulator.is_empty() {
                         return Err(ParsingError::WrongToken {
                             expecting: "text".to_string(),
-                            found: self.peek().clone(),
+                            found: self.peek().clone().into_owned(),
                         });
                     }
                     return Ok(accumulator.into());
@@ -491,7 +503,7 @@ impl<R: io::BufRead> XmlParser<R> {
         matches!(self.parents.last(), Some(Event::Start(_)) | None)
     }
 
-    pub fn close(&mut self) -> Result<Event<'static>, ParsingError> {
+    pub fn close(&mut self) -> Result<Event<'a>, ParsingError> {
         // Handle the empty case
         if !self.parent_has_child() {
             self.parents.pop();
@@ -580,7 +592,7 @@ impl<R: io::BufRead> XmlParser<R> {
 
     /// Deserializes all elements inside an XML sequence, till an end tag of the
     /// element openned before calling this method is reached.
-    pub fn collect_xml_sequence<N: XmlDeserialize<N> + fmt::Debug + PartialEq + Sync>(
+    pub fn collect_xml_sequence<N: XmlDeserialize<'a, N> + fmt::Debug + PartialEq + Sync>(
         &mut self,
     ) -> Result<Vec<N>, ParsingError> {
         if !self.parent_has_child() {
@@ -610,7 +622,7 @@ impl<R: io::BufRead> XmlParser<R> {
     /// reached. This variant filters elements by their namespace and tag
     /// name.
     pub fn collect_xml_sequence_with_tag<
-        N: XmlDeserialize<N> + XmlSerialize + fmt::Debug + PartialEq + Sync,
+        N: XmlDeserialize<'a, N> + XmlSerialize + fmt::Debug + PartialEq + Sync,
     >(
         &mut self,
         ns: Option<Namespace<'_>>,
@@ -655,7 +667,7 @@ mod tests {
     use super::*;
     use quick_xml::events::{BytesDecl, BytesEnd, BytesText};
 
-    fn create_parser(xml: &'_ str) -> XmlParser<&'_ [u8]> {
+    fn create_parser<'a>(xml: &'a str) -> XmlParser<'a, &'a [u8]> {
         let ns_reader = NsReader::from_reader(xml.as_bytes());
         XmlParser::new(ns_reader).expect("Failed to create parser")
     }
@@ -968,9 +980,13 @@ mod tests {
         let writer = quick_xml::writer::Writer::new(&mut buffer);
         let ns_to_apply =
             IndexMap::from([(Namespace(b"https://example.com"), "xmlns".to_string())]);
+        let cow_bindings = IndexMap::from([(
+            Cow::Owned(b"https://example.com".to_vec()),
+            "xmlns".to_string(),
+        )]);
         let xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply.clone())
             .expect("failed creating writer");
-        assert_eq!(xml_writer.namespace_bindings, vec![ns_to_apply]);
+        assert_eq!(xml_writer.namespace_bindings, vec![cow_bindings]);
     }
 
     #[test]

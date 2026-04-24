@@ -53,7 +53,10 @@ mod tests {
     use quick_xml::NsReader;
     use std::{fmt, io};
 
-    pub(crate) fn test_parse_error<T: XmlDeserialize<T> + XmlSerialize + PartialEq + fmt::Debug>(
+    pub(crate) fn test_parse_error<
+        'a,
+        T: XmlDeserialize<'a, T> + XmlSerialize + PartialEq + fmt::Debug,
+    >(
         input_str: &'_ str,
     ) -> Result<(), ParsingError> {
         // Check first we can deserialize value correctly
@@ -68,12 +71,12 @@ mod tests {
 
     /// Test function for types that own all their data (no borrowed references)
     /// This version can do round-trip testing
-    pub(crate) fn test_xml_value_owned<T>(
+    pub(crate) fn test_xml_value_owned<'a, T>(
         input_str: &'_ str,
         expected: T,
     ) -> Result<(), ParsingError>
     where
-        T: XmlDeserialize<T> + XmlSerialize + PartialEq + fmt::Debug + Clone,
+        T: XmlDeserialize<'a, T> + XmlSerialize + PartialEq + fmt::Debug + Clone,
     {
         // Check first we can deserialize value correctly
         let mut reader = NsReader::from_str(input_str);
@@ -107,7 +110,8 @@ mod tests {
     }
 
     pub(crate) fn test_xml_value<
-        T: XmlDeserialize<T> + XmlSerialize + PartialEq + fmt::Debug + Clone,
+        'a,
+        T: XmlDeserialize<'a, T> + XmlSerialize + PartialEq + fmt::Debug + Clone,
     >(
         input_str: &'_ str,
         expected: T,

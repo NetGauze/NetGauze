@@ -780,8 +780,8 @@ impl YangLibrary {
     }
 }
 
-impl XmlDeserialize<YangLibrary> for YangLibrary {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, YangLibrary> for YangLibrary {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         // Parse yang-library children in any order
         if matches!(parser.peek(), Event::Decl(_)) {
             parser.skip()?;
@@ -817,7 +817,7 @@ impl XmlDeserialize<YangLibrary> for YangLibrary {
             } else {
                 return Err(ParsingError::WrongToken {
                     expecting: "<module-set>, <schema>, <datastore>, <content-id>".to_string(),
-                    found: parser.peek().clone(),
+                    found: parser.peek().clone().into_owned(),
                 });
             }
         }
@@ -961,8 +961,8 @@ impl ModuleSet {
     }
 }
 
-impl XmlDeserialize<ModuleSet> for ModuleSet {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ModuleSet> for ModuleSet {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(YANG_LIBRARY_NS), "module-set")?;
         let name = parse_yang_lib_name(parser)?;
@@ -1106,8 +1106,8 @@ impl Module {
     }
 }
 
-impl XmlDeserialize<Module> for Module {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, Module> for Module {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(YANG_LIBRARY_NS), "module")?;
         let name = parse_yang_lib_name(parser)?;
@@ -1271,8 +1271,8 @@ impl Submodule {
     }
 }
 
-impl XmlDeserialize<Submodule> for Submodule {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, Submodule> for Submodule {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(YANG_LIBRARY_NS), "submodule")?;
         let name = parse_yang_lib_name(parser)?;
@@ -1356,8 +1356,8 @@ impl ImportOnlyModule {
     }
 }
 
-impl XmlDeserialize<ImportOnlyModule> for ImportOnlyModule {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ImportOnlyModule> for ImportOnlyModule {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(YANG_LIBRARY_NS), "import-only-module")?;
         let name = parse_yang_lib_name(parser)?;
@@ -1423,8 +1423,8 @@ impl Schema {
     }
 }
 
-impl XmlDeserialize<Schema> for Schema {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, Schema> for Schema {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(YANG_LIBRARY_NS), "schema")?;
         let name = parse_yang_lib_name(parser)?;
@@ -1537,8 +1537,8 @@ impl Datastore {
     }
 }
 
-impl XmlDeserialize<Datastore> for Datastore {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, Datastore> for Datastore {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(YANG_LIBRARY_NS), "datastore")?;
         parser.skip_text()?;
@@ -1603,7 +1603,9 @@ impl XmlSerialize for Datastore {
 }
 
 #[inline]
-fn parse_yang_lib_name(parser: &mut XmlParser<impl io::BufRead>) -> Result<Box<str>, ParsingError> {
+fn parse_yang_lib_name<'a>(
+    parser: &mut XmlParser<'a, impl io::BufRead>,
+) -> Result<Box<str>, ParsingError> {
     parser.skip_text()?;
     parser.open(Some(YANG_LIBRARY_NS), "name")?;
     let name = parser.tag_string()?.trim().into();
@@ -1625,8 +1627,8 @@ fn serialize_yang_lib_name<T: io::Write>(
 }
 
 #[inline]
-fn parse_yang_lib_revision(
-    parser: &mut XmlParser<impl io::BufRead>,
+fn parse_yang_lib_revision<'a>(
+    parser: &mut XmlParser<'a, impl io::BufRead>,
 ) -> Result<Option<Box<str>>, ParsingError> {
     parser.skip_text()?;
     if parser
@@ -1656,8 +1658,8 @@ fn serialize_yang_lib_revision<T: io::Write>(
 }
 
 #[inline]
-fn parse_yang_lib_namespace(
-    parser: &mut XmlParser<impl io::BufRead>,
+fn parse_yang_lib_namespace<'a>(
+    parser: &mut XmlParser<'a, impl io::BufRead>,
 ) -> Result<Box<str>, ParsingError> {
     parser.skip_text()?;
     parser.open(Some(YANG_LIBRARY_NS), "namespace")?;
@@ -1679,8 +1681,8 @@ fn serialize_yang_lib_namespace<T: io::Write>(
 }
 
 #[inline]
-fn parse_yang_lib_location(
-    parser: &mut XmlParser<impl io::BufRead>,
+fn parse_yang_lib_location<'a>(
+    parser: &mut XmlParser<'a, impl io::BufRead>,
 ) -> Result<Box<[Box<str>]>, ParsingError> {
     let mut location = Vec::new();
     while parser

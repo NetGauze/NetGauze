@@ -48,8 +48,8 @@ pub enum NetConfMessage {
     RpcReply(RpcReply),
 }
 
-impl XmlDeserialize<NetConfMessage> for NetConfMessage {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, NetConfMessage> for NetConfMessage {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip XML declaration header if present in the message
         if matches!(parser.peek(), Event::Decl(_)) {
             parser.skip()?;
@@ -68,7 +68,7 @@ impl XmlDeserialize<NetConfMessage> for NetConfMessage {
             },
             token => Err(ParsingError::WrongToken {
                 expecting: "<hello>, <rpc>, or <rpc-reply>".to_string(),
-                found: token.clone(),
+                found: token.clone().into_owned(),
             }),
         }
     }
@@ -127,8 +127,10 @@ impl Hello {
     }
 }
 
-impl XmlDeserialize<Hello> for Hello {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Hello, ParsingError> {
+impl<'a> XmlDeserialize<'a, Hello> for Hello {
+    fn xml_deserialize(
+        parser: &mut XmlParser<'a, impl io::BufRead>,
+    ) -> Result<Hello, ParsingError> {
         // Skip XML declaration header if present in the message
         if matches!(parser.peek(), Event::Decl(_)) {
             parser.skip()?;
@@ -268,8 +270,8 @@ fn extract_message_id(open: &BytesStart<'_>) -> Result<Option<Box<str>>, Parsing
     Ok(msg_id_attr)
 }
 
-impl XmlDeserialize<Rpc> for Rpc {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Rpc, ParsingError> {
+impl<'a> XmlDeserialize<'a, Rpc> for Rpc {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Rpc, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
         let open = parser.open(Some(NETCONF_NS), "rpc")?;
@@ -332,8 +334,8 @@ pub enum YangSchemaFormat {
     Rnc,
 }
 
-impl XmlDeserialize<YangSchemaFormat> for YangSchemaFormat {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, YangSchemaFormat> for YangSchemaFormat {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(NETCONF_MONITORING_NS), "format")?;
         let value_str = parser.tag_string()?;
@@ -396,8 +398,8 @@ pub enum ConfigSource {
     Startup,
 }
 
-impl XmlDeserialize<ConfigSource> for ConfigSource {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ConfigSource> for ConfigSource {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(NETCONF_NS), "source")?;
         let value = if parser.maybe_open(Some(NETCONF_NS), "candidate")?.is_some() {
@@ -409,7 +411,7 @@ impl XmlDeserialize<ConfigSource> for ConfigSource {
         } else {
             return Err(ParsingError::WrongToken {
                 expecting: "<candidate/>, <running/>, <startup/>".into(),
-                found: parser.peek().clone(),
+                found: parser.peek().clone().into_owned(),
             });
         };
 
@@ -447,8 +449,8 @@ pub enum ConfigTarget {
     Running,
 }
 
-impl XmlDeserialize<ConfigTarget> for ConfigTarget {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ConfigTarget> for ConfigTarget {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(NETCONF_NS), "target")?;
         let value = if parser.maybe_open(Some(NETCONF_NS), "candidate")?.is_some() {
@@ -458,7 +460,7 @@ impl XmlDeserialize<ConfigTarget> for ConfigTarget {
         } else {
             return Err(ParsingError::WrongToken {
                 expecting: "<candidate/> or <running/>".into(),
-                found: parser.peek().clone(),
+                found: parser.peek().clone().into_owned(),
             });
         };
         // close target type
@@ -517,8 +519,8 @@ pub enum ConfigUpdateDefaultOperation {
     None,
 }
 
-impl XmlDeserialize<ConfigUpdateDefaultOperation> for ConfigUpdateDefaultOperation {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ConfigUpdateDefaultOperation> for ConfigUpdateDefaultOperation {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(NETCONF_NS), "default-operation")?;
         let value_str = parser.tag_string()?;
@@ -577,8 +579,8 @@ pub enum ConfigEditTestOption {
     TestOnly,
 }
 
-impl XmlDeserialize<ConfigEditTestOption> for ConfigEditTestOption {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ConfigEditTestOption> for ConfigEditTestOption {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(NETCONF_NS), "test-option")?;
         let value_str = parser.tag_string()?;
@@ -631,8 +633,8 @@ pub enum ConfigErrorOption {
     RollbackOnError,
 }
 
-impl XmlDeserialize<ConfigErrorOption> for ConfigErrorOption {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ConfigErrorOption> for ConfigErrorOption {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(NETCONF_NS), "error-option")?;
         let value_str = parser.tag_string()?;
@@ -680,8 +682,8 @@ pub enum Filter {
     XPath(Box<str>),
 }
 
-impl XmlDeserialize<Filter> for Filter {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, Filter> for Filter {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         let filter_start = parser.open(Some(NETCONF_NS), "filter")?;
         let filter_type = extract_attribute(&filter_start, b"type").unwrap_or("subtree".into());
@@ -743,8 +745,8 @@ pub enum EditConfig {
     Url(Box<str>),
 }
 
-impl XmlDeserialize<EditConfig> for EditConfig {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, EditConfig> for EditConfig {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         let value = if parser.maybe_open(Some(NETCONF_NS), "url")?.is_some() {
             let url = parser.tag_string()?;
@@ -757,7 +759,7 @@ impl XmlDeserialize<EditConfig> for EditConfig {
         } else {
             return Err(ParsingError::WrongToken {
                 expecting: "<url/> or <config/>".into(),
-                found: parser.peek().clone(),
+                found: parser.peek().clone().into_owned(),
             });
         };
         Ok(value)
@@ -842,7 +844,9 @@ impl WellKnownOperation {
     ///
     /// NOTE: this method assumes that `parser.open` is already called on
     /// get-config
-    fn parse_get_config(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+    fn parse_get_config<'a>(
+        parser: &mut XmlParser<'a, impl io::BufRead>,
+    ) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         let source = ConfigSource::xml_deserialize(parser)?;
         let filter = Filter::xml_deserialize(parser)?;
@@ -868,7 +872,9 @@ impl WellKnownOperation {
     ///
     /// NOTE: this method assumes that `parser.open` is already called on
     /// edit-config
-    fn parse_edit_config(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+    fn parse_edit_config<'a>(
+        parser: &mut XmlParser<'a, impl io::BufRead>,
+    ) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         let target = ConfigTarget::xml_deserialize(parser)?;
 
@@ -931,7 +937,7 @@ impl WellKnownOperation {
         Ok(())
     }
 
-    fn parse_get(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+    fn parse_get<'a>(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         let filter = Filter::xml_deserialize(parser)?;
         // Close get
@@ -950,7 +956,9 @@ impl WellKnownOperation {
         Ok(())
     }
 
-    fn parse_get_schema(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+    fn parse_get_schema<'a>(
+        parser: &mut XmlParser<'a, impl io::BufRead>,
+    ) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         parser.open(Some(NETCONF_MONITORING_NS), "identifier")?;
         let identifier = parser.tag_string()?.trim().into();
@@ -1023,8 +1031,8 @@ impl WellKnownOperation {
     }
 }
 
-impl XmlDeserialize<WellKnownOperation> for WellKnownOperation {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, WellKnownOperation> for WellKnownOperation {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         if parser.maybe_open(Some(NETCONF_NS), "get-config")?.is_some() {
             return Self::parse_get_config(parser);
@@ -1154,8 +1162,8 @@ impl From<RpcReply> for RpcReplyContent {
     }
 }
 
-impl XmlDeserialize<RpcReply> for RpcReply {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, RpcReply> for RpcReply {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         let rpc_reply = parser.open(Some(NETCONF_NS), "rpc-reply")?;
         let message_id = extract_message_id(&rpc_reply)?;
@@ -1309,14 +1317,16 @@ pub enum WellKnownRpcResponse {
 }
 
 impl WellKnownRpcResponse {
-    fn parse_yang_schema(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+    fn parse_yang_schema<'a>(
+        parser: &mut XmlParser<'a, impl io::BufRead>,
+    ) -> Result<Self, ParsingError> {
         let schema = decode_html_entities(parser.tag_string()?.as_ref()).into_boxed_str();
         parser.close()?;
         Ok(WellKnownRpcResponse::YangSchema { schema })
     }
 }
-impl XmlDeserialize<WellKnownRpcResponse> for WellKnownRpcResponse {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, WellKnownRpcResponse> for WellKnownRpcResponse {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         if parser
             .maybe_open(Some(NETCONF_MONITORING_NS), "data")?
@@ -1468,8 +1478,8 @@ impl RpcError {
     }
 }
 
-impl XmlDeserialize<RpcError> for RpcError {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, RpcError> for RpcError {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         let mut rpc_error = RpcError::default();
         parser.open(Some(NETCONF_NS), "rpc-error")?;
         // Skip any empty text
@@ -1556,9 +1566,9 @@ pub struct ErrorMessage {
     pub text: Box<str>,
 }
 
-impl XmlDeserialize<ErrorMessage> for ErrorMessage {
+impl<'a> XmlDeserialize<'a, ErrorMessage> for ErrorMessage {
     fn xml_deserialize(
-        parser: &mut XmlParser<impl io::BufRead>,
+        parser: &mut XmlParser<'a, impl io::BufRead>,
     ) -> Result<ErrorMessage, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
@@ -1620,8 +1630,8 @@ pub enum ErrorType {
     Application,
 }
 
-impl XmlDeserialize<ErrorType> for ErrorType {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ErrorType> for ErrorType {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
         parser.open(Some(NETCONF_NS), "error-type")?;
@@ -1729,8 +1739,8 @@ pub enum ErrorTag {
     MalformedMessage,
 }
 
-impl XmlDeserialize<ErrorTag> for ErrorTag {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ErrorTag> for ErrorTag {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
         parser.open(Some(NETCONF_NS), "error-tag")?;
@@ -1784,8 +1794,8 @@ pub enum ErrorSeverity {
     Warning,
 }
 
-impl XmlDeserialize<ErrorSeverity> for ErrorSeverity {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ErrorSeverity> for ErrorSeverity {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
         parser.open(Some(NETCONF_NS), "error-severity")?;
@@ -1851,8 +1861,8 @@ pub enum ErrorInfo {
     Error(Box<[ErrorInfoValue]>),
 }
 
-impl XmlDeserialize<ErrorInfo> for ErrorInfo {
-    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+impl<'a> XmlDeserialize<'a, ErrorInfo> for ErrorInfo {
+    fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.open(Some(NETCONF_NS), "error-info")?;
         if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "session-id") {
             let session_id = parser.tag_string()?.parse()?;
@@ -1936,9 +1946,9 @@ pub struct ErrorInfoValue {
     bad_namespace: Option<Box<str>>,
 }
 
-impl XmlDeserialize<ErrorInfoValue> for ErrorInfoValue {
+impl<'a> XmlDeserialize<'a, ErrorInfoValue> for ErrorInfoValue {
     fn xml_deserialize(
-        parser: &mut XmlParser<impl io::BufRead>,
+        parser: &mut XmlParser<'a, impl io::BufRead>,
     ) -> Result<ErrorInfoValue, ParsingError> {
         let mut at_least_one = false;
         let mut value = ErrorInfoValue {
