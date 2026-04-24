@@ -881,7 +881,7 @@ fn serialize_udp_notif(
     input: Arc<UdpNotifRequest>,
     writer_id: String,
 ) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
-    let (peer, msg) = input.as_ref();
+    let (peer, _col, msg) = input.as_ref();
     let mut value = serde_json::to_value(msg)?;
     if let serde_json::Value::Object(val) = &mut value {
         // Add the writer ID to the message
@@ -1029,6 +1029,7 @@ mod tests {
     fn test_serialize_udp_notif_unknown_media_type() {
         let writer_id = String::from("writer_id");
         let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let collector = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12345);
         let pkt = UdpNotifPacket::new(
             MediaType::Unknown(0xee),
             0x01000001,
@@ -1037,7 +1038,7 @@ mod tests {
             Bytes::from(&[0xffu8, 0xffu8][..]),
         );
 
-        let request = Arc::new((peer, pkt));
+        let request = Arc::new((peer, collector, pkt));
         let serialized = serialize_udp_notif(request.clone(), writer_id.clone());
         assert!(matches!(
             serialized,
@@ -1051,6 +1052,7 @@ mod tests {
     fn test_serialize_udp_notif_json() {
         let writer_id = String::from("writer_id");
         let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let collector = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12345);
         let pkt = UdpNotifPacket::new(
             MediaType::YangDataJson,
             0x01000001,
@@ -1077,8 +1079,8 @@ mod tests {
                 "writer_id": "writer_id"
             }
         );
-        let request_invalid = Arc::new((peer, pkt_invalid_json));
-        let request_good = Arc::new((peer, pkt));
+        let request_invalid = Arc::new((peer, collector, pkt_invalid_json));
+        let request_good = Arc::new((peer, collector, pkt));
         let result_invalid = serialize_udp_notif(request_invalid, writer_id.clone());
         let serialized =
             serialize_udp_notif(request_good, writer_id.clone()).expect("failed to serialize json");
@@ -1100,6 +1102,7 @@ mod tests {
     fn test_serialize_udp_notif_xml() {
         let writer_id = String::from("writer_id");
         let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let collector = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12345);
         let pkt = UdpNotifPacket::new(
             MediaType::YangDataXml,
             0x01000001,
@@ -1127,8 +1130,8 @@ mod tests {
             }
         );
 
-        let request_invalid = Arc::new((peer, pkt_invalid_utf8));
-        let request_good = Arc::new((peer, pkt));
+        let request_invalid = Arc::new((peer, collector, pkt_invalid_utf8));
+        let request_good = Arc::new((peer, collector, pkt));
         let result_invalid = serialize_udp_notif(request_invalid, writer_id.clone());
         let serialized =
             serialize_udp_notif(request_good, writer_id.clone()).expect("failed to serialize json");
@@ -1149,6 +1152,7 @@ mod tests {
     fn test_serialize_udp_notif_cbor() {
         let writer_id = String::from("writer_id");
         let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let collector = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 12345);
         let mut cursor = std::io::Cursor::new(vec![]);
         ciborium::ser::into_writer(&serde_json::json!({"id": 1}), &mut cursor)
             .expect("failed to serialize cbor");
@@ -1180,8 +1184,8 @@ mod tests {
             }
         );
 
-        let request_invalid = Arc::new((peer, pkt_invalid));
-        let request_good = Arc::new((peer, pkt));
+        let request_invalid = Arc::new((peer, collector, pkt_invalid));
+        let request_good = Arc::new((peer, collector, pkt));
         let result_invalid = serialize_udp_notif(request_invalid, writer_id.clone());
         let serialized =
             serialize_udp_notif(request_good, writer_id.clone()).expect("failed to serialize json");

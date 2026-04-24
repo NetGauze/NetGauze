@@ -38,7 +38,7 @@ pub type ActorId = u32;
 pub type SubscriberId = u32;
 
 /// The UDP-Notif packet and the peer [SocketAddr] that sent it.
-pub type UdpNotifRequest = (SocketAddr, UdpNotifPacket);
+pub type UdpNotifRequest = (SocketAddr, SocketAddr, UdpNotifPacket);
 
 pub type UdpNotifSender = async_channel::Sender<Arc<UdpNotifRequest>>;
 pub type UdpNotifReceiver = async_channel::Receiver<Arc<UdpNotifRequest>>;

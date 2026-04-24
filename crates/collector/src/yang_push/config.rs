@@ -149,6 +149,7 @@ mod tests {
     fn create_test_subscription_info(ip: IpAddr) -> SubscriptionInfo {
         SubscriptionInfo::new(
             SocketAddr::new(ip, 8080),
+            SocketAddr::from(([127, 0, 0, 1], 12345)),
             1,
             "test-content-id".to_string(),
             netgauze_udp_notif_pkt::notification::Target::new_datastore(
