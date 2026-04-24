@@ -1517,7 +1517,7 @@ impl From<DatastoreName> for (Box<str>, Box<str>) {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Datastore {
     name: DatastoreName,
     schema: Box<str>,
