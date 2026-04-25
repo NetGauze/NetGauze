@@ -18,7 +18,7 @@
 use crate::NETCONF_NS;
 use indexmap::IndexMap;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, NamespaceError, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceError, PrefixDeclaration, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -312,6 +312,16 @@ impl From<quick_xml::encoding::EncodingError> for ParsingError {
     }
 }
 
+/// Output of [`XmlParser::copy_buffer_till_with_namespaces`].
+pub struct CopiedSubtree {
+    /// Raw XML of the copied region, verbatim — no injected xmlns attributes.
+    pub xml: Box<str>,
+    /// Prefix → URI bindings actually referenced by any element or attribute
+    /// inside the region. The empty key represents the default namespace
+    /// and is only present if an unprefixed element appeared.
+    pub namespaces: IndexMap<String, String>,
+}
+
 /// Transform an XML stream of characters into a Rust object
 pub struct XmlParser<'a, R: Sized> {
     ns_reader: NsReader<R>,
@@ -590,6 +600,51 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         Ok(ret.into())
     }
 
+    /// Copy every event between the current position and the end tag whose
+    /// local name matches `tag`, recording which namespace prefixes are
+    /// actually referenced inside.
+    ///
+    /// Unlike naive text extraction, this resolves each element and attribute
+    /// QName against the parser's namespace resolver at the moment it is seen,
+    /// so bindings that go out of scope before the closing tag (e.g. ,declared
+    /// on a now-closed child element) are still captured correctly.
+    ///
+    /// The returned XML is not modified: no `xmlns` attributes are injected.
+    /// Callers that need a self-contained fragment can construct one from
+    /// [`CopiedSubtree::namespaces`].
+    pub fn copy_buffer_till_with_namespaces(
+        &mut self,
+        tag: &'_ [u8],
+    ) -> Result<CopiedSubtree, ParsingError> {
+        let mut writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
+        let mut namespaces: IndexMap<String, String> = IndexMap::new();
+
+        loop {
+            if let Event::End(b) = self.peek()
+                && b.local_name().into_inner() == tag
+            {
+                break;
+            }
+            if let Event::Eof = self.peek() {
+                return Err(ParsingError::Eof);
+            }
+
+            // Record prefix usage on Start/Empty. We resolve NOW so that bindings
+            // declared on inner elements are captured even after those elements
+            // close and their bindings are popped from the resolver stack.
+            if let Event::Start(e) | Event::Empty(e) = self.peek() {
+                Self::record_element_usage(e, &self.ns_reader, &mut namespaces);
+            }
+
+            writer.write_event(self.current.clone())?;
+            self.next_event()?;
+        }
+
+        let bytes = writer.into_inner().into_inner();
+        let xml: Box<str> = std::str::from_utf8(&bytes)?.to_string().into();
+        Ok(CopiedSubtree { xml, namespaces })
+    }
+
     /// Deserializes all elements inside an XML sequence, till an end tag of the
     /// element openned before calling this method is reached.
     pub fn collect_xml_sequence<N: XmlDeserialize<'a, N> + fmt::Debug + PartialEq + Sync>(
@@ -660,6 +715,120 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
             }
         }
     }
+
+    pub fn read_xpath_with_namespaces(
+        &mut self,
+    ) -> Result<(Box<str>, IndexMap<String, String>), ParsingError> {
+        // Snapshot every prefix currently in scope BEFORE advancing the reader.
+        let mut all_namespaces = IndexMap::new();
+        for (decl, Namespace(ns)) in self.ns_reader().resolver().bindings() {
+            let prefix = match decl {
+                PrefixDeclaration::Default => String::from(""),
+                PrefixDeclaration::Named(p) => String::from_utf8_lossy(p).into_owned(),
+            };
+            all_namespaces.insert(prefix, String::from_utf8_lossy(ns).into_owned());
+        }
+        let path = self.tag_string()?;
+        let used_namespaces = Self::find_xpath_prefixes(&path);
+        let namespaces: IndexMap<String, String> = all_namespaces
+            .into_iter()
+            .filter(|(prefix, _)| used_namespaces.contains(prefix))
+            .collect();
+        Ok((path, namespaces))
+    }
+
+    fn record_element_usage(
+        e: &BytesStart<'_>,
+        ns_reader: &NsReader<R>,
+        out: &mut IndexMap<String, String>,
+    ) {
+        use quick_xml::name::ResolveResult;
+
+        // Element QName: prefix (or empty for default namespace).
+        let prefix = match e.name().prefix() {
+            Some(p) => String::from_utf8_lossy(p.as_ref()).into_owned(),
+            None => String::new(),
+        };
+        if !out.contains_key(&prefix)
+            && let (ResolveResult::Bound(Namespace(uri)), _) =
+                ns_reader.resolver().resolve_element(e.name())
+        {
+            out.insert(prefix, String::from_utf8_lossy(uri).into_owned());
+        }
+
+        // Attributes: only prefixed ones carry a namespace; xmlns* are bindings,
+        // not usages, so skip them.
+        for attr in e.attributes().flatten() {
+            let key = attr.key.as_ref();
+            if key == b"xmlns" || key.starts_with(b"xmlns:") {
+                continue;
+            }
+            if let Some(p) = attr.key.prefix() {
+                let prefix = String::from_utf8_lossy(p.as_ref()).into_owned();
+                if out.contains_key(&prefix) {
+                    continue;
+                }
+                if let (ResolveResult::Bound(Namespace(uri)), _) =
+                    ns_reader.resolver().resolve_attribute(attr.key)
+                {
+                    out.insert(prefix, String::from_utf8_lossy(uri).into_owned());
+                }
+            }
+        }
+    }
+
+    /// Find prefixes used within an Xpath expression
+    fn find_xpath_prefixes(xpath: &str) -> HashSet<String> {
+        let mut prefixes = HashSet::new();
+        let mut chars = xpath.char_indices().peekable();
+        let mut in_single = false;
+        let mut in_double = false;
+
+        while let Some((i, c)) = chars.next() {
+            // Skip over string literals — colons inside them aren't prefixes.
+            if in_single {
+                if c == '\'' {
+                    in_single = false;
+                }
+                continue;
+            }
+            if in_double {
+                if c == '"' {
+                    in_double = false;
+                }
+                continue;
+            }
+            match c {
+                '\'' => in_single = true,
+                '"' => in_double = true,
+                c if c.is_ascii_alphabetic() || c == '_' => {
+                    let start = i;
+                    let mut end = i + c.len_utf8();
+                    while let Some(&(_, nc)) = chars.peek() {
+                        if nc.is_ascii_alphanumeric() || nc == '_' || nc == '-' || nc == '.' {
+                            chars.next();
+                            end += nc.len_utf8();
+                        } else {
+                            break;
+                        }
+                    }
+                    // A prefix is an NCName followed by exactly one ':'
+                    // (two colons = axis specifier like `child::`).
+                    if let Some(&(_, ':')) = chars.peek() {
+                        let mut look = chars.clone();
+                        look.next();
+                        let is_axis = matches!(look.peek(), Some(&(_, ':')));
+                        if !is_axis {
+                            prefixes.insert(xpath[start..end].to_string());
+                            chars.next(); // consume the ':'
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        prefixes
+    }
 }
 
 #[cfg(test)]
@@ -667,7 +836,7 @@ mod tests {
     use super::*;
     use quick_xml::events::{BytesDecl, BytesEnd, BytesText};
 
-    fn create_parser<'a>(xml: &'a str) -> XmlParser<'a, &'a [u8]> {
+    fn create_parser(xml: &str) -> XmlParser<'_, &[u8]> {
         let ns_reader = NsReader::from_reader(xml.as_bytes());
         XmlParser::new(ns_reader).expect("Failed to create parser")
     }
@@ -1163,5 +1332,361 @@ mod tests {
         let attrs2: Vec<_> = element2.attributes().collect();
         assert_eq!(attrs2.len(), 0);
         assert!(xml_writer.ns_applied);
+    }
+
+    fn set<const N: usize>(items: [&str; N]) -> HashSet<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn assert_prefixes(expr: &str, expected: HashSet<String>) {
+        assert_eq!(
+            XmlParser::<io::Cursor<&[u8]>>::find_xpath_prefixes(expr),
+            expected,
+            "unexpected prefix set for: {expr}"
+        );
+    }
+
+    #[test]
+    fn test_find_xpath_prefixes_yields_empty_when_no_qnames_present() {
+        // Empty/whitespace input, unprefixed paths, pure numeric/operator
+        // expressions, the `current()` function, and bare node tests all
+        // contain no QNames — so nothing should be reported.
+        for expr in [
+            "",
+            "   \n\t",
+            "/interfaces/interface/name",
+            "1 + 2.5 - 3 <= 4 and 5 != 6",
+            "current()",
+            "node() | text() | comment() | processing-instruction()",
+        ] {
+            assert_prefixes(expr, HashSet::new());
+        }
+    }
+
+    #[test]
+    fn test_find_xpath_prefixes_test_extracts_prefixes_from_simple_location_paths() {
+        // Motivating Huawei debug case, RFC 8641 Figure 12 (`/ex:foo`),
+        // the subscribed-notifications `/int:interfaces` example,
+        // prefix deduplication, and multi-prefix paths.
+        let cases: &[(&str, HashSet<String>)] = &[
+            (
+                "/debug:debug/debug:board-resouce-states/debug:board-resouce-state",
+                set(["debug"]),
+            ),
+            ("/ex:foo", set(["ex"])),
+            ("/int:interfaces", set(["int"])),
+            ("/if:interfaces/if:interface/if:name", set(["if"])),
+            ("/a:x/b:y/c:z", set(["a", "b", "c"])),
+        ];
+        for (expr, expected) in cases {
+            assert_prefixes(expr, expected.clone());
+        }
+    }
+
+    #[test]
+    fn test_find_xpath_prefixes_recognizes_full_ncname_charset_in_prefixes() {
+        // NCName permits letters, digits, `_`, `-`, `.`
+        // (the last three may not start the name).
+        let cases: &[(&str, HashSet<String>)] = &[
+            // Hyphenated — common in OpenConfig.
+            (
+                "/oc-if:interfaces/oc-if:interface[oc-if:name='eth0']",
+                set(["oc-if"]),
+            ),
+            // Dot in the middle (legal NCName, rare in practice).
+            ("/a.b:c", set(["a.b"])),
+            // Underscore-leading.
+            ("/_ns:leaf", set(["_ns"])),
+        ];
+        for (expr, expected) in cases {
+            assert_prefixes(expr, expected.clone());
+        }
+    }
+
+    #[test]
+    fn test_find_xpath_prefixes_handles_prefixed_wildcards_and_attributes() {
+        let cases: &[(&str, HashSet<String>)] = &[
+            ("/ex:*", set(["ex"])),
+            ("//@ex:id", set(["ex"])),
+            ("/if:interface[@nc:operation='delete']", set(["if", "nc"])),
+        ];
+        for (expr, expected) in cases {
+            assert_prefixes(expr, expected.clone());
+        }
+    }
+
+    #[test]
+    fn test_find_xpath_prefixes_xpath_axes_are_never_reported_as_prefixes() {
+        // Every XPath 1.0 axis name followed by `::` must be skipped,
+        // since the `::` is an axis separator rather than a prefix colon.
+        const AXES: &[&str] = &[
+            "ancestor",
+            "ancestor-or-self",
+            "attribute",
+            "child",
+            "descendant",
+            "descendant-or-self",
+            "following",
+            "following-sibling",
+            "namespace",
+            "parent",
+            "preceding",
+            "preceding-sibling",
+            "self",
+        ];
+        for axis in AXES {
+            assert_prefixes(&format!("{axis}::node()"), HashSet::new());
+        }
+        // Axes can still coexist with real prefixes in the same expression.
+        assert_prefixes("descendant::if:interface/child::if:name", set(["if"]));
+    }
+
+    #[test]
+    fn test_find_xpath_prefixes_skips_colons_inside_string_literals() {
+        // Single-quoted identityref comparisons (RFC 7950 §9.10),
+        // double-quoted variants, and mixed-quote expressions.
+        let cases: &[(&str, HashSet<String>)] = &[
+            ("../crypto = 'mc:aes'", HashSet::new()),
+            ("name() = \"ns:bogus\"", HashSet::new()),
+            ("@a:x = 'p:q' or @b:y = \"r:s\"", set(["a", "b"])),
+        ];
+        for (expr, expected) in cases {
+            assert_prefixes(expr, expected.clone());
+        }
+    }
+
+    #[test]
+    fn test_find_xpath_prefixes_handles_compound_expressions() {
+        // Function calls, leafref-style predicates with current(),
+        // unions, boolean ops across modules, and nested predicates.
+        let cases: &[(&str, HashSet<String>)] = &[
+            ("ex:size(@id)", set(["ex"])),
+            (
+                "/if:interfaces/if:interface[if:name = current()/../if:name]",
+                set(["if"]),
+            ),
+            ("/a:foo | /b:bar", set(["a", "b"])),
+            (
+                "(/if:interfaces/if:interface/if:enabled = 'true') \
+                 and count(/rt:routing/rt:routes) > 0",
+                set(["if", "rt"]),
+            ),
+            ("/a:x[a:y[b:z = '1']/a:w = c:fn()]", set(["a", "b", "c"])),
+        ];
+        for (expr, expected) in cases {
+            assert_prefixes(expr, expected.clone());
+        }
+    }
+
+    #[test]
+    fn test_find_xpath_prefixes_real_world_yang_expressions() {
+        // ietf-interfaces-style `must`: only `if:` is a live prefix;
+        // the `ianaift:*` tokens are identityref values inside string
+        // literals and must not be reported.
+        let must_expr = "(/if:interfaces/if:interface[if:name=current()]/if:type \
+                         = 'ianaift:ethernetCsmacd') \
+                         or \
+                         (/if:interfaces/if:interface[if:name=current()]/if:type \
+                         = 'ianaift:ieee8023adLag')";
+        assert_prefixes(must_expr, set(["if"]));
+
+        // Multi-module subscriber filter for yp:datastore-xpath-filter.
+        let filter_expr = "/if:interfaces/if:interface[if:name='eth0'] \
+                           | /rt:routing/rt:ribs/rt:rib[rt:name=current()/ref:rib]";
+        assert_prefixes(filter_expr, set(["if", "rt", "ref"]));
+    }
+
+    #[test]
+    fn test_find_xpath_prefixes_whitespace_between_ncname_and_colon_breaks_qname() {
+        // In XPath 1.0 a QName is lexically `NCName ':' NCName` with no
+        // whitespace. `if : interfaces` is three tokens, so `if` must not
+        // be reported as a prefix. This behavior is intentional.
+        assert_prefixes("  /  if : interfaces  ", HashSet::new());
+    }
+
+    #[test]
+    fn test_read_xpath_with_namespaces_basic_filter() {
+        // One prefix declared on the filter element, used in the path.
+        // Both should round-trip.
+        let xml = r#"<datastore-xpath-filter
+        xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications"
+        xmlns:ex="urn:example:debug">/ex:debug/ex:board-resouce-states</datastore-xpath-filter>"#;
+        let mut parser = create_parser(xml);
+        parser
+            .open(
+                Some(Namespace(
+                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                )),
+                "datastore-xpath-filter",
+            )
+            .expect("failed to open filter");
+
+        let (path, namespaces) = parser
+            .read_xpath_with_namespaces()
+            .expect("read_xpath_with_namespaces failed");
+
+        assert_eq!(path.as_ref(), "/ex:debug/ex:board-resouce-states");
+        assert_eq!(
+            namespaces,
+            IndexMap::from([("ex".to_string(), "urn:example:debug".to_string())]),
+        );
+    }
+
+    #[test]
+    fn test_read_xpath_with_namespaces_drops_unused_bindings() {
+        // Two prefixes declared, only one referenced. The default namespace
+        // and `unused:` must NOT appear in the result — this is the whole
+        // point of filtering by find_xpath_prefixes.
+        let xml = r#"<datastore-xpath-filter
+        xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications"
+        xmlns:if="urn:example:interfaces"
+        xmlns:unused="urn:example:not-referenced">/if:interfaces/if:interface</datastore-xpath-filter>"#;
+        let mut parser = create_parser(xml);
+        parser
+            .open(
+                Some(Namespace(
+                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                )),
+                "datastore-xpath-filter",
+            )
+            .unwrap();
+
+        let (path, namespaces) = parser.read_xpath_with_namespaces().unwrap();
+
+        assert_eq!(path.as_ref(), "/if:interfaces/if:interface");
+        assert_eq!(
+            namespaces,
+            IndexMap::from([("if".to_string(), "urn:example:interfaces".to_string())]),
+        );
+    }
+
+    #[test]
+    fn test_read_xpath_with_namespaces_inherits_ancestor_bindings() {
+        // RFC 7950 §9.13.2 requires referenced prefixes to be in the XML
+        // namespace scope of the value's element — but "in scope" includes
+        // ancestor declarations. Here `if:` is declared on <filters>, not
+        // on <datastore-xpath-filter>, and must still be picked up.
+        let xml = r#"<filters
+        xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications"
+        xmlns:if="urn:example:interfaces">
+        <datastore-xpath-filter>/if:interfaces</datastore-xpath-filter>
+    </filters>"#;
+        let mut parser = create_parser(xml);
+        parser
+            .open(
+                Some(Namespace(
+                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                )),
+                "filters",
+            )
+            .unwrap();
+        parser.skip_text().unwrap();
+        parser
+            .open(
+                Some(Namespace(
+                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                )),
+                "datastore-xpath-filter",
+            )
+            .unwrap();
+
+        let (path, namespaces) = parser.read_xpath_with_namespaces().unwrap();
+
+        assert_eq!(path.as_ref(), "/if:interfaces");
+        assert_eq!(
+            namespaces,
+            IndexMap::from([("if".to_string(), "urn:example:interfaces".to_string())]),
+        );
+    }
+
+    #[test]
+    fn test_read_xpath_with_namespaces_inner_binding_shadows_ancestor() {
+        // Same prefix declared at two levels with different URIs — the
+        // resolver must return the inner one, since we snapshot bindings at
+        // the moment we're sitting on the filter element's start tag.
+        let xml = r#"<outer xmlns:p="urn:example:wrong">
+        <datastore-xpath-filter
+            xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications"
+            xmlns:p="urn:example:right">/p:foo</datastore-xpath-filter>
+    </outer>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "outer").unwrap();
+        parser.skip_text().unwrap();
+        parser
+            .open(
+                Some(Namespace(
+                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                )),
+                "datastore-xpath-filter",
+            )
+            .unwrap();
+
+        let (path, namespaces) = parser.read_xpath_with_namespaces().unwrap();
+
+        assert_eq!(path.as_ref(), "/p:foo");
+        assert_eq!(
+            namespaces,
+            IndexMap::from([("p".to_string(), "urn:example:right".to_string())]),
+        );
+    }
+
+    #[test]
+    fn test_read_xpath_with_namespaces_undeclared_prefix_is_silently_dropped() {
+        // RFC 7950 §9.13.2 says prefixes used in an instance value MUST be
+        // declared in scope. If a sender violates that, find_xpath_prefixes
+        // still extracts `bogus`, but no binding exists to map it to a URI,
+        // so it's filtered out of the result. The function favors permissive
+        // parsing over rejecting malformed input.
+        let xml = r#"<datastore-xpath-filter
+        xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications">/bogus:foo</datastore-xpath-filter>"#;
+        let expected: IndexMap<String, String> = IndexMap::new();
+
+        let mut parser = create_parser(xml);
+        parser
+            .open(
+                Some(Namespace(
+                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                )),
+                "datastore-xpath-filter",
+            )
+            .unwrap();
+
+        let (path, namespaces) = parser.read_xpath_with_namespaces().unwrap();
+
+        assert_eq!(path.as_ref(), "/bogus:foo");
+        assert_eq!(namespaces, expected);
+    }
+
+    #[test]
+    fn test_read_xpath_with_namespaces_multiple_modules_and_literal_prefixes() {
+        // Real-world `must`-style filter mixing live prefixes with prefixed
+        // identityref values inside string literals. The `t:` token appears
+        // only inside quotes, so even though it's declared, it shouldn't end
+        // up in the namespace map (find_xpath_prefixes correctly skips it).
+        // Conversely `if:` is live and must be kept.
+        let xml = r#"<datastore-xpath-filter
+        xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications"
+        xmlns:if="urn:example:interfaces"
+        xmlns:t="urn:example:if-types">/if:interfaces/if:interface[if:type='t:ethernetCsmacd']</datastore-xpath-filter>"#;
+        let mut parser = create_parser(xml);
+        parser
+            .open(
+                Some(Namespace(
+                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                )),
+                "datastore-xpath-filter",
+            )
+            .unwrap();
+
+        let (path, namespaces) = parser.read_xpath_with_namespaces().unwrap();
+
+        assert_eq!(
+            path.as_ref(),
+            "/if:interfaces/if:interface[if:type='t:ethernetCsmacd']",
+        );
+        assert_eq!(
+            namespaces,
+            IndexMap::from([("if".to_string(), "urn:example:interfaces".to_string())]),
+        );
     }
 }
