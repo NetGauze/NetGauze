@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="ipfix">
 <title>IP Flow Information Export (IPFIX) Entities</title>
 <created>2007-05-10</created>
-<updated>2026-04-02</updated>
+<updated>2026-04-24</updated>
 
 <note><xref type="rfc" data="rfc7012"/> has obsoleted <xref type="rfc" data="rfc5102"/>. However, references to <xref type="rfc" data="rfc5102"/>
 remain as part of the historical record.</note>
@@ -12726,7 +12726,7 @@ the IANA <xref type="registry" data="performance-metrics">Performance Metric</xr
       OWDelay_HybridType1_IP_RFC9951_Seconds_Mean in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref> registry.
     </paragraph>
   </references>
-<xref type="draft" data="RFC-ietf-opsawg-ipfix-on-path-telemetry-23"/>
+<xref type="rfc" data="rfc9951"/>
   <revision>0</revision>
   <date>2026-04-02</date>
 </record>
@@ -12751,7 +12751,7 @@ node), according to the OWDelay_HybridType1_IP_RFC9951_Seconds_Min in the IANA <
       OWDelay_HybridType1_IP_RFC9951_Seconds_Min in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref> registry.
     </paragraph>
   </references>
-<xref type="draft" data="RFC-ietf-opsawg-ipfix-on-path-telemetry-23"/>
+<xref type="rfc" data="rfc9951"/>
   <revision>0</revision>
   <date>2026-04-02</date>
 </record>
@@ -12776,7 +12776,7 @@ node), according to OWDelay_HybridType1_IP_RFC9951_Seconds_Max in the IANA <xref
       OWDelay_HybridType1_IP_RFC9951_Seconds_Max in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref> registry.
     </paragraph>
   </references>
-<xref type="draft" data="RFC-ietf-opsawg-ipfix-on-path-telemetry-23"/>
+<xref type="rfc" data="rfc9951"/>
   <revision>0</revision>
   <date>2026-04-02</date>
 </record>
@@ -12801,7 +12801,7 @@ node), according to OWDelay_HybridType1_IP_RFC9951_Seconds_Sum in the IANA <xref
       OWDelay_HybridType1_IP_RFC9951_Seconds_Sum in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref> registry.
     </paragraph>
   </references>
-<xref type="draft" data="RFC-ietf-opsawg-ipfix-on-path-telemetry-23"/>
+<xref type="rfc" data="rfc9951"/>
   <revision>0</revision>
   <date>2026-04-02</date>
 </record>
@@ -12810,7 +12810,6 @@ node), according to OWDelay_HybridType1_IP_RFC9951_Seconds_Sum in the IANA <xref
   <name>Unassigned</name>
   <elementId>534-32767</elementId>
 </record>
-   
 
 
 
