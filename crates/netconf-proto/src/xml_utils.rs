@@ -16,8 +16,9 @@
 //! Low-level XML parsing utils
 
 use crate::NETCONF_NS;
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use indexmap::IndexMap;
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, NamespaceError, PrefixDeclaration, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::borrow::Cow;
@@ -520,9 +521,7 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
             .resolver()
             .resolve(QName(raw.trim().as_bytes()), true);
         let ns_uri = match resolved_ns {
-            ResolveResult::Bound(ns) => {
-                std::str::from_utf8(ns.into_inner())?.to_owned()
-            }
+            ResolveResult::Bound(ns) => std::str::from_utf8(ns.into_inner())?.to_owned(),
             _ => {
                 return Err(ParsingError::InvalidValue(raw.to_string()));
             }
@@ -852,6 +851,43 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         }
         prefixes
     }
+}
+
+/// Format a `DateTime<Utc>` as YANG `date-and-time` (RFC 3339, UTC).
+pub fn format_datetime(ts: &DateTime<Utc>) -> String {
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        ts.year(),
+        ts.month(),
+        ts.day(),
+        ts.hour(),
+        ts.minute(),
+        ts.second()
+    )
+}
+
+/// Parse a YANG `date-and-time` string into `DateTime<Utc>`.
+pub fn parse_datetime(s: &str) -> Result<DateTime<Utc>, ParsingError> {
+    DateTime::parse_from_rfc3339(s.trim())
+        .map(|dt| dt.with_timezone(&Utc))
+        .map_err(|e| ParsingError::InvalidValue(e.to_string()))
+}
+
+/// Write an optional text leaf. Returns `Ok(())` without writing anything if
+/// `value` is `None`.
+pub fn xml_write_optional_text_leaf<T: io::Write>(
+    writer: &mut XmlWriter<T>,
+    ns: Namespace<'_>,
+    tag: &str,
+    value: Option<&str>,
+) -> Result<(), quick_xml::Error> {
+    if let Some(v) = value {
+        let elem = writer.create_ns_element(ns, tag)?;
+        writer.write_event(Event::Start(elem.clone()))?;
+        writer.write_event(Event::Text(BytesText::new(v)))?;
+        writer.write_event(Event::End(elem.to_end()))?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
