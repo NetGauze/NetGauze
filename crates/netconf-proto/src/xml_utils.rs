@@ -18,7 +18,7 @@
 use crate::NETCONF_NS;
 use indexmap::IndexMap;
 use quick_xml::events::{BytesStart, Event};
-use quick_xml::name::{Namespace, NamespaceError, PrefixDeclaration, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceError, PrefixDeclaration, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
@@ -506,6 +506,29 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
                 _ => self.next_event()?,
             };
         }
+    }
+
+    /// Resolve a YANG identityref QName string (e.g. `"ds:operational"`) using
+    /// the namespace bindings currently in scope.
+    ///
+    /// Returns `(namespace_uri, local_name)` as owned strings.
+    /// Fails with [`ParsingError::InvalidValue`] if the prefix cannot be
+    /// resolved.
+    pub fn resolve_identity_ref(&self, raw: &str) -> Result<(String, String), ParsingError> {
+        let (resolved_ns, local) = self
+            .ns_reader
+            .resolver()
+            .resolve(QName(raw.trim().as_bytes()), true);
+        let ns_uri = match resolved_ns {
+            ResolveResult::Bound(ns) => {
+                std::str::from_utf8(ns.into_inner())?.to_owned()
+            }
+            _ => {
+                return Err(ParsingError::InvalidValue(raw.to_string()));
+            }
+        };
+        let local_name = std::str::from_utf8(local.into_inner())?.to_owned();
+        Ok((ns_uri, local_name))
     }
 
     #[inline]

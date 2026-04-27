@@ -4,7 +4,6 @@ use crate::{YANG_DATASTORES_NS_STR, YANG_LIBRARY_AUGMENTED_BY_NS, YANG_LIBRARY_N
 use indexmap::IndexMap;
 use petgraph::prelude::EdgeRef;
 use quick_xml::events::{BytesText, Event};
-use quick_xml::name::{QName, ResolveResult};
 use russh::keys::signature::digest::Digest;
 use schema_registry_client::rest::models::RegisteredSchema;
 use schema_registry_client::rest::schema_registry_client::Client as SRClient;
@@ -1545,16 +1544,8 @@ impl<'a> XmlDeserialize<'a, Datastore> for Datastore {
         parser.open(Some(YANG_LIBRARY_NS), "name")?;
         let name: Box<str> = parser.tag_string()?.trim().into();
         // Resolve datastore name
-        let (ns, local) = parser
-            .ns_reader()
-            .resolver()
-            .resolve(QName(name.as_bytes()), true);
-        let ds_ns = match ns {
-            ResolveResult::Bound(ns) => std::str::from_utf8(ns.into_inner())?,
-            _ => return Err(ParsingError::InvalidValue(name.to_string())),
-        };
-        let ds_name = std::str::from_utf8(local.into_inner())?;
-        let ds = DatastoreName::from((ds_ns, ds_name));
+        let (ds_ns, ds_name) = parser.resolve_identity_ref(&name)?;
+        let ds = DatastoreName::from((ds_ns.as_str(), ds_name.as_str()));
         // close name
         parser.close()?;
 
