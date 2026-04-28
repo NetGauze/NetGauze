@@ -45,7 +45,7 @@ serde = [
 codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
-json-schema = ["schemars", "netgauze-iana/json-schema", "ipnet/schemars"]
+json-schema = ["schemars", "netgauze-iana/json-schema", "ipnet/schemars1"]
 
 [dev-dependencies]
 netgauze-pcap-reader = { workspace = true }
