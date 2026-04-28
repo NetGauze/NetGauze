@@ -34,9 +34,10 @@ use crate::yang_push::{
     DeleteAllPayload, DeletePayload, EnrichmentOperation, UpsertPayload, Weight,
 };
 use chrono::Utc;
+use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_udp_notif_pkt::decoded::{UdpNotifPacketDecoded, UdpNotifPayload};
 use netgauze_udp_notif_pkt::notification::{
-    NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
+    NotificationVariant, SubscriptionStartedModified, SubscriptionTerminated,
 };
 use netgauze_udp_notif_service::OTL_UDP_NOTIF_PUBLISHER_ID_KEY;
 use netgauze_yang_push::cache::storage::SubscriptionInfo;
@@ -865,10 +866,11 @@ impl EnrichmentHandle<EnrichmentOperation> for YangPushEnrichmentActorHandle {
 mod tests {
     use super::*;
     use bytes::Bytes;
+    use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
+    use netgauze_netconf_proto::yang_push::subscription::UpdateTrigger;
+    use netgauze_netconf_proto::yang_push::types::CentiSeconds;
     use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
-    use netgauze_udp_notif_pkt::notification::{
-        CentiSeconds, Encoding, Target, Transport, UpdateTrigger,
-    };
+    use netgauze_udp_notif_pkt::notification::Target;
     use netgauze_udp_notif_pkt::raw::{MediaType, UdpNotifPacket};
     use netgauze_yang_push::model::telemetry::{Label, LabelValue};
     use serde_json::json;

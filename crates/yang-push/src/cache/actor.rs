@@ -222,7 +222,7 @@ use crate::{
 };
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
-use netgauze_udp_notif_pkt::notification::SubscriptionId;
+use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use rustc_hash::FxHashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;

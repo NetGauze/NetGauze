@@ -210,11 +210,13 @@ impl TryFrom<&UdpNotifPacket> for UdpNotifPacketDecoded {
 mod tests {
     use super::*;
     use crate::notification::{
-        Encoding, NotificationEnvelope, NotificationLegacy, NotificationVariant,
-        SubscriptionStartedModified, Target, UpdateTrigger, YangPushModuleVersion,
+        NotificationEnvelope, NotificationLegacy, NotificationVariant, SubscriptionStartedModified,
+        Target, YangPushModuleVersion,
     };
     use bytes::Bytes;
     use chrono::{DateTime, Utc};
+    use netgauze_netconf_proto::yang_push::identities::Encoding;
+    use netgauze_netconf_proto::yang_push::subscription::UpdateTrigger;
     use serde_json::json;
     use std::collections::HashMap;
 

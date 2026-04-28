@@ -94,8 +94,9 @@
 
 use crate::ContentId;
 use netgauze_netconf_proto::xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter};
+use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_netconf_proto::yanglib::{SchemaLoadingError, YangLibrary};
-use netgauze_udp_notif_pkt::notification::{SubscriptionId, Target};
+use netgauze_udp_notif_pkt::notification::Target;
 use quick_xml::NsReader;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};

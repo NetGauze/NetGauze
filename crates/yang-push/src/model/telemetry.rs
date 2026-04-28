@@ -41,13 +41,13 @@
 //!   key-value labels that can be used to enrich collected data with custom
 //!   information.
 use chrono::{DateTime, Utc};
+
+use netgauze_netconf_proto::yang_push::identities::{ChangeType, Encoding, Transport};
+use netgauze_netconf_proto::yang_push::types::{CentiSeconds, SubscriptionId};
+use netgauze_udp_notif_pkt::notification::YangPushModuleVersion;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::IpAddr;
-
-use netgauze_udp_notif_pkt::notification::{
-    CentiSeconds, ChangeType, Encoding, SubscriptionId, Transport, YangPushModuleVersion,
-};
 
 /// Telemetry Message Wrapper
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -443,17 +443,17 @@ pub enum UpdateTrigger {
     },
 }
 
-impl From<netgauze_udp_notif_pkt::notification::UpdateTrigger> for UpdateTrigger {
-    fn from(trigger: netgauze_udp_notif_pkt::notification::UpdateTrigger) -> Self {
+impl From<netgauze_netconf_proto::yang_push::subscription::UpdateTrigger> for UpdateTrigger {
+    fn from(trigger: netgauze_netconf_proto::yang_push::subscription::UpdateTrigger) -> Self {
         match trigger {
-            netgauze_udp_notif_pkt::notification::UpdateTrigger::Periodic {
+            netgauze_netconf_proto::yang_push::subscription::UpdateTrigger::Periodic {
                 period,
                 anchor_time,
             } => UpdateTrigger::Periodic {
                 period,
                 anchor_time,
             },
-            netgauze_udp_notif_pkt::notification::UpdateTrigger::OnChange {
+            netgauze_netconf_proto::yang_push::subscription::UpdateTrigger::OnChange {
                 dampening_period,
                 sync_on_start,
                 excluded_change,
@@ -565,7 +565,6 @@ where
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
-    use netgauze_udp_notif_pkt::notification::CentiSeconds;
     use serde_json;
     use std::str::FromStr;
     use std::vec;

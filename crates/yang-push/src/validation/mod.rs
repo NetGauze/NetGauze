@@ -120,10 +120,9 @@ use crate::{
     OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY, OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY,
     OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
 };
+use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
-use netgauze_udp_notif_pkt::notification::{
-    NotificationVariant, SubscriptionId, SubscriptionStartedModified,
-};
+use netgauze_udp_notif_pkt::notification::{NotificationVariant, SubscriptionStartedModified};
 use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
 use netgauze_udp_notif_service::OTL_UDP_NOTIF_PUBLISHER_ID_KEY;
 use rustc_hash::FxHashMap;
