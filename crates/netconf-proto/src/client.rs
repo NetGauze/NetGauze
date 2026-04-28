@@ -16,9 +16,14 @@
 use crate::capabilities::{Capability, NetconfVersion};
 use crate::codec::{SshCodec, SshCodecError};
 use crate::protocol::{
-    Hello, NetConfMessage, Rpc, RpcOperation, RpcReply, RpcReplyContent, RpcResponse,
+    Filter, Hello, NetConfMessage, Rpc, RpcOperation, RpcReply, RpcReplyContent, RpcResponse,
     WellKnownOperation, WellKnownRpcResponse, YangSchemaFormat,
 };
+use crate::xml_utils::{ParsingError, XmlDeserialize};
+use crate::yang_push::SUBSCRIBED_NOTIFICATIONS_NS;
+use crate::yang_push::filters::Filters;
+use crate::yang_push::subscription::{DatastoreSelectionFilterObjects, Subscription, Target};
+use crate::yang_push::types::SubscriptionId;
 use crate::yanglib::{
     BackwardCompatibilityChecker, DependencyError, ImportOnlyModule, Module, ModuleSetBuilder,
     Submodule, YangLibrary,
@@ -26,6 +31,7 @@ use crate::yanglib::{
 use crate::yangparser::extract_yang_dependencies;
 use futures_util::SinkExt;
 use futures_util::stream::StreamExt;
+use quick_xml::NsReader;
 use secrecy::ExposeSecret;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
@@ -85,6 +91,9 @@ pub enum NetConfSshClientError {
 
     #[strum(to_string = "Error in exchanging the <hello> message with the server: {0}")]
     HelloMessageError(String),
+
+    #[strum(to_string = "Error in XML parsing the <rpc-reply> message: {0}")]
+    ParsingError(ParsingError),
 }
 
 impl std::error::Error for NetConfSshClientError {}
@@ -98,6 +107,12 @@ impl From<SshCodecError> for NetConfSshClientError {
 impl From<russh::Error> for NetConfSshClientError {
     fn from(err: russh::Error) -> Self {
         NetConfSshClientError::SshError(err)
+    }
+}
+
+impl From<ParsingError> for NetConfSshClientError {
+    fn from(err: ParsingError) -> Self {
+        NetConfSshClientError::ParsingError(err)
     }
 }
 
@@ -239,6 +254,11 @@ pub struct NetConfSshClient<T> {
 
     /// Cache peer's YANG Library
     yang_library: Option<Arc<YangLibrary>>,
+
+    /// Cache configured YANG Push filters on the device, this is used to avoid
+    /// making multiple requests to the device to get the filters when
+    /// processing multiple subscriptions
+    yang_push_filters: Option<Filters>,
 }
 
 impl<T> NetConfSshClient<T> {
@@ -331,6 +351,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             session_id,
             next_message_id,
             yang_library: None,
+            yang_push_filters: None,
         })
     }
 
@@ -672,6 +693,105 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
 
         let (yang_lib, schemas) = builder.build_yang_lib();
         Ok((yang_lib, schemas))
+    }
+
+    pub async fn get_yang_push_filters(&mut self) -> Result<Filters, NetConfSshClientError> {
+        if let Some(filters) = self.yang_push_filters.as_ref() {
+            debug!("[{}] Serving YANG Push Filters from the cache", self.peer);
+            return Ok(filters.clone());
+        }
+        debug!(
+            "[{}] Requesting YANG Push Filters from the device",
+            self.peer
+        );
+        let message_id = self
+            .rpc(RpcOperation::WellKnown(WellKnownOperation::Get {filter: Filter::Subtree(
+                    r#"<filters xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications" />"#.into(),
+            )}))
+            .await?;
+        let rpc_reply = self.rpc_reply().await?;
+        self.validate_message_id(&message_id, &rpc_reply)?;
+        if let Some(RpcResponse::WellKnown(WellKnownRpcResponse::Data(data))) =
+            rpc_reply.reply().responses()
+        {
+            let mut reader = NsReader::from_str(data);
+            reader.config_mut().trim_text(true);
+            let mut parser = crate::xml_utils::XmlParser::new(reader)?;
+            let filters = Filters::xml_deserialize(&mut parser)?;
+            return Ok(filters);
+        }
+        Err(NetConfSshClientError::UnexpectedMessage {
+            expected:
+                r#"<filters xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications">"#
+                    .to_string(),
+            actual: NetConfMessage::RpcReply(rpc_reply),
+        })
+    }
+
+    pub async fn get_yang_push_subscription_by_id(
+        &mut self,
+        id: SubscriptionId,
+    ) -> Result<Subscription, NetConfSshClientError> {
+        debug!(
+            "[{}] Requesting YANG Push subscription by id `{id}`",
+            self.peer
+        );
+        let message_id = self
+            .rpc(RpcOperation::WellKnown(WellKnownOperation::Get {filter: Filter::Subtree(
+                format!(r#"<subscriptions xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications">
+                  <subscription>
+                    <id>{id}</id>
+                  </subscription>
+                </subscriptions>"#).into(),
+            )}))
+            .await?;
+        let rpc_reply = self.rpc_reply().await?;
+        self.validate_message_id(&message_id, &rpc_reply)?;
+
+        if let Some(RpcResponse::WellKnown(WellKnownRpcResponse::Data(data))) =
+            rpc_reply.reply().responses()
+        {
+            // Parse the response streams if any returned, filters if any returned
+            // and then the subscription details
+            let mut reader = NsReader::from_str(data);
+            reader.config_mut().trim_text(true);
+            let mut parser = crate::xml_utils::XmlParser::new(reader)?;
+            let subscription = if parser.is_tag(Some(SUBSCRIBED_NOTIFICATIONS_NS), "subscriptions")
+            {
+                parser.open(Some(SUBSCRIBED_NOTIFICATIONS_NS), "subscriptions")?;
+                let mut subscription = Subscription::xml_deserialize(&mut parser)?;
+                if let Target::Datastore(datastore_target) = &mut subscription.target
+                    && let DatastoreSelectionFilterObjects::ByReference(name) =
+                        &datastore_target.selection
+                {
+                    let filters = self.get_yang_push_filters().await?;
+                    if let Some(target_filter) = filters.selection_filters.get(name).cloned() {
+                        debug!(
+                            "[{}] Replacing target by reference {name} for subscription {id} to be by value {:?}",
+                            self.peer, target_filter.filter_spec
+                        );
+                        datastore_target.selection =
+                            DatastoreSelectionFilterObjects::WithInSubscription(
+                                target_filter.filter_spec,
+                            );
+                    }
+                }
+                parser.close()?;
+                subscription
+            } else {
+                return Err(NetConfSshClientError::ParsingError(
+                    ParsingError::WrongToken {
+                        expecting: "subscriptions".to_string(),
+                        found: parser.peek().clone().into_owned(),
+                    },
+                ));
+            };
+            return Ok(subscription);
+        }
+        Err(NetConfSshClientError::UnexpectedMessage {
+            expected: r#"<subscriptions xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications">"#.to_string(),
+            actual: NetConfMessage::RpcReply(rpc_reply),
+        })
     }
 }
 
