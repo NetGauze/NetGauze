@@ -3000,7 +3000,6 @@ name = "netgauze-netconf-proto"
 version = "0.11.0"
 dependencies = [
  "anyhow",
- "bytes",
  "chrono",
  "clap",
  "futures-util",
@@ -3011,6 +3010,7 @@ dependencies = [
  "schema-registry-client",
  "secrecy",
  "serde",
+ "serde_json",
  "sha2 0.10.9",
  "strum",
  "strum_macros",
@@ -3081,6 +3081,7 @@ dependencies = [
  "ciborium",
  "either",
  "netgauze-locate",
+ "netgauze-netconf-proto",
  "netgauze-parse-utils",
  "netgauze-pcap-reader",
  "netgauze-serde-macros",

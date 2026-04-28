@@ -20,6 +20,7 @@ categories = ["network-programming", "parsing"]
 netgauze-locate = { workspace = true, optional = true }
 netgauze-parse-utils = { workspace = true, optional = true }
 netgauze-serde-macros = { workspace = true, optional = true }
+netgauze-netconf-proto = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 

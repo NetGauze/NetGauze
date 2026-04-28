@@ -207,12 +207,12 @@
 //!   additional fields to ensure compatibility with YANG augmentations
 
 use chrono::{DateTime, Utc};
+use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
+use netgauze_netconf_proto::yang_push::subscription::UpdateTrigger;
+use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum_macros::Display;
-
-/// Subscription ID defined as uint32 in [RFC 8639](https://datatracker.ietf.org/doc/html/rfc8639)
-pub type SubscriptionId = u32;
 
 /// Yang-Push Notification Envelope
 /// [draft-ietf-netconf-notif-envelope](https://datatracker.ietf.org/doc/draft-ietf-netconf-notif-envelope)
@@ -742,100 +742,6 @@ impl std::fmt::Display for Target {
     }
 }
 
-/// Transport protocol used to deliver the notification message to the data
-/// collection.
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Transport {
-    /// UDP-based notification transport
-    /// [ietf-udp-notif-transport](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-udp-notif)
-    #[serde(rename = "ietf-udp-notif-transport:udp-notif")]
-    UDPNotif,
-
-    /// HTTPS-based notification transport
-    /// [draft-ietf-netconf-https-notif](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-https-notif)
-    #[serde(rename = "ietf-https-notif:https")]
-    HTTPSNotif,
-
-    #[default]
-    #[serde(other)]
-    #[serde(rename = "unknown")]
-    Unknown,
-}
-
-/// Encoding used for the notification payload
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum Encoding {
-    #[serde(rename = "ietf-subscribed-notifications:encode-xml")]
-    #[serde(alias = "encode-xml")]
-    Xml,
-
-    #[serde(rename = "ietf-subscribed-notifications:encode-json")]
-    #[serde(alias = "encode-json")]
-    Json,
-
-    #[serde(rename = "ietf-udp-notif-transport:encode-cbor")]
-    #[serde(alias = "encode-cbor")]
-    Cbor,
-
-    #[default]
-    #[serde(other)]
-    #[serde(rename = "unknown")]
-    Unknown,
-}
-
-/// Update Trigger
-/// ```text
-/// UpdateTrigger
-/// ├── Periodic
-/// │   ├── period: CentiSeconds (update interval in 1/100 seconds)
-/// │   └── anchor-time: DateTime (optional reference time)
-/// │
-/// └── OnChange
-///     ├── dampening-period: CentiSeconds (minimum time between updates)
-///     ├── sync-on-start: bool (send initial snapshot)
-///     └── excluded-change: Vec<ChangeType> (filter change types)
-///         ├── Create
-///         ├── Delete
-///         ├── Insert
-///         ├── Move
-///         └── Replace
-/// ```
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum UpdateTrigger {
-    #[serde(rename = "ietf-yang-push:periodic")]
-    #[serde(rename_all = "kebab-case")]
-    Periodic {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        period: Option<CentiSeconds>,
-
-        #[serde(skip_serializing_if = "Option::is_none")]
-        anchor_time: Option<DateTime<Utc>>,
-    },
-
-    #[serde(rename = "ietf-yang-push:on-change")]
-    #[serde(rename_all = "kebab-case")]
-    OnChange {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        dampening_period: Option<CentiSeconds>,
-
-        #[serde(skip_serializing_if = "Option::is_none")]
-        sync_on_start: Option<bool>,
-
-        #[serde(skip_serializing_if = "Option::is_none")]
-        excluded_change: Option<Vec<ChangeType>>,
-    },
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum ChangeType {
-    Create,
-    Delete,
-    Insert,
-    Move,
-    Replace,
-}
-
 /// Module Versioning (draft-ietf-netconf-yang-notifications-versioning)
 ///
 /// The `YangPushModuleVersion` structure provides information about YANG
@@ -880,136 +786,14 @@ impl YangPushModuleVersion {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CentiSeconds(u32);
-
-impl CentiSeconds {
-    pub const fn new(value: u32) -> Self {
-        CentiSeconds(value)
-    }
-
-    pub const fn as_u32(&self) -> u32 {
-        self.0
-    }
-
-    pub const fn to_milliseconds(&self) -> u32 {
-        self.0 * 10
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
+
+    use netgauze_netconf_proto::yang_push::identities::ChangeType;
+    use netgauze_netconf_proto::yang_push::types::CentiSeconds;
     use serde_json;
-
-    #[test]
-    fn test_transport_serialization() {
-        assert_eq!(
-            serde_json::to_string(&Transport::UDPNotif).unwrap(),
-            r#""ietf-udp-notif-transport:udp-notif""#
-        );
-        assert_eq!(
-            serde_json::to_string(&Transport::HTTPSNotif).unwrap(),
-            r#""ietf-https-notif:https""#
-        );
-        assert_eq!(
-            serde_json::to_string(&Transport::Unknown).unwrap(),
-            r#""unknown""#
-        );
-    }
-
-    #[test]
-    fn test_transport_deserialization() {
-        assert_eq!(
-            serde_json::from_str::<Transport>(r#""ietf-udp-notif-transport:udp-notif""#).unwrap(),
-            Transport::UDPNotif
-        );
-        assert_eq!(
-            serde_json::from_str::<Transport>(r#""ietf-https-notif:https""#).unwrap(),
-            Transport::HTTPSNotif
-        );
-        assert_eq!(
-            serde_json::from_str::<Transport>(r#""unknown""#).unwrap(),
-            Transport::Unknown
-        );
-
-        // Test deserialization of unknown/empty values
-        assert_eq!(
-            serde_json::from_str::<Transport>(r#""unsupported-value""#).unwrap(),
-            Transport::Unknown
-        );
-        assert_eq!(
-            serde_json::from_str::<Transport>(r#""""#).unwrap(),
-            Transport::Unknown
-        );
-    }
-
-    #[test]
-    fn test_encoding_serialization() {
-        assert_eq!(
-            serde_json::to_string(&Encoding::Xml).unwrap(),
-            r#""ietf-subscribed-notifications:encode-xml""#
-        );
-
-        assert_eq!(
-            serde_json::to_string(&Encoding::Json).unwrap(),
-            r#""ietf-subscribed-notifications:encode-json""#
-        );
-
-        assert_eq!(
-            serde_json::to_string(&Encoding::Cbor).unwrap(),
-            r#""ietf-udp-notif-transport:encode-cbor""#
-        );
-        assert_eq!(
-            serde_json::to_string(&Encoding::Unknown).unwrap(),
-            r#""unknown""#
-        );
-    }
-
-    #[test]
-    fn test_encoding_deserialization() {
-        assert_eq!(
-            serde_json::from_str::<Encoding>(r#""ietf-subscribed-notifications:encode-xml""#)
-                .unwrap(),
-            Encoding::Xml
-        );
-        assert_eq!(
-            serde_json::from_str::<Encoding>(r#""encode-xml""#).unwrap(),
-            Encoding::Xml
-        );
-        assert_eq!(
-            serde_json::from_str::<Encoding>(r#""ietf-subscribed-notifications:encode-json""#)
-                .unwrap(),
-            Encoding::Json
-        );
-        assert_eq!(
-            serde_json::from_str::<Encoding>(r#""encode-json""#).unwrap(),
-            Encoding::Json
-        );
-        assert_eq!(
-            serde_json::from_str::<Encoding>(r#""ietf-udp-notif-transport:encode-cbor""#).unwrap(),
-            Encoding::Cbor
-        );
-        assert_eq!(
-            serde_json::from_str::<Encoding>(r#""encode-cbor""#).unwrap(),
-            Encoding::Cbor
-        );
-        assert_eq!(
-            serde_json::from_str::<Encoding>(r#""unknown""#).unwrap(),
-            Encoding::Unknown
-        );
-
-        // Test deserialization of unknown/empty values
-        assert_eq!(
-            serde_json::from_str::<Encoding>(r#""unsupported-value""#).unwrap(),
-            Encoding::Unknown
-        );
-        assert_eq!(
-            serde_json::from_str::<Encoding>(r#""""#).unwrap(),
-            Encoding::Unknown
-        );
-    }
 
     #[test]
     fn test_sub_started_modified_serde() {

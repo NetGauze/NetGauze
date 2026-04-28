@@ -30,6 +30,7 @@ pub mod client;
 pub mod codec;
 pub mod protocol;
 pub mod xml_utils;
+pub mod yang_push;
 pub mod yanglib;
 pub mod yangparser;
 
