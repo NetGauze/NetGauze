@@ -27,6 +27,7 @@ use std::net::IpAddr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BmpMessageValue {
     RouteMonitoring(RouteMonitoringMessage),
     StatisticsReport(StatisticsReportMessage),
@@ -71,6 +72,7 @@ impl BmpMessageValue {
 /// others are optional. The string TLV MAY be included multiple times.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct InitiationMessage {
     information: Vec<InitiationInformation>,
 }
@@ -100,6 +102,7 @@ impl InitiationMessage {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum InitiationInformation {
     /// The Information field contains a free-form UTF-8 string whose length is
     /// given by the Information Length field.
@@ -169,6 +172,7 @@ impl InitiationInformation {
 /// why it is terminating a session.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct TerminationMessage {
     information: Vec<TerminationInformation>,
 }
@@ -197,6 +201,7 @@ impl TerminationMessage {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TerminationInformation {
     String(String),
     Reason(PeerTerminationCode),
@@ -225,6 +230,7 @@ impl TerminationInformation {
 /// [`BgpMessage::Update`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMonitoringMessageError {
     UnexpectedMessageType(BgpMessageType),
 }
@@ -238,6 +244,7 @@ pub enum RouteMonitoringMessageError {
 /// PDU.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
     update_message: BgpMessage,
@@ -272,6 +279,7 @@ impl RouteMonitoringMessage {
 /// received.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RouteMirroringMessage {
     peer_header: PeerHeader,
     mirrored: Vec<RouteMirroringValue>,
@@ -296,6 +304,7 @@ impl RouteMirroringMessage {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum MirroredBgpMessage {
     Parsed(BgpMessage),
     Raw(Vec<u8>),
@@ -303,6 +312,7 @@ pub enum MirroredBgpMessage {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMirroringValue {
     /// A BGP PDU.  This PDU may or may not be an Update message.
     /// If the BGP Message TLV occurs in the Route Mirroring message,
@@ -356,6 +366,7 @@ impl RouteMirroringValue {
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerUpNotificationMessage {
     peer_header: PeerHeader,
     #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ip)))]
@@ -372,6 +383,7 @@ pub struct PeerUpNotificationMessage {
 /// [`BgpMessage::Open`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PeerUpNotificationMessageError {
     UnexpectedSentMessageType(BgpMessageType),
     UnexpectedReceivedMessageType(BgpMessageType),
@@ -444,6 +456,7 @@ impl PeerUpNotificationMessage {
 /// [`BgpMessage::Notification`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PeerDownNotificationMessageError {
     UnexpectedBgpMessageType(BgpMessageType),
     UnexpectedInitiationInformationTlvType(InitiationInformationTlvType),
@@ -463,6 +476,7 @@ pub enum PeerDownNotificationMessageError {
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerDownNotificationMessage {
     peer_header: PeerHeader,
     reason: PeerDownNotificationReason,
@@ -519,6 +533,7 @@ impl PeerDownNotificationMessage {
 /// [`PeerDownNotificationMessage`] is sent.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PeerDownNotificationReason {
     /// The local system closed the session.  Following the
     /// Reason is a BGP PDU containing a BGP NOTIFICATION message that
@@ -605,6 +620,7 @@ impl PeerDownNotificationReason {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StatisticsReportMessage {
     peer_header: PeerHeader,
     counters: Vec<StatisticsCounter>,
@@ -641,6 +657,7 @@ impl StatisticsReportMessage {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum StatisticsCounter {
     NumberOfPrefixesRejectedByInboundPolicy(CounterU32),
     NumberOfDuplicatePrefixAdvertisements(CounterU32),

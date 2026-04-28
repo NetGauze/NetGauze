@@ -27,6 +27,7 @@ pub const BMPV4_TLV_GROUP_GBIT: u16 = 0x8000;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BmpMessageValue {
     RouteMonitoring(RouteMonitoringMessage),
     StatisticsReport(v3::StatisticsReportMessage),
@@ -43,6 +44,7 @@ pub enum BmpMessageValue {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PeerDownTlv {
     Unknown { code: u16, value: Vec<u8> },
 }
@@ -75,6 +77,7 @@ impl BmpMessageValue {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RouteMonitoringTlv {
     index: u16,
     value: RouteMonitoringTlvValue,
@@ -82,6 +85,7 @@ pub struct RouteMonitoringTlv {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMonitoringTlvError {
     BadGroupTlvIndex(u16),
     BadBgpMessageType(BgpMessageType),
@@ -150,6 +154,7 @@ impl RouteMonitoringTlv {
 #[repr(u16)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRepr, Display)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMonitoringTlvType {
     StatelessParsing = 1,
     GroupTlv = 2,
@@ -160,6 +165,7 @@ pub enum RouteMonitoringTlvType {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMonitoringTlvValue {
     StatelessParsing(BgpCapability),
     GroupTlv(Vec<u16>),
@@ -184,6 +190,7 @@ pub enum RouteMonitoringTlvValue {
 /// ```
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PathMarking {
     /// [PathStatus] is just a collection of all possible flags in this bitflag
     path_status: PathStatus,
@@ -281,8 +288,29 @@ impl PathStatus {
     }
 }
 
+#[cfg(feature = "json-schema")]
+mod json_schema_impl {
+    use schemars::{JsonSchema, Schema, SchemaGenerator};
+    use std::borrow::Cow;
+
+    impl JsonSchema for super::PathStatus {
+        fn schema_name() -> Cow<'static, str> {
+            "PathStatus".into()
+        }
+
+        fn json_schema(_: &mut SchemaGenerator) -> Schema {
+            schemars::json_schema!({
+                "type": "string",
+                "description": "Bitflags serialized as a `|`-separated string, e.g. \"BEST | PRIMARY\".",
+                "examples": ["BEST | PRIMARY", "STALE"]
+            })
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PathMarkingReason {
     WellKnown(WellKnownPathMarkingReasonCode),
     Unknown(u16),
@@ -318,6 +346,7 @@ impl From<WellKnownPathMarkingReasonCode> for PathMarkingReason {
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr, strum_macros::Display,
 )]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[repr(u16)]
 pub enum WellKnownPathMarkingReasonCode {
     #[strum(to_string = "Invalid due to AS loop")]
@@ -346,6 +375,7 @@ pub enum WellKnownPathMarkingReasonCode {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMonitoringError {
     TlvError(RouteMonitoringTlvError),
 }
@@ -365,6 +395,7 @@ impl From<RouteMonitoringTlvError> for RouteMonitoringError {
 /// PDU.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
     update_pdu: RouteMonitoringTlv,
@@ -411,6 +442,7 @@ impl RouteMonitoringMessage {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerDownNotificationMessage {
     peer_header: PeerHeader,
     reason: v3::PeerDownNotificationReason,
