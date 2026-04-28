@@ -797,6 +797,70 @@ mod tests {
 
     #[test]
     fn test_sub_started_modified_serde() {
+        let event_time = Utc.timestamp_millis_opt(1777367504000).unwrap();
+        let expected_legacy_json = serde_json::json!(
+            {
+              "eventTime": "2026-04-28T09:11:44Z",
+              "ietf-notification-sequencing:sysName": "example-node",
+              "ietf-subscribed-notifications:subscription-started": {
+                "id": 1,
+                "ietf-yang-push:datastore": "example-datastore",
+                "ietf-yang-push:datastore-xpath-filter": "/example/datastore/xpath/filter",
+                "stop-time": "1970-01-01T00:00:00Z",
+                "transport": "ietf-udp-notif-transport:udp-notif",
+                "encoding": "ietf-subscribed-notifications:encode-json",
+                "purpose": "test-purpose",
+                "ietf-yang-push:on-change": {
+                  "dampening-period": 100,
+                  "sync-on-start": true,
+                  "excluded-change": [
+                    "create",
+                    "replace"
+                  ]
+                },
+                "ietf-yang-push-revision:module-version": [
+                  {
+                    "name": "example-module",
+                    "revision": "2025-04-25"
+                  }
+                ],
+                "ietf-yang-push-revision:yang-library-content-id": "content-id"
+              }
+            }
+        );
+        let expected_enveloped_json = serde_json::json!(
+            {
+              "event-time": "2026-04-28T09:11:44Z",
+              "hostname": "example-host",
+              "sequence-number": 12345,
+              "contents": {
+                "ietf-subscribed-notifications:subscription-started": {
+                  "id": 1,
+                  "ietf-yang-push:datastore": "example-datastore",
+                  "ietf-yang-push:datastore-xpath-filter": "/example/datastore/xpath/filter",
+                  "stop-time": "1970-01-01T00:00:00Z",
+                  "transport": "ietf-udp-notif-transport:udp-notif",
+                  "encoding": "ietf-subscribed-notifications:encode-json",
+                  "purpose": "test-purpose",
+                  "ietf-yang-push:on-change": {
+                    "dampening-period": 100,
+                    "sync-on-start": true,
+                    "excluded-change": [
+                      "create",
+                      "replace"
+                    ]
+                  },
+                  "ietf-yang-push-revision:module-version": [
+                    {
+                      "name": "example-module",
+                      "revision": "2025-04-25"
+                    }
+                  ],
+                  "ietf-yang-push-revision:yang-library-content-id": "content-id"
+                }
+              }
+            }
+        );
         // Create a SubscriptionStartedModified instance
         let sub_started = SubscriptionStartedModified {
             id: 1,
@@ -829,7 +893,7 @@ mod tests {
 
         // Create a Notification instance
         let notification = NotificationLegacy {
-            event_time: Utc::now(),
+            event_time,
             sys_name: Some("example-node".to_string()),
             notification: Some(NotificationVariant::SubscriptionStarted(
                 sub_started.clone(),
@@ -838,18 +902,19 @@ mod tests {
         };
 
         // Serialize the Notification to JSON
-        let serialized = serde_json::to_string(&notification).expect("Serialization failed");
+        let serialized = serde_json::to_value(&notification).expect("Serialization failed");
+        assert_eq!(serialized, expected_legacy_json);
 
         // Deserialize the JSON back to a Notification
         let deserialized: NotificationLegacy =
-            serde_json::from_str(&serialized).expect("Deserialization failed");
+            serde_json::from_value(serialized).expect("Deserialization failed");
 
         // Assert that the deserialized Notification matches the original
         assert_eq!(notification, deserialized);
 
         // Create a NotificationEnvelope instance
         let notification_envelope = NotificationEnvelope {
-            event_time: Utc::now(),
+            event_time,
             hostname: Some("example-host".to_string()),
             sequence_number: Some(12345),
             contents: Some(NotificationVariant::SubscriptionStarted(sub_started)),
@@ -858,11 +923,12 @@ mod tests {
 
         // Serialize the NotificationEnvelope to JSON
         let serialized_envelope =
-            serde_json::to_string(&notification_envelope).expect("Serialization failed");
+            serde_json::to_value(&notification_envelope).expect("Serialization failed");
+        assert_eq!(serialized_envelope, expected_enveloped_json);
 
         // Deserialize the JSON back to a NotificationEnvelope
         let deserialized_envelope: NotificationEnvelope =
-            serde_json::from_str(&serialized_envelope).expect("Deserialization failed");
+            serde_json::from_value(serialized_envelope).expect("Deserialization failed");
 
         // Assert that the deserialized NotificationEnvelope matches the original
         assert_eq!(notification_envelope, deserialized_envelope);
@@ -986,6 +1052,32 @@ mod tests {
 
     #[test]
     fn test_sub_terminated_serde() {
+        let event_time = Utc.timestamp_millis_opt(1777367504000).unwrap();
+        let expected_legacy_json = serde_json::json!(
+            {
+              "eventTime": "2026-04-28T09:11:44Z",
+              "ietf-notification-sequencing:sysName": "example-node",
+              "ietf-subscribed-notifications:subscription-terminated": {
+                "id": 1,
+                "reason": "some-reason"
+              }
+            }
+        );
+
+        let expected_enveloped_json = serde_json::json!(
+             {
+               "event-time": "2026-04-28T09:11:44Z",
+               "hostname": "example-host",
+               "sequence-number": 12345,
+               "contents": {
+                 "ietf-subscribed-notifications:subscription-terminated": {
+                   "id": 1,
+                   "reason": "some-reason"
+                 }
+               }
+             }
+        );
+
         // Create a SubscriptionTerminated instance
         let sub_terminated = SubscriptionTerminated {
             id: 1,
@@ -995,7 +1087,7 @@ mod tests {
 
         // Create a Notification instance
         let notification = NotificationLegacy {
-            event_time: Utc::now(),
+            event_time,
             sys_name: Some("example-node".to_string()),
             notification: Some(NotificationVariant::SubscriptionTerminated(
                 sub_terminated.clone(),
@@ -1004,18 +1096,19 @@ mod tests {
         };
 
         // Serialize the Notification to JSON
-        let serialized = serde_json::to_string(&notification).expect("Serialization failed");
+        let serialized = serde_json::to_value(&notification).expect("Serialization failed");
+        assert_eq!(serialized, expected_legacy_json);
 
         // Deserialize the JSON back to a Notification
         let deserialized: NotificationLegacy =
-            serde_json::from_str(&serialized).expect("Deserialization failed");
+            serde_json::from_value(serialized).expect("Deserialization failed");
 
         // Assert that the deserialized Notification matches the original
         assert_eq!(notification, deserialized);
 
         // Create a NotificationEnvelope instance
         let notification_envelope = NotificationEnvelope {
-            event_time: Utc::now(),
+            event_time,
             hostname: Some("example-host".to_string()),
             sequence_number: Some(12345),
             contents: Some(NotificationVariant::SubscriptionTerminated(sub_terminated)),
@@ -1024,11 +1117,12 @@ mod tests {
 
         // Serialize the NotificationEnvelope to JSON
         let serialized_envelope =
-            serde_json::to_string(&notification_envelope).expect("Serialization failed");
+            serde_json::to_value(&notification_envelope).expect("Serialization failed");
+        assert_eq!(serialized_envelope, expected_enveloped_json);
 
         // Deserialize the JSON back to a NotificationEnvelope
         let deserialized_envelope: NotificationEnvelope =
-            serde_json::from_str(&serialized_envelope).expect("Deserialization failed");
+            serde_json::from_value(serialized_envelope).expect("Deserialization failed");
 
         // Assert that the deserialized NotificationEnvelope matches the original
         assert_eq!(notification_envelope, deserialized_envelope);
@@ -1053,6 +1147,81 @@ mod tests {
 
     #[test]
     fn test_yang_push_update_serde() {
+        let event_time = Utc.timestamp_millis_opt(1777367504000).unwrap();
+        let expected_legacy_json = serde_json::json!(
+            {
+              "eventTime": "2026-04-28T09:11:44Z",
+              "ietf-notification-sequencing:sysName": "example-node",
+              "ietf-yang-push:push-update": {
+                "id": 1,
+                "datastore-contents": {
+                  "layer1": {
+                    "layer2": {
+                      "anotherKey": "anotherValue",
+                      "layer3": {
+                        "key1": "value1",
+                        "key2": 42,
+                        "key3": {
+                          "subkey1": true,
+                          "subkey2": [
+                            1,
+                            2,
+                            3
+                          ],
+                          "subkey3": {
+                            "deepkey": "deepvalue"
+                          }
+                        }
+                      }
+                    },
+                    "simpleKey": "simpleValue"
+                  }
+                },
+                "ietf-distributed-notif:message-publisher-id": 1,
+                "ietf-yp-observation:point-in-time": "current-accounting",
+                "ietf-yp-observation:timestamp": "2025-05-06T00:00:00Z"
+              }
+            }
+        );
+
+        let expected_enveloped_json = serde_json::json!(
+            {
+              "event-time": "2026-04-28T09:11:44Z",
+              "hostname": "example-host",
+              "sequence-number": 12345,
+              "contents": {
+                "ietf-yang-push:push-update": {
+                  "id": 1,
+                  "datastore-contents": {
+                    "layer1": {
+                      "layer2": {
+                        "anotherKey": "anotherValue",
+                        "layer3": {
+                          "key1": "value1",
+                          "key2": 42,
+                          "key3": {
+                            "subkey1": true,
+                            "subkey2": [
+                              1,
+                              2,
+                              3
+                            ],
+                            "subkey3": {
+                              "deepkey": "deepvalue"
+                            }
+                          }
+                        }
+                      },
+                      "simpleKey": "simpleValue"
+                    }
+                  },
+                  "ietf-distributed-notif:message-publisher-id": 1,
+                  "ietf-yp-observation:point-in-time": "current-accounting",
+                  "ietf-yp-observation:timestamp": "2025-05-06T00:00:00Z"
+                }
+              }
+            }
+        );
         // Create a YangPushUpdate instance
         let yang_push_update = YangPushUpdate {
             id: 1,
@@ -1084,7 +1253,7 @@ mod tests {
 
         // Create a Notification instance
         let notification = NotificationLegacy {
-            event_time: Utc::now(),
+            event_time,
             sys_name: Some("example-node".to_string()),
             notification: Some(NotificationVariant::YangPushUpdate(
                 yang_push_update.clone(),
@@ -1093,18 +1262,19 @@ mod tests {
         };
 
         // Serialize the Notification to JSON
-        let serialized = serde_json::to_string(&notification).expect("Serialization failed");
+        let serialized = serde_json::to_value(&notification).expect("Serialization failed");
+        assert_eq!(serialized, expected_legacy_json);
 
         // Deserialize the JSON back to a Notification
         let deserialized: NotificationLegacy =
-            serde_json::from_str(&serialized).expect("Deserialization failed");
+            serde_json::from_value(serialized).expect("Deserialization failed");
 
         // Assert that the deserialized Notification matches the original
         assert_eq!(notification, deserialized);
 
         // Create a NotificationEnvelope instance
         let notification_envelope = NotificationEnvelope {
-            event_time: Utc::now(),
+            event_time,
             hostname: Some("example-host".to_string()),
             sequence_number: Some(12345),
             contents: Some(NotificationVariant::YangPushUpdate(yang_push_update)),
@@ -1113,11 +1283,12 @@ mod tests {
 
         // Serialize the NotificationEnvelope to JSON
         let serialized_envelope =
-            serde_json::to_string(&notification_envelope).expect("Serialization failed");
+            serde_json::to_value(&notification_envelope).expect("Serialization failed");
+        assert_eq!(serialized_envelope, expected_enveloped_json);
 
         // Deserialize the JSON back to a NotificationEnvelope
         let deserialized_envelope: NotificationEnvelope =
-            serde_json::from_str(&serialized_envelope).expect("Deserialization failed");
+            serde_json::from_value(serialized_envelope).expect("Deserialization failed");
 
         // Assert that the deserialized NotificationEnvelope matches the original
         assert_eq!(notification_envelope, deserialized_envelope);
