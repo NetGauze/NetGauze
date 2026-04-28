@@ -34,6 +34,7 @@ tokio-util = { workspace = true, default-features = false, features = ["codec"],
 bytes = { workspace = true, optional = true }
 either = { workspace = true }
 bitflags = { workspace = true, features = ["serde"] }
+schemars = { workspace = true, features = ["derive", "chrono04"], optional = true }
 
 [features]
 default = ["serde"]
@@ -47,6 +48,7 @@ serde = [
 codec = ["tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext", "bitflags/arbitrary"]
+json-schema = ["schemars", "netgauze-bgp-pkt/json-schema", "netgauze-iana/json-schema", "ipnet/schemars1"]
 
 [dev-dependencies]
 netgauze-pcap-reader = { workspace = true }

@@ -42,6 +42,7 @@ pub const PEER_FLAGS_IS_FILTERED: u8 = 0b10000000;
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BmpVersion {
     Version3 = 3,
     Version4 = 4,
@@ -73,6 +74,7 @@ impl TryFrom<u8> for BmpVersion {
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BmpMessageType {
     #[strum(to_string = "Route Monitoring")]
     RouteMonitoring = 0,
@@ -124,6 +126,7 @@ impl TryFrom<u8> for BmpMessageType {
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BmpPeerTypeCode {
     #[strum(to_string = "Global Instance Peer")]
     GlobalInstancePeer = 0,
@@ -169,6 +172,7 @@ impl TryFrom<u8> for BmpPeerTypeCode {
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum InitiationInformationTlvType {
     #[strum(to_string = "String")]
     String = 0,
@@ -216,6 +220,7 @@ impl TryFrom<u16> for InitiationInformationTlvType {
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TerminationInformationTlvType {
     #[strum(to_string = "String")]
     String = 0,
@@ -257,6 +262,7 @@ impl TryFrom<u16> for TerminationInformationTlvType {
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PeerTerminationCode {
     #[strum(to_string = "Administratively closed")]
     AdministrativelyClosed = 0,
@@ -304,6 +310,7 @@ impl TryFrom<u16> for PeerTerminationCode {
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PeerDownReasonCode {
     #[strum(to_string = "Local system closed, NOTIFICATION PDU follows")]
     LocalSystemClosedNotificationPduFollows = 1,
@@ -353,6 +360,7 @@ impl TryFrom<u8> for PeerDownReasonCode {
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMirroringTlvType {
     #[strum(to_string = "BGP Message")]
     BgpMessage = 0,
@@ -394,6 +402,7 @@ impl TryFrom<u16> for RouteMirroringTlvType {
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMirroringInformation {
     #[strum(to_string = "Errored PDU")]
     ErroredPdu = 0,
@@ -435,6 +444,7 @@ impl TryFrom<u16> for RouteMirroringInformation {
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BmpStatisticsType {
     // [RFC8671](https://datatracker.ietf.org/doc/html/rfc8671)
     #[strum(to_string = "Number of prefixes rejected by inbound policy")]

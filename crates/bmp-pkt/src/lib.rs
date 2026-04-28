@@ -47,6 +47,7 @@ pub mod wire;
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BmpMessage {
     V3(v3::BmpMessageValue),
     V4(v4::BmpMessageValue),
@@ -99,6 +100,7 @@ impl BmpMessage {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerHeader {
     peer_type: BmpPeerType,
     rd: Option<RouteDistinguisher>,
@@ -192,6 +194,7 @@ impl PeerHeader {
 ///    set when a filter is applied to Loc-RIB routes sent to the BMP collector.
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BmpPeerType {
     GlobalInstancePeer {
         ipv6: bool,
@@ -249,6 +252,7 @@ impl BmpPeerType {
 /// increasing again from 0.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CounterU32(u32);
 
 impl CounterU32 {
@@ -281,6 +285,7 @@ impl Deref for CounterU32 {
 /// value), the 64-bit Gauge also decreases (or increases).
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct GaugeU64(u64);
 
 impl GaugeU64 {
@@ -312,6 +317,7 @@ fn arbitrary_ipv4(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Ipv4
 /// to the BMP session.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerKey {
     #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ip)))]
     peer_address: Option<IpAddr>,
