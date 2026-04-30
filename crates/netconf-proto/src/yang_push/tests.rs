@@ -26,7 +26,7 @@ use crate::yang_push::filters::*;
 use crate::yang_push::identities::*;
 use crate::yang_push::subscription::*;
 use crate::yang_push::types::*;
-use crate::yanglib::{Datastore, DatastoreName};
+use crate::yanglib::DatastoreName;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use quick_xml::events::Event;
@@ -353,10 +353,7 @@ fn test_datastore_target_with_xpath_filter() {
         </subscription>"#;
 
     let expected = DatastoreTarget {
-        datastore: Datastore::new(
-            DatastoreName::Operational,
-            "urn:ietf:params:xml:ns:yang:ietf-datastores".into(),
-        ),
+        datastore: DatastoreName::Operational,
         selection: DatastoreSelectionFilterObjects::WithInSubscription(DatastoreFilterSpec::Xpath(
             DatastoreXPathFilter {
                 namespaces: IndexMap::from([(
@@ -383,10 +380,7 @@ fn test_datastore_target_with_subtree_filter() {
         </subscription>"#;
 
     let expected = DatastoreTarget {
-        datastore: Datastore::new(
-            DatastoreName::Running,
-            "urn:ietf:params:xml:ns:yang:ietf-datastores".into(),
-        ),
+        datastore: DatastoreName::Running,
         selection: DatastoreSelectionFilterObjects::WithInSubscription(
             DatastoreFilterSpec::Subtree(DatastoreSubtreeFilter {
                 namespaces: IndexMap::from([(
@@ -410,10 +404,7 @@ fn test_datastore_target_with_filter_ref() {
         </subscription>"#;
 
     let expected = DatastoreTarget {
-        datastore: Datastore::new(
-            DatastoreName::Operational,
-            "urn:ietf:params:xml:ns:yang:ietf-datastores".into(),
-        ),
+        datastore: DatastoreName::Operational,
         selection: DatastoreSelectionFilterObjects::ByReference("my-cpu-filter".into()),
     };
 
@@ -575,10 +566,7 @@ fn test_subscription() {
     let expected_by_value = Subscription {
         id: 3,
         target: Target::Datastore(DatastoreTarget {
-            datastore: Datastore::new(
-                DatastoreName::Operational,
-                "urn:ietf:params:xml:ns:yang:ietf-datastores".into(),
-            ),
+            datastore: DatastoreName::Operational,
             selection: DatastoreSelectionFilterObjects::WithInSubscription(
                 DatastoreFilterSpec::Xpath(DatastoreXPathFilter {
                     namespaces: IndexMap::new(), /* no namespace prefixes declared for
@@ -637,10 +625,7 @@ fn test_subscription() {
     let expected_by_reference = Subscription {
         id: 1,
         target: Target::Datastore(DatastoreTarget {
-            datastore: Datastore::new(
-                DatastoreName::Operational,
-                "urn:ietf:params:xml:ns:yang:ietf-datastores".into(),
-            ),
+            datastore: DatastoreName::Operational,
             selection: DatastoreSelectionFilterObjects::ByReference("STATSBOARDRESOURCE".into()),
         }),
         stop_time: None,
