@@ -36,7 +36,9 @@ use crate::yang_push::filters::{
 };
 use crate::yang_push::identities::{ChangeType, ConfiguredSubscriptionState, Encoding, Transport};
 use crate::yang_push::types::{CentiSeconds, SubscriptionId};
-use crate::yang_push::{DISTRIBUTED_NOTIF_NS, SUBSCRIBED_NOTIFICATIONS_NS, YANG_PUSH_NS};
+use crate::yang_push::{
+    DISTRIBUTED_NOTIF_NS, SUBSCRIBED_NOTIFICATIONS_NS, YANG_PUSH_NS, YANG_PUSH_REVISION,
+};
 use crate::yanglib::DatastoreName;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -86,6 +88,10 @@ pub struct Subscription {
 
     #[serde(flatten)]
     pub update_trigger: Option<UpdateTrigger>,
+
+    #[serde(rename = "ietf-yang-push-revision:module-version")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub module_version: Option<Box<[YangPushModuleVersion]>>,
 }
 
 impl Subscription {
@@ -104,6 +110,7 @@ impl Subscription {
             configured_subscription_state: None,
             message_publisher_id: None,
             update_trigger: None,
+            module_version: None,
         }
     }
 }
@@ -620,6 +627,13 @@ impl XmlSerialize for Subscription {
             trigger.xml_serialize(writer)?;
         }
 
+        // ypr:module-version
+        if let Some(module_version) = self.module_version.as_deref() {
+            for module_version in module_version {
+                module_version.xml_serialize(writer)?;
+            }
+        }
+
         writer.write_event(Event::End(elem.to_end()))?;
         if ns_added {
             writer.pop_namespace_binding();
@@ -644,6 +658,7 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
         let mut configured_subscription_state = None;
         let mut message_publisher_ids: Option<Vec<u32>> = None;
         let mut update_trigger = None;
+        let mut module_versions: Option<Vec<YangPushModuleVersion>> = None;
 
         // Target pieces — collected separately because XML elements can
         // appear in any order and the target choice children are interleaved
@@ -783,12 +798,20 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
                 }
                 parser.close()?;
             }
+            // ietf-yang-push-revision:module-version
+            else if parser.is_tag(Some(YANG_PUSH_REVISION), "module-version") {
+                let module_version = YangPushModuleVersion::xml_deserialize(parser)?;
+                if let Some(ref mut versions) = module_versions {
+                    versions.push(module_version);
+                } else {
+                    module_versions = Some(vec![module_version]);
+                }
+            }
             // ── Unknown / augmented element — skip gracefully ───────────
             else {
                 parser.skip()?;
             }
         }
-
         parser.close()?; // </subscription>
 
         let id = id.ok_or_else(|| ParsingError::WrongToken {
@@ -840,6 +863,7 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
             configured_subscription_state,
             message_publisher_id: message_publisher_ids.map(|x| x.into_boxed_slice()),
             update_trigger,
+            module_version: module_versions.map(|x| x.into_boxed_slice()),
         })
     }
 }
@@ -918,33 +942,117 @@ pub struct YangPushModuleVersion {
     /// Alias 'module-name' still supported
     /// (draft-ietf-netconf-yang-notifications-versioning < 9)
     #[serde(alias = "module-name")]
-    pub name: String,
+    pub name: Box<str>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub revision: Option<String>,
+    pub revision: Option<Box<str>>,
 
     /// Alias 'revision-label' still supported
     /// (draft-ietf-netconf-yang-notifications-versioning < 9)
     #[serde(alias = "revision-label")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
+    pub version: Option<Box<str>>,
 }
 
 impl YangPushModuleVersion {
-    pub const fn new(name: String, revision: Option<String>, version: Option<String>) -> Self {
+    pub const fn new(
+        name: Box<str>,
+        revision: Option<Box<str>>,
+        version: Option<Box<str>>,
+    ) -> Self {
         Self {
             name,
             revision,
             version,
         }
     }
-    pub const fn name(&self) -> &str {
-        self.name.as_str()
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
     }
+
     pub fn revision(&self) -> Option<&str> {
         self.revision.as_deref()
     }
     pub fn version(&self) -> Option<&str> {
         self.version.as_deref()
+    }
+}
+
+impl XmlSerialize for YangPushModuleVersion {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        let mut ns_added = false;
+        if writer.get_namespace_prefix(YANG_PUSH_REVISION).is_none() {
+            ns_added = true;
+            writer
+                .push_namespace_binding(IndexMap::from([(YANG_PUSH_REVISION, "".to_string())]))?;
+        }
+        let module_version_start =
+            writer.create_ns_element(YANG_PUSH_REVISION, "module-version")?;
+        writer.write_event(Event::Start(module_version_start.clone()))?;
+        let name_start = writer.create_ns_element(YANG_PUSH_REVISION, "name")?;
+
+        writer.write_event(Event::Start(name_start.clone()))?;
+        writer.write_event(Event::Text(BytesText::new(self.name.as_ref())))?;
+        writer.write_event(Event::End(name_start.to_end()))?;
+
+        if let Some(revision) = &self.revision {
+            let revision_start = writer.create_ns_element(YANG_PUSH_REVISION, "revision")?;
+            writer.write_event(Event::Start(revision_start.clone()))?;
+            writer.write_event(Event::Text(BytesText::new(revision.as_ref())))?;
+            writer.write_event(Event::End(revision_start.to_end()))?;
+        }
+        if let Some(version) = &self.version {
+            let version_start = writer.create_ns_element(YANG_PUSH_REVISION, "version")?;
+            writer.write_event(Event::Start(version_start.clone()))?;
+            writer.write_event(Event::Text(BytesText::new(version.as_ref())))?;
+            writer.write_event(Event::End(version_start.to_end()))?;
+        }
+        writer.write_event(Event::End(module_version_start.to_end()))?;
+        if ns_added {
+            writer.pop_namespace_binding();
+        }
+        Ok(())
+    }
+}
+
+impl XmlDeserialize<'_, YangPushModuleVersion> for YangPushModuleVersion {
+    fn xml_deserialize(parser: &mut XmlParser<'_, impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        let module_version_start = parser.open(Some(YANG_PUSH_REVISION), "module-version")?;
+
+        let mut revision: Option<Box<str>> = None;
+        let mut version: Option<Box<str>> = None;
+
+        parser.skip_text()?;
+        parser.open(Some(YANG_PUSH_REVISION), "name")?;
+        let name = parser.tag_string()?.trim().into();
+        parser.close()?;
+
+        parser.skip_text()?;
+        if parser.is_tag(Some(YANG_PUSH_REVISION), "revision") {
+            parser.open(Some(YANG_PUSH_REVISION), "revision")?;
+            revision = Some(parser.tag_string()?.trim().into());
+            parser.close()?;
+        }
+        parser.skip_text()?;
+        if parser.is_tag(Some(YANG_PUSH_REVISION), "version") {
+            parser.open(Some(YANG_PUSH_REVISION), "version")?;
+            version = Some(parser.tag_string()?.trim().into());
+            parser.close()?;
+        }
+        while parser.peek() != &Event::End(module_version_start.to_end()) {
+            // skip any augmentation
+            parser.skip()?;
+        }
+        parser.close()?; // </module-version>
+
+        Ok(Self {
+            name,
+            revision,
+            version,
+        })
     }
 }

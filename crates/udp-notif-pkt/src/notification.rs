@@ -839,8 +839,8 @@ mod tests {
                 excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
             }),
             module_version: Some(vec![YangPushModuleVersion {
-                name: "example-module".to_string(),
-                revision: Some("2025-04-25".to_string()),
+                name: "example-module".into(),
+                revision: Some("2025-04-25".into()),
                 version: None,
             }]),
             yang_library_content_id: Some("content-id".to_string()),
@@ -935,8 +935,8 @@ mod tests {
                 excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
             }),
             module_version: Some(vec![YangPushModuleVersion {
-                name: "example-module".to_string(),
-                revision: Some("2025-04-25".to_string()),
+                name: "example-module".into(),
+                revision: Some("2025-04-25".into()),
                 version: None,
             }]),
             yang_library_content_id: Some("content-id".to_string()),
