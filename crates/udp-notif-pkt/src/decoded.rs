@@ -282,8 +282,8 @@ mod tests {
                 excluded_change: None,
             }),
             Some(vec![YangPushModuleVersion::new(
-                "openconfig-interfaces".to_string(),
-                Some("2025-06-10".to_string()),
+                "openconfig-interfaces".into(),
+                Some("2025-06-10".into()),
                 None,
             )]),
             None,

@@ -592,6 +592,7 @@ fn test_subscription() {
                     .with_timezone(&Utc),
             ),
         }),
+        module_version: None,
     };
 
     // Subscription with filter-by-reference, transport, encoding,
@@ -645,6 +646,7 @@ fn test_subscription() {
                     .with_timezone(&Utc),
             ),
         }),
+        module_version: None,
     };
 
     // Parse-only test for input_by_value (contains unknown elements that
@@ -670,4 +672,128 @@ fn test_subscription() {
     // lose, so full serialize → deserialize → compare works).
     test_xml_value(input_by_reference, expected_by_reference)
         .expect("subscription by-reference round-trip failed");
+}
+
+#[test]
+fn test_subscription_yang_push_augments() {
+    let input_by_value = r#"<subscription xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications">
+        <id>3</id>
+        <datastore-xpath-filter xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push">
+            openconfig-platform:components/component/state
+        </datastore-xpath-filter>
+        <datastore xmlns:idx="urn:ietf:params:xml:ns:yang:ietf-datastores"
+                   xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push">idx:operational
+        </datastore>
+        <periodic xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push">
+            <anchor-time>2025-01-01T00:00:30+00:00</anchor-time>
+            <period>360000</period>
+        </periodic>
+        <receivers>
+            <receiver>
+                <name>DAISY</name>
+                <receiver-instance-ref xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notif-receivers">DAISY
+                </receiver-instance-ref>
+            </receiver>
+        </receivers>
+        <source-interface>MgmtEth0/RP0/CPU0/0</source-interface>
+        <encoding xmlns:sn="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications">sn:encode-json</encoding>
+        <dscp>0</dscp>
+        <module-version xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push-revision">
+          <name>ietf-interfaces</name>
+        </module-version>
+        <module-version xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push-revision">
+          <name>example-module1</name>
+          <revision>2024-01-01</revision>
+        </module-version>
+        <module-version xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push-revision">
+          <name>example-module2</name>
+          <version>2.0.0</version>
+        </module-version>
+        <module-version xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push-revision">
+          <name>example-module3</name>
+          <revision>2024-02-02</revision>
+          <version>3.0.0</version>
+        </module-version>
+    </subscription>"#;
+
+    let expected_by_value = Subscription {
+        id: 3,
+        target: Target::Datastore(DatastoreTarget {
+            datastore: DatastoreName::Operational,
+            selection: DatastoreSelectionFilterObjects::WithInSubscription(
+                DatastoreFilterSpec::Xpath(DatastoreXPathFilter {
+                    namespaces: IndexMap::new(), /* no namespace prefixes declared for
+                                                  * "openconfig-platform" */
+                    path: "openconfig-platform:components/component/state".into(),
+                }),
+            ),
+        }),
+        stop_time: None,
+        dscp: Some(0),
+        weighting: None,
+        dependency: None,
+        transport: None,
+        encoding: Some(Encoding::Json),
+        purpose: None,
+        configured_subscription_state: None,
+        message_publisher_id: None,
+        update_trigger: Some(UpdateTrigger::Periodic {
+            period: Some(CentiSeconds::new(360000)),
+            anchor_time: Some(
+                DateTime::parse_from_rfc3339("2025-01-01T00:00:30+00:00")
+                    .unwrap()
+                    .with_timezone(&Utc),
+            ),
+        }),
+        module_version: Some(
+            vec![
+                YangPushModuleVersion::new("ietf-interfaces".into(), None, None),
+                YangPushModuleVersion::new(
+                    "example-module1".into(),
+                    Some("2024-01-01".into()),
+                    None,
+                ),
+                YangPushModuleVersion::new("example-module2".into(), None, Some("2.0.0".into())),
+                YangPushModuleVersion::new(
+                    "example-module3".into(),
+                    Some("2024-02-02".into()),
+                    Some("3.0.0".into()),
+                ),
+            ]
+            .into_boxed_slice(),
+        ),
+    };
+
+    test_xml_value(input_by_value, expected_by_value)
+        .expect("subscription by-reference round-trip failed");
+}
+
+#[test]
+fn test_yang_push_module_version_json_serde() {
+    let json_legacy = serde_json::json!({
+        "module-name": "ietf-interfaces",
+        "revision": "2014-05-08",
+        "revision-label": "2.0.0",
+    });
+
+    let json_value = serde_json::json!({
+        "name": "ietf-interfaces",
+        "revision": "2014-05-08",
+        "version": "2.0.0",
+    });
+
+    let modeled = YangPushModuleVersion {
+        name: "ietf-interfaces".into(),
+        revision: Some("2014-05-08".into()),
+        version: Some("2.0.0".into()),
+    };
+
+    let serialized = serde_json::to_value(&modeled).unwrap();
+    assert_eq!(serialized, json_value);
+
+    let deserialized: YangPushModuleVersion = serde_json::from_value(json_legacy).unwrap();
+    assert_eq!(deserialized, modeled);
+
+    let deserialized: YangPushModuleVersion = serde_json::from_value(json_value).unwrap();
+    assert_eq!(deserialized, modeled);
 }
