@@ -82,7 +82,7 @@ pub struct Subscription {
         rename = "ietf-distributed-notif:message-publisher-id",
         skip_serializing_if = "Option::is_none"
     )]
-    pub message_publisher_id: Option<u32>,
+    pub message_publisher_id: Option<Box<[u32]>>,
 
     #[serde(flatten)]
     pub update_trigger: Option<UpdateTrigger>,
@@ -594,7 +594,7 @@ impl XmlSerialize for Subscription {
         }
 
         // <message-publisher-id> (from ietf-distributed-notif, different NS)
-        if let Some(mpid) = self.message_publisher_id {
+        if let Some(message_publisher_ids) = &self.message_publisher_id {
             let mut dn_ns_added = false;
             if writer.get_namespace_prefix(DISTRIBUTED_NOTIF_NS).is_none() {
                 dn_ns_added = true;
@@ -603,10 +603,13 @@ impl XmlSerialize for Subscription {
                     "dn".to_string(),
                 )]))?;
             }
-            let child = writer.create_ns_element(DISTRIBUTED_NOTIF_NS, "message-publisher-id")?;
-            writer.write_event(Event::Start(child.clone()))?;
-            writer.write_event(Event::Text(BytesText::new(&mpid.to_string())))?;
-            writer.write_event(Event::End(child.to_end()))?;
+            for mpid in message_publisher_ids {
+                let child =
+                    writer.create_ns_element(DISTRIBUTED_NOTIF_NS, "message-publisher-id")?;
+                writer.write_event(Event::Start(child.clone()))?;
+                writer.write_event(Event::Text(BytesText::new(&mpid.to_string())))?;
+                writer.write_event(Event::End(child.to_end()))?;
+            }
             if dn_ns_added {
                 writer.pop_namespace_binding();
             }
@@ -639,7 +642,7 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
         let mut encoding = None;
         let mut purpose = None;
         let mut configured_subscription_state = None;
-        let mut message_publisher_id = None;
+        let mut message_publisher_ids: Option<Vec<u32>> = None;
         let mut update_trigger = None;
 
         // Target pieces — collected separately because XML elements can
@@ -765,9 +768,19 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
             // ── ietf-distributed-notif augmentation ─────────────────────
             else if parser.is_tag(Some(DISTRIBUTED_NOTIF_NS), "message-publisher-id") {
                 parser.open(Some(DISTRIBUTED_NOTIF_NS), "message-publisher-id")?;
-                message_publisher_id = Some(parser.tag_string()?.trim().parse().map_err(
-                    |e: std::num::ParseIntError| ParsingError::InvalidValue(e.to_string()),
-                )?);
+                let message_publisher_id =
+                    parser
+                        .tag_string()?
+                        .trim()
+                        .parse()
+                        .map_err(|e: std::num::ParseIntError| {
+                            ParsingError::InvalidValue(e.to_string())
+                        })?;
+                if let Some(ref mut ids) = message_publisher_ids {
+                    ids.push(message_publisher_id);
+                } else {
+                    message_publisher_ids = Some(vec![message_publisher_id]);
+                }
                 parser.close()?;
             }
             // ── Unknown / augmented element — skip gracefully ───────────
@@ -825,7 +838,7 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
             encoding,
             purpose,
             configured_subscription_state,
-            message_publisher_id,
+            message_publisher_id: message_publisher_ids.map(|x| x.into_boxed_slice()),
             update_trigger,
         })
     }

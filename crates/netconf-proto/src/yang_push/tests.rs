@@ -636,7 +636,7 @@ fn test_subscription() {
         encoding: Some(Encoding::Json),
         purpose: None,
         configured_subscription_state: Some(ConfiguredSubscriptionState::Valid),
-        message_publisher_id: Some(16843789),
+        message_publisher_id: Some(Box::new([16843789])),
         update_trigger: Some(UpdateTrigger::Periodic {
             period: Some(CentiSeconds::new(6000)),
             anchor_time: Some(
