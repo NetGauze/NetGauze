@@ -43,8 +43,8 @@
 use chrono::{DateTime, Utc};
 
 use netgauze_netconf_proto::yang_push::identities::{ChangeType, Encoding, Transport};
-use netgauze_netconf_proto::yang_push::types::{CentiSeconds, SubscriptionId};
 use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
+use netgauze_netconf_proto::yang_push::types::{CentiSeconds, SubscriptionId};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::IpAddr;
@@ -614,11 +614,11 @@ mod tests {
                             anchor_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
                         }),
                         module: vec![YangPushModuleVersion::new(
-                            "example-module".to_string(),
-                            Some("2025-01-01".to_string()),
-                            Some("1.0.0".to_string()),
+                            "example-module".into(),
+                            Some("2025-01-01".into()),
+                            Some("1.0.0".into()),
                         )],
-                        yang_library_content_id: Some("random-content-id".to_string()),
+                        yang_library_content_id: Some("random-content-id".into()),
                     }),
                 },
                 data_collection_manifest: Some(Manifest {
@@ -769,9 +769,9 @@ mod tests {
             excluded_change: Some(vec![ChangeType::Delete]),
         };
         let module = vec![YangPushModuleVersion::new(
-            "mod".to_string(),
-            Some("rev".to_string()),
-            Some("ver".to_string()),
+            "mod".into(),
+            Some("rev".into()),
+            Some("ver".into()),
         )];
         let metadata = YangPushSubscriptionMetadata::new(
             Some(1),
