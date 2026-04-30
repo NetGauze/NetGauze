@@ -2075,7 +2075,10 @@ impl ModuleSetBuilder {
             }
         }
         let content_id = content_id.finalize();
-        let content_id = format!("{content_id:x}");
+        let content_id = content_id
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>();
         let yang_lib_schema = Schema::new(
             default_name.clone(),
             Box::new([self.module_set.name().into()]),

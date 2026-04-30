@@ -180,7 +180,7 @@ mod tests {
     use super::*;
     use futures_util::SinkExt;
     use netgauze_bmp_pkt::v3::{BmpMessageValue, InitiationMessage};
-    use rand::Rng;
+    use rand::RngExt;
     use tokio::task::JoinHandle;
     use tower::{ServiceBuilder, service_fn};
 
