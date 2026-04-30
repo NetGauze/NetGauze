@@ -1471,22 +1471,28 @@ impl XmlSerialize for Schema {
 /// Datastore name as defined in RFC8342.
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, strum_macros::Display)]
 pub enum DatastoreName {
-    #[strum(serialize = "ietf-datastores:running")]
+    #[strum(to_string = "ietf-datastores:running")]
+    #[serde(rename = "ietf-datastores:running", alias = "running")]
     Running,
 
-    #[strum(serialize = "ietf-datastores:candidate")]
+    #[strum(to_string = "ietf-datastores:candidate")]
+    #[serde(rename = "ietf-datastores:candidate", alias = "candidate")]
     Candidate,
 
-    #[strum(serialize = "ietf-datastores:startup")]
+    #[strum(to_string = "ietf-datastores:startup")]
+    #[serde(rename = "ietf-datastores:startup", alias = "startup")]
     StartUp,
 
-    #[strum(serialize = "ietf-datastores:intended")]
+    #[strum(to_string = "ietf-datastores:intended")]
+    #[serde(rename = "ietf-datastores:intended", alias = "intended")]
     Intended,
 
-    #[strum(serialize = "ietf-datastores:operational")]
+    #[strum(to_string = "ietf-datastores:operational")]
+    #[serde(rename = "ietf-datastores:operational", alias = "operational")]
     Operational,
 
-    #[strum(serialize = "{ns}:{name}")]
+    #[strum(to_string = "{ns}:{name}")]
+    #[serde(rename = "{ns}:{name}")]
     Unknown { ns: Box<str>, name: Box<str> },
 }
 
