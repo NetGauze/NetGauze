@@ -37,7 +37,7 @@ use crate::yang_push::filters::{
 use crate::yang_push::identities::{ChangeType, ConfiguredSubscriptionState, Encoding, Transport};
 use crate::yang_push::types::{CentiSeconds, SubscriptionId};
 use crate::yang_push::{DISTRIBUTED_NOTIF_NS, SUBSCRIBED_NOTIFICATIONS_NS, YANG_PUSH_NS};
-use crate::yanglib::{Datastore, DatastoreName};
+use crate::yanglib::DatastoreName;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use quick_xml::events::{BytesText, Event};
@@ -146,80 +146,12 @@ pub struct StreamTarget {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct DatastoreTarget {
     /// Datastore, from which to retrieve data (e.g., operational, running)
-    #[serde(
-        rename = "ietf-yang-push:datastore",
-        serialize_with = "datastore_serialize",
-        deserialize_with = "datastore_deserialize"
-    )]
-    pub datastore: Datastore,
+    #[serde(rename = "ietf-yang-push:datastore", alias = "datastore")]
+    pub datastore: DatastoreName,
 
     /// Selection filter for datastore nodes
     #[serde(flatten)]
     pub selection: DatastoreSelectionFilterObjects,
-}
-
-pub(crate) fn datastore_serialize<S>(
-    datastore: &Datastore,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    const DS_NS: &str = "urn:ietf:params:xml:ns:yang:ietf-datastores";
-    const DS_PREFIX: &str = "ietf-datastores";
-
-    let prefix = if datastore.schema() == DS_NS {
-        DS_PREFIX
-    } else {
-        return Err(serde::ser::Error::custom(format!(
-            "Unsupported datastore namespace: {}",
-            datastore.schema()
-        )));
-    };
-
-    let name = match datastore.name() {
-        DatastoreName::Operational => "operational",
-        DatastoreName::Running => "running",
-        DatastoreName::Candidate => "candidate",
-        DatastoreName::StartUp => "startup",
-        DatastoreName::Intended => "intended",
-        DatastoreName::Unknown { name, .. } => name.as_ref(),
-    };
-
-    serializer.serialize_str(&format!("{prefix}:{name}"))
-}
-
-pub(crate) fn datastore_deserialize<'de, D>(deserializer: D) -> Result<Datastore, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    const DS_NS: &str = "urn:ietf:params:xml:ns:yang:ietf-datastores";
-
-    let s = String::deserialize(deserializer)?;
-    let (prefix, name) = s.split_once(':').ok_or_else(|| {
-        serde::de::Error::custom(format!("Expected 'prefix:name' format, got '{s}'"))
-    })?;
-
-    if prefix != "ietf-datastores" {
-        return Err(serde::de::Error::custom(format!(
-            "Expected 'ietf-datastores' namespace, got '{prefix}'",
-        )));
-    }
-
-    let datastore_name = match name {
-        "operational" => DatastoreName::Operational,
-        "running" => DatastoreName::Running,
-        "candidate" => DatastoreName::Candidate,
-        "startup" => DatastoreName::StartUp,
-        "intended" => DatastoreName::Intended,
-        _ => {
-            return Err(serde::de::Error::custom(format!(
-                "Unknown datastore: {name}",
-            )));
-        }
-    };
-
-    Ok(Datastore::new(datastore_name, DS_NS.into()))
 }
 
 /// Update Trigger
@@ -276,7 +208,7 @@ impl XmlSerialize for DatastoreTarget {
             ns_added = true;
             writer.push_namespace_binding(IndexMap::from([(YANG_PUSH_NS, "".to_string())]))?;
         }
-        let (ns, name): (Box<str>, Box<str>) = self.datastore.name().clone().into();
+        let (ns, name): (Box<str>, Box<str>) = self.datastore.clone().into();
         let mut elem = writer.create_ns_element(YANG_PUSH_NS, "datastore")?;
         elem.push_attribute(("xmlns:ds", ns.as_ref()));
         writer.write_event(Event::Start(elem.clone()))?;
@@ -293,8 +225,11 @@ impl XmlSerialize for DatastoreTarget {
 impl<'a> XmlDeserialize<'a, DatastoreTarget> for DatastoreTarget {
     fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        let datastore = parse_datastore_identity_ref(parser)?;
-        parser.skip_text()?;
+        parser.open(Some(YANG_PUSH_NS), "datastore")?;
+        let name: Box<str> = parser.tag_string()?.trim().into();
+        let (ds_ns, ds_name) = parser.resolve_identity_ref(&name)?;
+        let datastore = DatastoreName::from((ds_ns.as_str(), ds_name.as_str()));
+        parser.close()?;
         let selection = DatastoreSelectionFilterObjects::xml_deserialize(parser)?;
         Ok(Self {
             datastore,
@@ -716,7 +651,7 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
         let mut replay_start_time: Option<DateTime<Utc>> = None;
         let mut configured_replay = false;
         // Datastore target pieces:
-        let mut ds_datastore: Option<Datastore> = None;
+        let mut ds_datastore: Option<DatastoreName> = None;
         let mut ds_selection: Option<DatastoreSelectionFilterObjects> = None;
 
         loop {
@@ -802,7 +737,12 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
             }
             // ── Datastore target children ───────────────────────────────
             else if parser.is_tag(Some(YANG_PUSH_NS), "datastore") {
-                ds_datastore = Some(parse_datastore_identity_ref(parser)?);
+                parser.open(Some(YANG_PUSH_NS), "datastore")?;
+                let name: Box<str> = parser.tag_string()?.trim().into();
+                let (ds_ns, ds_name) = parser.resolve_identity_ref(&name)?;
+                let ds = DatastoreName::from((ds_ns.as_str(), ds_name.as_str()));
+                parser.close()?;
+                ds_datastore = Some(ds);
             } else if parser.is_tag(Some(YANG_PUSH_NS), "selection-filter-ref") {
                 parser.open(Some(YANG_PUSH_NS), "selection-filter-ref")?;
                 ds_selection = Some(DatastoreSelectionFilterObjects::ByReference(
@@ -950,16 +890,4 @@ impl<'a> XmlDeserialize<'a, DatastoreSelectionFilterObjects> for DatastoreSelect
             ))
         }
     }
-}
-
-/// Helper: deserialize a `<datastore>` identityref leaf under `YANG_PUSH_NS`.
-fn parse_datastore_identity_ref(
-    parser: &mut XmlParser<'_, impl io::BufRead>,
-) -> Result<Datastore, ParsingError> {
-    parser.open(Some(YANG_PUSH_NS), "datastore")?;
-    let raw: Box<str> = parser.tag_string()?.trim().into();
-    let (ns_uri, local_name) = parser.resolve_identity_ref(&raw)?;
-    let name = DatastoreName::from((ns_uri.as_str(), local_name.as_str()));
-    parser.close()?;
-    Ok(Datastore::new(name, ns_uri.into()))
 }
