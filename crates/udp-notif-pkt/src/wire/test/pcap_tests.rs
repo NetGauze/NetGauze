@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::codec::UdpPacketCodec;
+use crate::decoded::UdpNotifPacketDecoded;
 use crate::raw::MediaType;
 use bytes::{Buf, BytesMut};
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
@@ -60,10 +61,18 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
         "{}-udp-notif.json",
         filename.split(".pcap").next().unwrap()
     ));
+    let mut decoded_json_path = PathBuf::from(parent);
+    decoded_json_path.push(format!(
+        "{}-udp-notif-decoded.json",
+        filename.split(".pcap").next().unwrap()
+    ));
     let pcap_file = File::open(pcap_path.as_path()).unwrap();
-    let (mut json_file, mut lines) = if overwrite {
+    let (mut json_file, mut decoded_json_file, mut lines, mut decoded_lines) = if overwrite {
         let err_msg = format!("Couldn't create json file: {json_path:?}.\nDetailed Error");
-        (Some(File::create(json_path.clone()).expect(&err_msg)), None)
+        let json_file = Some(File::create(json_path.clone()).expect(&err_msg));
+        let err_msg = format!("Couldn't create json file: {decoded_json_path:?}.\nDetailed Error");
+        let decoded_json_file = Some(File::create(decoded_json_path.clone()).expect(&err_msg));
+        (json_file, decoded_json_file, None, None)
     } else {
         let err_msg = format!(
             "Couldn't open json file: {json_path:?} for pcap trace: {:?}.\
@@ -73,7 +82,16 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
         );
         let reader = BufReader::new(File::open(json_path.clone()).expect(&err_msg));
         let lines = reader.lines();
-        (None, Some(lines))
+
+        let err_msg = format!(
+            "Couldn't open json file: {decoded_json_path:?} for pcap trace: {:?}.\
+            \nTry running with `OVERWRITE=true` to create new output.\
+            \nDetailed Error",
+            pcap_path.as_path(),
+        );
+        let reader = BufReader::new(File::open(decoded_json_path.clone()).expect(&err_msg));
+        let decoded_lines = reader.lines();
+        (None, None, Some(lines), Some(decoded_lines))
     };
     let pcap_reader =
         LegacyPcapReader::new(165536, pcap_file).expect("Couldn't create pcap reader");
@@ -83,7 +101,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
         // The filter for 161 is included because n7-sa1_yang-push.pcap have some snmp
         // traffic
         if protocol != TransportProtocol::UDP
-            || ![10003, 57499].contains(&dst_port)
+            || ![10003, 10100, 57499].contains(&dst_port)
             || src_port == 161
         {
             continue;
@@ -95,11 +113,13 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
         buf.clear();
         buf.extend_from_slice(&value);
         while buf.has_remaining() {
-            let serialized = match codec.decode(buf) {
+            let (serialized, decoded) = match codec.decode(buf) {
                 Ok(Some(msg)) => {
                     let mut udp_notif_value = serde_json::to_value(&msg)
                         .expect("Couldn't serialize UDP-Notif message to json");
                     // Convert when possible inner payload into human-readable format
+                    let decoded = UdpNotifPacketDecoded::try_from(&msg)
+                        .map_err(|err| format!("Couldn't decode UDP-Notif message: {err}"));
                     match msg.media_type() {
                         MediaType::YangDataJson => {
                             match serde_json::from_slice(&msg.payload()) {
@@ -155,7 +175,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                         }
                         _ => {}
                     }
-                    udp_notif_value
+                    (udp_notif_value, decoded)
                 }
                 Ok(None) => {
                     // packet is fragmented, need to read the next PDU first before attempting to
@@ -174,13 +194,22 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                             "dump": hexdump,
                         }
                     );
-                    ret
+                    (
+                        ret,
+                        Err(format!("Packet was not valid UDP-Notif massage: {err}")),
+                    )
                 }
             };
             if let Some(file) = json_file.as_mut() {
                 file.write_all(serde_json::to_string(&serialized).unwrap().as_bytes())
                     .expect("Couldn't write json message");
                 file.write_all(b"\n").expect("Couldn't write json message");
+            }
+            if let Some(file) = decoded_json_file.as_mut() {
+                file.write_all(serde_json::to_string(&decoded).unwrap().as_bytes())
+                    .expect("Couldn't write json message");
+                file.write_all(b"\n")
+                    .expect("Couldn't write json message for the decoded packet");
             }
             if let Some(lines) = lines.as_mut() {
                 let err_msg = format!(
@@ -195,6 +224,20 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                     serde_json::from_str(&expected).expect("Failed to parse expected JSON");
 
                 assert_eq!(expected_json, serialized);
+            }
+
+            if let Some(lines) = decoded_lines.as_mut() {
+                let err_msg = format!(
+                    "PCAP PDU is not found in expected output file.\
+                    \nPCAP PDU {decoded:?}.\
+                    \nExpected output file: {decoded_json_path:?}",
+                );
+                let expected = lines.next().expect(&err_msg).expect("Error reading");
+
+                let expected_json: Result<UdpNotifPacketDecoded, String> =
+                    serde_json::from_str(&expected).expect("Failed to parse expected JSON");
+
+                assert_eq!(expected_json, decoded);
             }
         }
     }
