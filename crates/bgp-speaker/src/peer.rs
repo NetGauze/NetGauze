@@ -30,7 +30,7 @@ use netgauze_bgp_pkt::open::{BgpOpenMessage, BgpOpenMessageParameter};
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingIgnoredErrors;
 use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
 use rand::rngs::SmallRng;
-use rand::{Rng, RngCore, SeedableRng};
+use rand::{Rng, RngExt, SeedableRng};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::oneshot;
 use tokio::time::Interval;
