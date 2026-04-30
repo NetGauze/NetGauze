@@ -92,6 +92,10 @@ pub struct Subscription {
     #[serde(rename = "ietf-yang-push-revision:module-version")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub module_version: Option<Box<[YangPushModuleVersion]>>,
+
+    #[serde(rename = "ietf-yang-push-revision:yang-library-content-id")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub yang_library_content_id: Option<String>,
 }
 
 impl Subscription {
@@ -111,6 +115,7 @@ impl Subscription {
             message_publisher_id: None,
             update_trigger: None,
             module_version: None,
+            yang_library_content_id: None,
         }
     }
 }
@@ -634,6 +639,26 @@ impl XmlSerialize for Subscription {
             }
         }
 
+        // ypr:yang-library-content-id
+        if let Some(yang_library_content_id) = self.yang_library_content_id.as_deref() {
+            let mut ns_added = false;
+            if writer.get_namespace_prefix(YANG_PUSH_REVISION).is_none() {
+                ns_added = true;
+                writer.push_namespace_binding(IndexMap::from([(
+                    YANG_PUSH_REVISION,
+                    "ypr".to_string(),
+                )]))?;
+            }
+            let child = writer.create_ns_element(YANG_PUSH_REVISION, "yang-library-content-id")?;
+            writer.write_event(Event::Start(child.clone()))?;
+            writer.write_event(Event::Text(BytesText::new(yang_library_content_id)))?;
+            writer.write_event(Event::End(child.to_end()))?;
+
+            if ns_added {
+                writer.pop_namespace_binding();
+            }
+        }
+
         writer.write_event(Event::End(elem.to_end()))?;
         if ns_added {
             writer.pop_namespace_binding();
@@ -659,6 +684,7 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
         let mut message_publisher_ids: Option<Vec<u32>> = None;
         let mut update_trigger = None;
         let mut module_versions: Option<Vec<YangPushModuleVersion>> = None;
+        let mut yang_library_content_id = None;
 
         // Target pieces — collected separately because XML elements can
         // appear in any order and the target choice children are interleaved
@@ -807,6 +833,12 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
                     module_versions = Some(vec![module_version]);
                 }
             }
+            // ietf-yang-push-revision:yang-library-content-id
+            else if parser.is_tag(Some(YANG_PUSH_REVISION), "yang-library-content-id") {
+                parser.open(Some(YANG_PUSH_REVISION), "yang-library-content-id")?;
+                yang_library_content_id = Some(parser.tag_string()?.trim().into());
+                parser.close()?;
+            }
             // ── Unknown / augmented element — skip gracefully ───────────
             else {
                 parser.skip()?;
@@ -864,6 +896,7 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
             message_publisher_id: message_publisher_ids.map(|x| x.into_boxed_slice()),
             update_trigger,
             module_version: module_versions.map(|x| x.into_boxed_slice()),
+            yang_library_content_id,
         })
     }
 }

@@ -593,6 +593,7 @@ fn test_subscription() {
             ),
         }),
         module_version: None,
+        yang_library_content_id: None,
     };
 
     // Subscription with filter-by-reference, transport, encoding,
@@ -647,6 +648,7 @@ fn test_subscription() {
             ),
         }),
         module_version: None,
+        yang_library_content_id: None,
     };
 
     // Parse-only test for input_by_value (contains unknown elements that
@@ -714,6 +716,9 @@ fn test_subscription_yang_push_augments() {
           <revision>2024-02-02</revision>
           <version>3.0.0</version>
         </module-version>
+        <yang-library-content-id xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push-revision">
+          123
+        </yang-library-content-id>
     </subscription>"#;
 
     let expected_by_value = Subscription {
@@ -762,6 +767,7 @@ fn test_subscription_yang_push_augments() {
             ]
             .into_boxed_slice(),
         ),
+        yang_library_content_id: Some("123".into()),
     };
 
     test_xml_value(input_by_value, expected_by_value)
