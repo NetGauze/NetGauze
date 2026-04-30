@@ -44,7 +44,7 @@ use chrono::{DateTime, Utc};
 
 use netgauze_netconf_proto::yang_push::identities::{ChangeType, Encoding, Transport};
 use netgauze_netconf_proto::yang_push::types::{CentiSeconds, SubscriptionId};
-use netgauze_udp_notif_pkt::notification::YangPushModuleVersion;
+use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::IpAddr;

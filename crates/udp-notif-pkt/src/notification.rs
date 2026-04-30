@@ -208,7 +208,7 @@
 
 use chrono::{DateTime, Utc};
 use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
-use netgauze_netconf_proto::yang_push::subscription::UpdateTrigger;
+use netgauze_netconf_proto::yang_push::subscription::{UpdateTrigger, YangPushModuleVersion};
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -739,50 +739,6 @@ impl std::fmt::Display for Target {
             result.push(format!("datastore-xpath-filter: {datastore_xpath_filter}"));
         }
         write!(f, "{{ {} }}", result.join(", "))
-    }
-}
-
-/// Module Versioning (draft-ietf-netconf-yang-notifications-versioning)
-///
-/// The `YangPushModuleVersion` structure provides information about YANG
-/// modules:
-/// - `name`: Module name
-/// - `revision`: Module revision date (e.g., "2025-04-25")
-/// - `version`: Semantic version label
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub struct YangPushModuleVersion {
-    /// Alias 'module-name' still supported
-    /// (draft-ietf-netconf-yang-notifications-versioning < 9)
-    #[serde(alias = "module-name")]
-    name: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    revision: Option<String>,
-
-    /// Alias 'revision-label' still supported
-    /// (draft-ietf-netconf-yang-notifications-versioning < 9)
-    #[serde(alias = "revision-label")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    version: Option<String>,
-}
-
-impl YangPushModuleVersion {
-    pub const fn new(name: String, revision: Option<String>, version: Option<String>) -> Self {
-        Self {
-            name,
-            revision,
-            version,
-        }
-    }
-    pub const fn name(&self) -> &str {
-        self.name.as_str()
-    }
-    pub fn revision(&self) -> Option<&str> {
-        self.revision.as_deref()
-    }
-    pub fn version(&self) -> Option<&str> {
-        self.version.as_deref()
     }
 }
 

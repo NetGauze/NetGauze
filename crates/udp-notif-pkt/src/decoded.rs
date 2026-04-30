@@ -211,12 +211,12 @@ mod tests {
     use super::*;
     use crate::notification::{
         NotificationEnvelope, NotificationLegacy, NotificationVariant, SubscriptionStartedModified,
-        Target, YangPushModuleVersion,
+        Target,
     };
     use bytes::Bytes;
     use chrono::{DateTime, Utc};
     use netgauze_netconf_proto::yang_push::identities::Encoding;
-    use netgauze_netconf_proto::yang_push::subscription::UpdateTrigger;
+    use netgauze_netconf_proto::yang_push::subscription::{UpdateTrigger, YangPushModuleVersion};
     use serde_json::json;
     use std::collections::HashMap;
 
