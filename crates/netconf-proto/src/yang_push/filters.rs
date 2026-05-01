@@ -293,7 +293,7 @@ impl<'a> XmlDeserialize<'a, StreamFilter> for StreamFilter {
 ///
 /// Note, DatastoreFilterSpec keeps all the namespaces in scope that are used in
 /// the filter along with the prefix mapping.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(untagged)]
 pub enum DatastoreFilterSpec {
     Subtree(DatastoreSubtreeFilter),
@@ -337,7 +337,7 @@ impl<'a> XmlDeserialize<'a, DatastoreFilterSpec> for DatastoreFilterSpec {
 
 /// XPath 1.0 filter expression.
 /// Namespace: prefix → namespace
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(rename = "ietf-yang-push:datastore-xpath-filter")]
 pub struct DatastoreXPathFilter {
     pub namespaces: Box<[(Box<str>, Box<str>)]>,
@@ -400,7 +400,7 @@ impl<'a> XmlDeserialize<'a, DatastoreXPathFilter> for DatastoreXPathFilter {
 
 /// Subtree filter (RFC 6241 Section 6).
 /// Namespace: prefix → namespace
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(rename = "ietf-yang-push:datastore-subtree-filter")]
 pub struct DatastoreSubtreeFilter {
     pub namespaces: Box<[(Box<str>, Box<str>)]>,
@@ -467,7 +467,7 @@ impl<'a> XmlDeserialize<'a, DatastoreSubtreeFilter> for DatastoreSubtreeFilter {
 /// Stream filter specification (RFC 8639).
 ///
 /// Supports either subtree or XPath filtering.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(untagged)]
 pub enum StreamFilterSpec {
     /// Subtree filter (RFC 6241 Section 6)
@@ -514,7 +514,7 @@ impl<'a> XmlDeserialize<'a, StreamFilterSpec> for StreamFilterSpec {
 
 /// XPath 1.0 filter expression.
 /// Namespace: prefix → namespace
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(rename = "ietf-subscribed-notifications:stream-xpath-filter")]
 pub struct StreamXPathFilter {
     pub namespaces: Box<[(Box<str>, Box<str>)]>,
@@ -579,7 +579,7 @@ impl<'a> XmlDeserialize<'a, StreamXPathFilter> for StreamXPathFilter {
 
 /// Subtree filter (RFC 6241 Section 6).
 /// Namespace: prefix → namespace
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(rename = "ietf-subscribed-notifications:stream-subtree-filter")]
 pub struct StreamSubtreeFilter {
     pub namespaces: Box<[(Box<str>, Box<str>)]>,
@@ -650,7 +650,7 @@ impl<'a> XmlDeserialize<'a, StreamSubtreeFilter> for StreamSubtreeFilter {
 ///
 /// Filters can be specified by reference to a pre-configured filter,
 /// or inline within the subscription.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(untagged)]
 pub enum StreamSelectionFilterObjects {
     /// Reference to a pre-configured filter

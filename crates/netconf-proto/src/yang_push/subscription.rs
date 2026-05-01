@@ -124,7 +124,7 @@ impl Subscription {
 ///
 /// A subscription can target either an event stream (RFC 8639) or a datastore
 /// (RFC 8641).
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(untagged)]
 pub enum Target {
     Stream(StreamTarget),
@@ -134,7 +134,7 @@ pub enum Target {
 /// Stream subscription target as defined in RFC 8639.
 ///
 /// Specifies which event stream to subscribe to and how to filter events.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct StreamTarget {
     /// Name of the event stream
     pub stream: Box<str>,
@@ -155,7 +155,7 @@ pub struct StreamTarget {
 ///
 /// Specifies which datastore to subscribe to, how to filter the data,
 /// and when/how updates should be triggered.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct DatastoreTarget {
     /// Datastore, from which to retrieve data (e.g., operational, running)
     #[serde(rename = "ietf-yang-push:datastore", alias = "datastore")]
@@ -905,7 +905,7 @@ impl<'a> XmlDeserialize<'a, Subscription> for Subscription {
 ///
 /// Filters can be specified by reference to a pre-configured filter,
 /// or inline within the subscription.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[serde(untagged)]
 pub enum DatastoreSelectionFilterObjects {
     /// Reference to a pre-configured filter
