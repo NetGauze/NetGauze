@@ -340,7 +340,7 @@ impl<'a> XmlDeserialize<'a, DatastoreFilterSpec> for DatastoreFilterSpec {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename = "ietf-yang-push:datastore-xpath-filter")]
 pub struct DatastoreXPathFilter {
-    pub namespaces: IndexMap<String, String>,
+    pub namespaces: Box<[(Box<str>, Box<str>)]>,
     pub path: Box<str>,
 }
 
@@ -354,7 +354,7 @@ impl XmlSerialize for DatastoreXPathFilter {
             IndexMap::with_capacity(self.namespaces.len() + 1);
         for (prefix, namespace) in &self.namespaces {
             let ns = Namespace(namespace.as_bytes());
-            new_namespaces.insert(ns, prefix.clone());
+            new_namespaces.insert(ns, prefix.clone().into());
         }
         if writer.get_namespace_prefix(YANG_PUSH_NS).is_none()
             && !new_namespaces.contains_key(&YANG_PUSH_NS)
@@ -389,7 +389,10 @@ impl<'a> XmlDeserialize<'a, DatastoreXPathFilter> for DatastoreXPathFilter {
         let (path, namespaces) = parser.read_xpath_with_namespaces()?;
         parser.close()?;
         Ok(Self {
-            namespaces,
+            namespaces: namespaces
+                .into_iter()
+                .map(|(prefix, ns)| (prefix.into_boxed_str(), ns.into_boxed_str()))
+                .collect(),
             path: path.trim().into(),
         })
     }
@@ -400,7 +403,7 @@ impl<'a> XmlDeserialize<'a, DatastoreXPathFilter> for DatastoreXPathFilter {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename = "ietf-yang-push:datastore-subtree-filter")]
 pub struct DatastoreSubtreeFilter {
-    pub namespaces: IndexMap<String, String>,
+    pub namespaces: Box<[(Box<str>, Box<str>)]>,
     pub subtree: Box<str>,
 }
 
@@ -414,7 +417,7 @@ impl XmlSerialize for DatastoreSubtreeFilter {
             IndexMap::with_capacity(self.namespaces.len() + 1);
         for (prefix, namespace) in &self.namespaces {
             let ns = Namespace(namespace.as_bytes());
-            new_namespaces.insert(ns, prefix.clone());
+            new_namespaces.insert(ns, prefix.clone().into());
         }
         if writer.get_namespace_prefix(YANG_PUSH_NS).is_none()
             && !new_namespaces.contains_key(&YANG_PUSH_NS)
@@ -451,7 +454,11 @@ impl<'a> XmlDeserialize<'a, DatastoreSubtreeFilter> for DatastoreSubtreeFilter {
 
         parser.close()?;
         Ok(Self {
-            namespaces: subtree.namespaces,
+            namespaces: subtree
+                .namespaces
+                .into_iter()
+                .map(|(prefix, ns)| (prefix.into_boxed_str(), ns.into_boxed_str()))
+                .collect(),
             subtree: subtree.xml.trim().into(),
         })
     }
@@ -510,7 +517,7 @@ impl<'a> XmlDeserialize<'a, StreamFilterSpec> for StreamFilterSpec {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename = "ietf-subscribed-notifications:stream-xpath-filter")]
 pub struct StreamXPathFilter {
-    pub namespaces: IndexMap<String, String>,
+    pub namespaces: Box<[(Box<str>, Box<str>)]>,
     pub path: Box<str>,
 }
 
@@ -524,7 +531,7 @@ impl XmlSerialize for StreamXPathFilter {
             IndexMap::with_capacity(self.namespaces.len() + 1);
         for (prefix, namespace) in &self.namespaces {
             let ns = Namespace(namespace.as_bytes());
-            new_namespaces.insert(ns, prefix.clone());
+            new_namespaces.insert(ns, prefix.clone().into());
         }
         if writer
             .get_namespace_prefix(SUBSCRIBED_NOTIFICATIONS_NS)
@@ -561,7 +568,10 @@ impl<'a> XmlDeserialize<'a, StreamXPathFilter> for StreamXPathFilter {
         let (path, namespaces) = parser.read_xpath_with_namespaces()?;
         parser.close()?;
         Ok(Self {
-            namespaces,
+            namespaces: namespaces
+                .into_iter()
+                .map(|(prefix, ns)| (prefix.into_boxed_str(), ns.into_boxed_str()))
+                .collect(),
             path: path.trim().into(),
         })
     }
@@ -572,7 +582,7 @@ impl<'a> XmlDeserialize<'a, StreamXPathFilter> for StreamXPathFilter {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename = "ietf-subscribed-notifications:stream-subtree-filter")]
 pub struct StreamSubtreeFilter {
-    pub namespaces: IndexMap<String, String>,
+    pub namespaces: Box<[(Box<str>, Box<str>)]>,
     pub subtree: Box<str>,
 }
 
@@ -586,7 +596,7 @@ impl XmlSerialize for StreamSubtreeFilter {
             IndexMap::with_capacity(self.namespaces.len() + 1);
         for (prefix, namespace) in &self.namespaces {
             let ns = Namespace(namespace.as_bytes());
-            new_namespaces.insert(ns, prefix.clone());
+            new_namespaces.insert(ns, prefix.clone().into());
         }
         if writer
             .get_namespace_prefix(SUBSCRIBED_NOTIFICATIONS_NS)
@@ -626,7 +636,11 @@ impl<'a> XmlDeserialize<'a, StreamSubtreeFilter> for StreamSubtreeFilter {
 
         parser.close()?;
         Ok(Self {
-            namespaces: subtree.namespaces,
+            namespaces: subtree
+                .namespaces
+                .into_iter()
+                .map(|(prefix, ns)| (prefix.into_boxed_str(), ns.into_boxed_str()))
+                .collect(),
             subtree: subtree.xml.trim().into(),
         })
     }
