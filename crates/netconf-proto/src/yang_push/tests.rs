@@ -139,7 +139,7 @@ fn test_encoding_deserialization() {
 
 #[test]
 fn test_datastore_filter_spec() {
-    let namespaces = IndexMap::from([("example".to_string(), "urn:vendor:example".to_string())]);
+    let namespaces = Box::new([("example".into(), "urn:vendor:example".into())]);
     let input_xpath = r#"<datastore-xpath-filter xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push" xmlns:example="urn:vendor:example">/example:example/debug:board-resouce-states</datastore-xpath-filter>"#;
     let input_subtree = r#"<datastore-subtree-filter xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push"  xmlns:example="urn:vendor:example">
         <example:debug/>
@@ -184,10 +184,7 @@ fn test_selection_filter() {
     let expected_xpath = SelectionFilter {
         filter_id: "STATSBOARDRESOURCE".into(),
         filter_spec: DatastoreFilterSpec::Xpath(DatastoreXPathFilter {
-            namespaces: IndexMap::from([(
-                "debug".to_string(),
-                "urn:example:yang:debug".to_string(),
-            )]),
+            namespaces: Box::new([("debug".into(), "urn:example:yang:debug".into())]),
             path: "/debug:debug/debug:board-resouce-states/debug:board-resouce-state".into(),
         }),
     };
@@ -195,10 +192,7 @@ fn test_selection_filter() {
     let expected_subtree = SelectionFilter {
         filter_id: "STATSCPU".into(),
         filter_spec: DatastoreFilterSpec::Subtree(DatastoreSubtreeFilter {
-            namespaces: IndexMap::from([(
-                "debug".to_string(),
-                "urn:example:yang:debug".to_string(),
-            )]),
+            namespaces: Box::new([("debug".into(), "urn:example:yang:debug".into())]),
             subtree: "<debug:cpu-utilization xmlns:debug=\"urn:example:yang:debug\"/>".into(),
         }),
     };
@@ -220,11 +214,11 @@ fn test_stream_filter_spec() {
         <debug:board-resouce-state xmlns:debug="urn:example:yang:debug"/>
         </stream-subtree-filter>"#;
     let expected_xpath = StreamFilterSpec::Xpath(StreamXPathFilter {
-        namespaces: IndexMap::from([("debug".to_string(), "urn:example:yang:debug".to_string())]),
+        namespaces: Box::new([("debug".into(), "urn:example:yang:debug".into())]),
         path: "/debug:debug/debug:board-resouce-states/debug:board-resouce-state".into(),
     });
     let expected_subtree = StreamFilterSpec::Subtree(StreamSubtreeFilter {
-        namespaces: IndexMap::from([("debug".to_string(), "urn:example:yang:debug".to_string())]),
+        namespaces: Box::new([("debug".into(), "urn:example:yang:debug".into())]),
         subtree: "<debug:board-resouce-state xmlns:debug=\"urn:example:yang:debug\"/>".into(),
     });
     test_xml_value(input_xpath, expected_xpath).expect("XPath filter serde failed");
@@ -249,10 +243,7 @@ fn test_filters() {
     let selection_filters = vec![SelectionFilter {
         filter_id: "STATSBOARDRESOURCE".into(),
         filter_spec: DatastoreFilterSpec::Xpath(DatastoreXPathFilter {
-            namespaces: IndexMap::from([(
-                "debug".to_string(),
-                "urn:example:yang:debug".to_string(),
-            )]),
+            namespaces: Box::new([("debug".into(), "urn:example:yang:debug".into())]),
             path: "/debug:debug/debug:board-resouce-states/debug:board-resouce-state".into(),
         }),
     }];
@@ -260,7 +251,7 @@ fn test_filters() {
     let stream_filters = vec![StreamFilter {
         name: "high-priority-syslog".into(),
         filter_spec: StreamFilterSpec::Xpath(StreamXPathFilter {
-            namespaces: IndexMap::from([("sl".to_string(), "urn:example:syslog".to_string())]),
+            namespaces: Box::new([("sl".into(), "urn:example:syslog".into())]),
             path: "/sl:syslog-message[sl:severity='critical' or sl:severity='error']".into(),
         }),
     }];
@@ -356,10 +347,7 @@ fn test_datastore_target_with_xpath_filter() {
         datastore: DatastoreName::Operational,
         selection: DatastoreSelectionFilterObjects::WithInSubscription(DatastoreFilterSpec::Xpath(
             DatastoreXPathFilter {
-                namespaces: IndexMap::from([(
-                    "if".to_string(),
-                    "urn:example:interfaces".to_string(),
-                )]),
+                namespaces: Box::new([("if".into(), "urn:example:interfaces".into())]),
                 path: "/if:interfaces/if:interface".into(),
             },
         )),
@@ -383,10 +371,7 @@ fn test_datastore_target_with_subtree_filter() {
         datastore: DatastoreName::Running,
         selection: DatastoreSelectionFilterObjects::WithInSubscription(
             DatastoreFilterSpec::Subtree(DatastoreSubtreeFilter {
-                namespaces: IndexMap::from([(
-                    "if".to_string(),
-                    "urn:example:interfaces".to_string(),
-                )]),
+                namespaces: Box::new([("if".into(), "urn:example:interfaces".into())]),
                 subtree: "<if:interfaces/>".into(),
             }),
         ),
@@ -424,10 +409,7 @@ fn test_stream_target_with_xpath_filter() {
         stream: "NETCONF".into(),
         filter: StreamSelectionFilterObjects::WithInSubscription(StreamFilterSpec::Xpath(
             StreamXPathFilter {
-                namespaces: IndexMap::from([(
-                    "if".to_string(),
-                    "urn:example:interfaces".to_string(),
-                )]),
+                namespaces: Box::new([("if".into(), "urn:example:interfaces".into())]),
                 path: "/if:interfaces/if:interface".into(),
             },
         )),
@@ -520,10 +502,7 @@ fn test_stream_target_with_subtree_filter() {
         stream: "NETCONF".into(),
         filter: StreamSelectionFilterObjects::WithInSubscription(StreamFilterSpec::Subtree(
             StreamSubtreeFilter {
-                namespaces: IndexMap::from([(
-                    "if".to_string(),
-                    "urn:example:interfaces".to_string(),
-                )]),
+                namespaces: Box::new([("if".into(), "urn:example:interfaces".into())]),
                 subtree: "<if:interfaces/>".into(),
             },
         )),
@@ -569,8 +548,8 @@ fn test_subscription() {
             datastore: DatastoreName::Operational,
             selection: DatastoreSelectionFilterObjects::WithInSubscription(
                 DatastoreFilterSpec::Xpath(DatastoreXPathFilter {
-                    namespaces: IndexMap::new(), /* no namespace prefixes declared for
-                                                  * "openconfig-platform" */
+                    namespaces: Box::new([]), /* no namespace prefixes declared for
+                                               * "openconfig-platform" */
                     path: "openconfig-platform:components/component/state".into(),
                 }),
             ),
@@ -727,8 +706,8 @@ fn test_subscription_yang_push_augments() {
             datastore: DatastoreName::Operational,
             selection: DatastoreSelectionFilterObjects::WithInSubscription(
                 DatastoreFilterSpec::Xpath(DatastoreXPathFilter {
-                    namespaces: IndexMap::new(), /* no namespace prefixes declared for
-                                                  * "openconfig-platform" */
+                    namespaces: Box::new([]), /* no namespace prefixes declared for
+                                               * "openconfig-platform" */
                     path: "openconfig-platform:components/component/state".into(),
                 }),
             ),
