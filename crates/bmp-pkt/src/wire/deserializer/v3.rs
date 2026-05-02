@@ -100,16 +100,20 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessageVa
                 (buf, v3::BmpMessageValue::RouteMirroring(init))
             }
             BmpMessageType::Experimental251 => {
-                (buf, v3::BmpMessageValue::Experimental252(buf.to_vec()))
+                let (span, buf) = nom::bytes::complete::take(buf.len())(buf)?;
+                (span, v3::BmpMessageValue::Experimental251(buf.to_vec()))
             }
             BmpMessageType::Experimental252 => {
-                (buf, v3::BmpMessageValue::Experimental252(buf.to_vec()))
+                let (span, buf) = nom::bytes::complete::take(buf.len())(buf)?;
+                (span, v3::BmpMessageValue::Experimental252(buf.to_vec()))
             }
             BmpMessageType::Experimental253 => {
-                (buf, v3::BmpMessageValue::Experimental253(buf.to_vec()))
+                let (span, buf) = nom::bytes::complete::take(buf.len())(buf)?;
+                (span, v3::BmpMessageValue::Experimental253(buf.to_vec()))
             }
             BmpMessageType::Experimental254 => {
-                (buf, v3::BmpMessageValue::Experimental254(buf.to_vec()))
+                let (span, buf) = nom::bytes::complete::take(buf.len())(buf)?;
+                (span, v3::BmpMessageValue::Experimental254(buf.to_vec()))
             }
         };
         Ok((buf, msg))

@@ -1665,3 +1665,78 @@ fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingE
     test_write(&good, &good_wire)?;
     Ok(())
 }
+
+#[test]
+fn test_bmp_value_experimental_messages() -> Result<(), BmpMessageValueWritingError> {
+    let good_251_wire = [
+        0xfb, 0x00, 0x01, 0x00, 0x06, 0x74, 0x65, 0x73, 0x74, 0x31, 0x31, 0x00, 0x02, 0x00, 0x03,
+        0x50, 0x45, 0x32,
+    ];
+    let good_252_wire = [
+        0xfc, 0x00, 0x01, 0x00, 0x06, 0x74, 0x65, 0x73, 0x74, 0x31, 0x31, 0x00, 0x02, 0x00, 0x03,
+        0x50, 0x45, 0x32,
+    ];
+    let good_253_wire = [
+        0xfd, 0x00, 0x01, 0x00, 0x06, 0x74, 0x65, 0x73, 0x74, 0x31, 0x31, 0x00, 0x02, 0x00, 0x03,
+        0x50, 0x45, 0x32,
+    ];
+    let good_254_wire = [
+        0xfe, 0x00, 0x01, 0x00, 0x06, 0x74, 0x65, 0x73, 0x74, 0x31, 0x31, 0x00, 0x02, 0x00, 0x03,
+        0x50, 0x45, 0x32,
+    ];
+
+    let good_251 = BmpMessageValue::Experimental251(good_251_wire[1..].to_vec());
+    let good_252 = BmpMessageValue::Experimental252(good_252_wire[1..].to_vec());
+    let good_253 = BmpMessageValue::Experimental253(good_253_wire[1..].to_vec());
+    let good_254 = BmpMessageValue::Experimental254(good_254_wire[1..].to_vec());
+
+    test_parsed_completely_with_one_input(&good_251_wire, &mut Default::default(), &good_251);
+    test_parsed_completely_with_one_input(&good_252_wire, &mut Default::default(), &good_252);
+    test_parsed_completely_with_one_input(&good_253_wire, &mut Default::default(), &good_253);
+    test_parsed_completely_with_one_input(&good_254_wire, &mut Default::default(), &good_254);
+
+    test_write(&good_251, &good_251_wire)?;
+    test_write(&good_252, &good_252_wire)?;
+    test_write(&good_253, &good_253_wire)?;
+    test_write(&good_254, &good_254_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_experimental() -> Result<(), BmpMessageWritingError> {
+    let good_251_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x0c, 0xfb, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
+    ];
+    let good_252_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x0b, 0xfc, 0x06, 0x07, 0x08, 0x09, 0x0a,
+    ];
+    let good_253_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x0d, 0xfd, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
+    ];
+    let good_254_wire = [0x03, 0x00, 0x00, 0x00, 0x06, 0xfe];
+
+    let good_251 = BmpMessage::V3(BmpMessageValue::Experimental251(
+        good_251_wire[6..].to_vec(),
+    ));
+    let good_252 = BmpMessage::V3(BmpMessageValue::Experimental252(
+        good_252_wire[6..].to_vec(),
+    ));
+    let good_253 = BmpMessage::V3(BmpMessageValue::Experimental253(
+        good_253_wire[6..].to_vec(),
+    ));
+    let good_254 = BmpMessage::V3(BmpMessageValue::Experimental254(
+        good_254_wire[6..].to_vec(),
+    ));
+
+    test_parsed_completely_with_one_input(&good_251_wire, &mut Default::default(), &good_251);
+    test_parsed_completely_with_one_input(&good_252_wire, &mut Default::default(), &good_252);
+    test_parsed_completely_with_one_input(&good_253_wire, &mut Default::default(), &good_253);
+    test_parsed_completely_with_one_input(&good_254_wire, &mut Default::default(), &good_254);
+
+    test_write(&good_251, &good_251_wire)?;
+    test_write(&good_252, &good_252_wire)?;
+    test_write(&good_253, &good_253_wire)?;
+    test_write(&good_254, &good_254_wire)?;
+
+    Ok(())
+}
