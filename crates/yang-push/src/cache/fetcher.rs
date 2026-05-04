@@ -29,7 +29,9 @@ use crate::cache::storage::{SubscriptionInfo, YangLibraryCacheError};
 use netgauze_netconf_proto::capabilities::{Capability, NetconfVersion};
 use netgauze_netconf_proto::client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect};
 use netgauze_netconf_proto::yang_push::filters::StreamSelectionFilterObjects;
-use netgauze_netconf_proto::yang_push::subscription::{DatastoreSelectionFilterObjects, Target};
+use netgauze_netconf_proto::yang_push::subscription::{
+    DatastoreSelectionFilterObjects, Target, YangPushModuleVersion,
+};
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_netconf_proto::yanglib::{DatastoreName, PermissiveVersionChecker, YangLibrary};
 use std::collections::{HashMap, HashSet};
@@ -143,7 +145,7 @@ impl NetconfYangLibraryFetcher {
         let modules = subscription_info
             .models()
             .iter()
-            .map(|x| x.as_str())
+            .map(|x| x.name())
             .collect::<Vec<_>>();
         // TODO: add timeout to loading YANG Library from the device
         let (yang_lib, schemas) = client
@@ -216,10 +218,7 @@ impl NetconfYangLibraryFetcher {
             .map_err(|err| (empty.clone(), err.into()))?;
 
         let modules = if let Some(modules) = &subscription.module_version {
-            modules
-                .iter()
-                .map(|x| x.name.to_string())
-                .collect::<Vec<_>>()
+            modules.clone().to_vec()
         } else {
             let (ds_name, namespaces) = match &subscription.target {
                 Target::Stream(stream_target) => {
@@ -256,15 +255,19 @@ impl NetconfYangLibraryFetcher {
             let mut ret = Vec::with_capacity(namespaces.len());
             for (_prefix, namespace) in namespaces {
                 let module = router_yang_library.find_module_by_datastore_and_ns(&ds_name, namespace).ok_or_else(|| (empty.clone(), YangLibraryCacheError::IoError(std::io::Error::other(format!("module with namespace {namespace} not found in YANG Library for datastore {ds_name}")))))?;
-                ret.push(module.name().to_string());
+                ret.push(YangPushModuleVersion::new(
+                    module.name().into(),
+                    module.revision().map(|x| x.into()),
+                    None,
+                ));
             }
             ret
         };
 
-        let modules_str = modules.iter().map(|x| x.as_str()).collect::<Vec<_>>();
+        let module_names = modules.iter().map(|x| x.name()).collect::<Vec<_>>();
         // TODO: add timeout to loading YANG Library from the device
         let (yang_lib, schemas) = client
-            .load_from_modules(&modules_str, &PermissiveVersionChecker)
+            .load_from_modules(&module_names, &PermissiveVersionChecker)
             .await
             .map_err(|err| (empty.clone(), err.into()))?;
         match tokio::time::timeout(timeout_duration, client.close()).await {
@@ -289,7 +292,7 @@ impl NetconfYangLibraryFetcher {
             subscription_id,
             router_yang_library.content_id().to_string(),
             subscription_target,
-            modules,
+            modules.into_boxed_slice(),
         );
         info!( host = %host,
             peer=%peer,

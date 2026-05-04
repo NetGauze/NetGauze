@@ -120,6 +120,7 @@ use crate::{
     OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY, OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY,
     OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
 };
+use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
 use netgauze_udp_notif_pkt::notification::{NotificationVariant, SubscriptionStartedModified};
@@ -973,10 +974,13 @@ impl ValidationActor {
     ) -> Option<SubscriptionInfo> {
         let modules = match sub_started.module_version() {
             Some(modules) => {
-                let mut module_names: Vec<String> =
-                    modules.iter().map(|m| m.name().to_string()).collect();
-                module_names.push("ietf-subscribed-notifications".to_string());
-                module_names
+                let mut modules = modules.clone();
+                modules.push(YangPushModuleVersion::new(
+                    "ietf-subscribed-notifications".into(),
+                    None,
+                    None,
+                ));
+                modules.into_boxed_slice()
             }
             None => {
                 warn!(
@@ -1180,7 +1184,7 @@ mod tests {
                             "ietf-yang-push-revision:module-version": [
                                 {
                                     "name": "ietf-interfaces",
-                                    "revision": ""
+                                    "revision": "2018-02-20"
                                 }
                             ],
                             "ietf-yang-push-revision:yang-library-content-id": "test-content-id-1",

@@ -143,6 +143,7 @@ impl
 mod tests {
     use super::*;
     use chrono::TimeZone;
+    use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
     use netgauze_yang_push::model::telemetry::*;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
@@ -155,7 +156,7 @@ mod tests {
                 "ietf-datastores:operational".to_string(),
                 either::Right("/test-path".to_string()),
             ),
-            vec!["test-module".to_string()],
+            Box::new([YangPushModuleVersion::new("test-module".into(), None, None)]),
         )
     }
 
