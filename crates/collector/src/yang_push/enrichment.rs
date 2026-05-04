@@ -1064,16 +1064,20 @@ mod tests {
         let subscription_info = SubscriptionInfo::new(
             peer,
             1,
-            "test-content-id".to_string(),
             Target::new_datastore(
                 "ds:operational".to_string(),
                 either::Right("/ietf-interfaces".to_string()),
             ),
+            None,
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            None,
             Box::new([YangPushModuleVersion::new(
                 "ietf-interfaces".into(),
                 Some("2018-02-20".into()),
                 None,
             )]),
+            "test-content-id".to_string(),
         );
         // Attempt to decode the packet (should succeed)
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();
