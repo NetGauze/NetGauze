@@ -18,9 +18,9 @@ build = "build.rs"
 
 [package.metadata.generate-rpm]
 assets = [
-  { source = "crates/collector/LICENSE", dest = "/usr/share/doc/netgauze-collector/LICENSE", doc = true },
-  { source = "crates/collector/README.md", dest = "/usr/share/doc/netgauze-collector/README.md", doc = true },
-  { source = "target/release/netgauze-collector", dest = "/usr/bin/netgauze-collector", caps = "cap_net_raw+ep" },
+  { source = "crates/collector/LICENSE", dest = "/usr/share/doc/netgauze-collector/LICENSE", mode = "644", doc = true },
+  { source = "crates/collector/README.md", dest = "/usr/share/doc/netgauze-collector/README.md", mode = "644", doc = true },
+  { source = "target/release/netgauze-collector", dest = "/usr/bin/netgauze-collector", mode = "755", caps = "cap_net_raw+ep" },
 ]
 
 [package.metadata.deb]
