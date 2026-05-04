@@ -958,6 +958,12 @@ impl ModuleSet {
         };
         Ok(builder)
     }
+
+    pub fn module_by_namespace(&self, namespace: &str) -> Option<&Module> {
+        self.modules
+            .values()
+            .find(|module| module.namespace() == namespace)
+    }
 }
 
 impl<'a> XmlDeserialize<'a, ModuleSet> for ModuleSet {
