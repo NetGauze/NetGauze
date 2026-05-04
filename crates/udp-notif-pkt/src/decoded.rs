@@ -274,7 +274,11 @@ mod tests {
             ),
             None,
             None,
+            None,
+            None,
+            None,
             Some(Encoding::Json),
+            None,
             None,
             Some(UpdateTrigger::OnChange {
                 dampening_period: None,
@@ -315,7 +319,7 @@ mod tests {
                 "ietf-subscribed-notifications:subscription-started": {
                   "encoding": "encode-json",
                   "id": 1,
-                  "ietf-distributed-notif:message-publisher-ids": [
+                  "ietf-distributed-notif:message-publisher-id": [
                     16974839, 16973828, 16974828
                   ],
                   "ietf-yang-push:datastore": "ietf-datastores:running",
@@ -350,15 +354,16 @@ mod tests {
             ),
             None,
             None,
+            None,
+            None,
+            None,
             Some(Encoding::Json),
             None,
+            Some(Box::new([16974839, 16973828, 16974828])),
             None,
             None,
             None,
-            json!({"ietf-distributed-notif:message-publisher-ids": [
-                    16974839, 16973828, 16974828
-                  ],
-                  "additional_stuff": [ { "key1": "a" }, { "key2": "b" } ]}),
+            json!({"additional_stuff": [ { "key1": "a" }, { "key2": "b" } ]}),
         );
         let expected = NotificationLegacy::new(
             DateTime::parse_from_rfc3339("2025-05-12T12:00:00Z")
