@@ -969,7 +969,7 @@ impl<'a> XmlDeserialize<'a, DatastoreSelectionFilterObjects> for DatastoreSelect
 /// - `name`: Module name
 /// - `revision`: Module revision date (e.g., "2025-04-25")
 /// - `version`: Semantic version label
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "kebab-case")]
 pub struct YangPushModuleVersion {
     /// Alias 'module-name' still supported
