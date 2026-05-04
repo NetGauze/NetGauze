@@ -417,7 +417,7 @@ impl FilterSpec {
 
 /// Update Trigger for Yang Push Subscription
 /// (redefined for Telemetry Message)
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum UpdateTrigger {
     #[serde(rename = "periodic")]
     #[serde(rename_all = "kebab-case")]

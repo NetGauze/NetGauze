@@ -76,7 +76,7 @@ impl<'a> XmlDeserialize<'a, ConfiguredSubscriptionState> for ConfiguredSubscript
 
 /// Transport protocol used to deliver the notification message to the data
 /// collection.
-#[derive(Default, Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default, Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Transport {
     /// UDP-based notification transport
     /// [ietf-udp-notif-transport](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-udp-notif)
@@ -134,7 +134,7 @@ impl<'a> XmlDeserialize<'a, Transport> for Transport {
 }
 
 /// Encoding used for the notification payload
-#[derive(Default, Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default, Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Encoding {
     #[serde(rename = "ietf-subscribed-notifications:encode-xml")]
     #[serde(alias = "encode-xml")]
@@ -199,7 +199,7 @@ impl<'a> XmlDeserialize<'a, Encoding> for Encoding {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum ChangeType {
     Create,
