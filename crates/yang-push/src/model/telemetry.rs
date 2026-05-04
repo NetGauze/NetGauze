@@ -42,9 +42,11 @@
 //!   information.
 use chrono::{DateTime, Utc};
 
+use crate::cache::storage::SubscriptionInfo;
 use netgauze_netconf_proto::yang_push::identities::{ChangeType, Encoding, Transport};
 use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
 use netgauze_netconf_proto::yang_push::types::{CentiSeconds, SubscriptionId};
+use netgauze_udp_notif_pkt::notification::Target;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::IpAddr;
@@ -371,6 +373,22 @@ impl YangPushSubscriptionMetadata {
     }
 }
 
+impl From<SubscriptionInfo> for YangPushSubscriptionMetadata {
+    fn from(info: SubscriptionInfo) -> Self {
+        Self {
+            id: Some(info.id()),
+            filter_spec: info.target().clone().into(),
+            stop_time: None,
+            transport: Some(Transport::UDPNotif),
+            encoding: Some(Encoding::Json),
+            purpose: None,
+            update_trigger: None,
+            module: vec![],
+            yang_library_content_id: None,
+        }
+    }
+}
+
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct FilterSpec {
@@ -412,6 +430,27 @@ impl FilterSpec {
     }
     pub const fn subtree_filter(&self) -> Option<&Value> {
         self.subtree_filter.as_ref()
+    }
+}
+
+impl From<Target> for FilterSpec {
+    fn from(target: Target) -> Self {
+        let xpath_filter = if let Some(xpath_filter) = target.stream_xpath_filter() {
+            Some(xpath_filter.to_string())
+        } else {
+            target.datastore_xpath_filter().map(String::from)
+        };
+        let subtree_filter = if let Some(subtree) = target.stream_subtree_filter() {
+            Some(subtree.clone())
+        } else {
+            target.datastore_subtree_filter().cloned()
+        };
+        Self {
+            stream: target.stream().map(String::from),
+            datastore: target.datastore().map(String::from),
+            xpath_filter,
+            subtree_filter,
+        }
     }
 }
 
