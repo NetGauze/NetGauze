@@ -774,6 +774,7 @@ impl YangLibraryReference {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SubscriptionInfo {
     peer: SocketAddr,
+    collector: SocketAddr,
     id: SubscriptionId,
     content_id: ContentId,
     target: Target,
@@ -784,6 +785,7 @@ pub struct SubscriptionInfo {
 impl SubscriptionInfo {
     pub fn new(
         peer: SocketAddr,
+        collector: SocketAddr,
         id: SubscriptionId,
         content_id: ContentId,
         target: Target,
@@ -791,6 +793,7 @@ impl SubscriptionInfo {
     ) -> Self {
         Self {
             peer,
+            collector,
             id,
             content_id,
             target,
@@ -801,9 +804,10 @@ impl SubscriptionInfo {
     /// Create an empty subscription info placeholder.
     /// This can be used when no subscription info is available.
     /// Or to indicate that no yang library is associated with the subscription.
-    pub fn new_empty(peer: SocketAddr, id: SubscriptionId) -> Self {
+    pub fn new_empty(peer: SocketAddr, collector: SocketAddr, id: SubscriptionId) -> Self {
         Self {
             peer,
+            collector,
             id,
             content_id: "EMPTY".to_string(),
             target: Target::new_datastore("EMPTY".to_string(), either::Right("EMPTY".to_string())),
@@ -819,6 +823,11 @@ impl SubscriptionInfo {
     /// message.
     pub const fn peer(&self) -> SocketAddr {
         self.peer
+    }
+
+    /// The collector address of the subscription.
+    pub const fn collector(&self) -> SocketAddr {
+        self.collector
     }
 
     /// The subscription ID associated with the subscription. This is a unique
@@ -1159,6 +1168,7 @@ mod tests {
     fn create_test_subscription_info(content_id: &str) -> SubscriptionInfo {
         SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 830),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 200)), 12345),
             1,
             ContentId::from(content_id.to_string()),
             Target::new_datastore(
@@ -1362,7 +1372,9 @@ mod tests {
         );
         let models = vec!["model1".to_string(), "model2".to_string()];
 
-        let info = SubscriptionInfo::new(peer, 1, content_id.clone(), Target::new_datastore(
+        let info = SubscriptionInfo::new(peer,
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 100)), 12345),
+            1, content_id.clone(), Target::new_datastore(
             "ds:operational".to_string(),
             either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
         ), models.clone());
@@ -1606,6 +1618,7 @@ mod tests {
         let subscription_info1 = create_test_subscription_info("content_id");
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 101)), 830),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 201)), 12345),
             2,
             ContentId::from("content_id2".to_string()),
             Target::new_datastore(
@@ -1616,6 +1629,7 @@ mod tests {
         );
         let subscription_info3 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 102)), 830),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 202)), 12345),
             2,
             ContentId::from("content_id3".to_string()),
             Target::new_datastore(
@@ -1685,6 +1699,7 @@ mod tests {
         // Create different subscription info with the same content_id
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 101)), 830),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 201)), 12345),
             2,
             ContentId::from(content_id.to_string()),
             Target::new_datastore(
@@ -1727,6 +1742,7 @@ mod tests {
         // Create first subscription info
         let subscription_info1 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 830),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 200)), 12345),
             1,
             ContentId::from(content_id.to_string()),
             Target::new_datastore(
@@ -1766,6 +1782,7 @@ mod tests {
         // content_id
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 101)), 830),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 201)), 12345),
             2,
             ContentId::from(content_id.to_string()),
             Target::new_datastore(
