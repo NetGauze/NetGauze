@@ -1017,7 +1017,9 @@ fn netconf_fetcher(config: &NetconfConfig) -> Result<NetconfYangLibraryFetcher, 
         ssh_config,
         config.port,
         Duration::from_secs(100),
-    );
+    )
+    .with_max_retries(config.max_retries)
+    .with_max_backoff(Duration::from_secs(config.max_backoff_secs));
     Ok(fetcher)
 }
 

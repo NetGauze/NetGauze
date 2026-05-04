@@ -34,11 +34,13 @@ use netgauze_netconf_proto::yang_push::subscription::{
 };
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_netconf_proto::yanglib::{DatastoreName, PermissiveVersionChecker, YangLibrary};
+use rand::RngExt;
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
-use tracing::{error, info, warn};
+use tracing::{error, info, trace, warn};
 
 pub type FetcherResult = Result<
     (SubscriptionInfo, YangLibrary, HashMap<Box<str>, Box<str>>),
@@ -73,6 +75,21 @@ pub trait YangLibraryFetcher {
     ) -> impl Future<Output = FetcherResult> + Send;
 }
 
+#[derive(Clone)]
+struct FetchConfig {
+    user: String,
+    private_key: Arc<russh::keys::ssh_key::PrivateKey>,
+    client_config: Arc<russh::client::Config>,
+    default_port: u16,
+    timeout: std::time::Duration,
+}
+
+#[derive(Clone, Copy)]
+struct RetryConfig {
+    max_retries: u32,
+    max_backoff: std::time::Duration,
+}
+
 /// A [YangLibraryFetcher] which fetches the YANG Library and schemas
 /// from a NETCONF device over SSH.
 ///
@@ -84,12 +101,12 @@ pub trait YangLibraryFetcher {
 /// TODO: Add peer to management address mapping support for devices using
 /// different IP address to send the YANG-Push messages
 pub struct NetconfYangLibraryFetcher {
-    user: String,
-    private_key: Arc<russh::keys::ssh_key::PrivateKey>,
-    client_config: Arc<russh::client::Config>,
-    default_port: u16,
-    default_timeout: std::time::Duration,
+    fetch_cfg: FetchConfig,
+    retry_cfg: RetryConfig,
 }
+
+/// Base delay for exponential backoff (1 second).
+const BASE_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 
 impl NetconfYangLibraryFetcher {
     pub fn new(
@@ -100,23 +117,37 @@ impl NetconfYangLibraryFetcher {
         default_timeout: std::time::Duration,
     ) -> Self {
         Self {
-            user,
-            private_key,
-            client_config: Arc::new(client_config),
-            default_port,
-            default_timeout,
+            fetch_cfg: FetchConfig {
+                user,
+                private_key,
+                client_config: Arc::new(client_config),
+                default_port,
+                timeout: default_timeout,
+            },
+            retry_cfg: RetryConfig {
+                max_retries: 10,
+                max_backoff: std::time::Duration::from_secs(60),
+            },
         }
     }
 
+    /// Set the maximum number of retry attempts. Set to 0 to disable retries.
+    pub fn with_max_retries(mut self, max_retries: u32) -> Self {
+        self.retry_cfg.max_retries = max_retries;
+        self
+    }
+
+    /// Set the maximum backoff duration between retries.
+    pub fn with_max_backoff(mut self, max_backoff: std::time::Duration) -> Self {
+        self.retry_cfg.max_backoff = max_backoff;
+        self
+    }
+
     async fn fetch_from_device(
-        timeout_duration: std::time::Duration,
+        cfg: &FetchConfig,
         subscription_info: SubscriptionInfo,
-        user: String,
-        private_key: Arc<russh::keys::ssh_key::PrivateKey>,
-        client_config: Arc<russh::client::Config>,
-        default_port: u16,
     ) -> FetcherResult {
-        let host = SocketAddr::new(subscription_info.peer().ip(), default_port);
+        let host = SocketAddr::new(subscription_info.peer().ip(), cfg.default_port);
         info!(
             host=%host,
             peer=%subscription_info.peer(),
@@ -126,12 +157,20 @@ impl NetconfYangLibraryFetcher {
             "starting fetching YANG Library from device",
         );
         let ssh_handler = SshHandler::default();
-        let auth = SshAuth::Key { user, private_key };
+        let auth = SshAuth::Key {
+            user: cfg.user.clone(),
+            private_key: Arc::clone(&cfg.private_key),
+        };
         let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
-        let config =
-            NetconfSshConnectConfig::new(auth, host, announce_caps, ssh_handler, client_config);
+        let config = NetconfSshConnectConfig::new(
+            auth,
+            host,
+            announce_caps,
+            ssh_handler,
+            Arc::clone(&cfg.client_config),
+        );
 
-        let mut client = match tokio::time::timeout(timeout_duration, connect(config)).await {
+        let mut client = match tokio::time::timeout(cfg.timeout, connect(config)).await {
             Ok(Ok(c)) => c,
             Ok(Err(err)) => {
                 error!(host=%host,error=%err, "error connecting to device over SSH");
@@ -152,7 +191,7 @@ impl NetconfYangLibraryFetcher {
             .load_from_modules(&modules, &PermissiveVersionChecker)
             .await
             .map_err(|err| (subscription_info.clone(), err.into()))?;
-        match tokio::time::timeout(timeout_duration, client.close()).await {
+        match tokio::time::timeout(cfg.timeout, client.close()).await {
             Ok(Ok(_)) => {
                 info!(host=%host,"SSH connection closed successfully");
             }
@@ -173,15 +212,11 @@ impl NetconfYangLibraryFetcher {
     }
 
     async fn fetch_from_device_by_id(
-        timeout_duration: std::time::Duration,
+        cfg: &FetchConfig,
         peer: SocketAddr,
         subscription_id: SubscriptionId,
-        user: String,
-        private_key: Arc<russh::keys::ssh_key::PrivateKey>,
-        client_config: Arc<russh::client::Config>,
-        default_port: u16,
     ) -> FetcherResult {
-        let host = SocketAddr::new(peer.ip(), default_port);
+        let host = SocketAddr::new(peer.ip(), cfg.default_port);
         info!(
             host=%host,
             peer=%peer,
@@ -189,14 +224,22 @@ impl NetconfYangLibraryFetcher {
             "starting fetching YANG Library from device",
         );
         let ssh_handler = SshHandler::default();
-        let auth = SshAuth::Key { user, private_key };
+        let auth = SshAuth::Key {
+            user: cfg.user.clone(),
+            private_key: Arc::clone(&cfg.private_key),
+        };
         let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
-        let config =
-            NetconfSshConnectConfig::new(auth, host, announce_caps, ssh_handler, client_config);
+        let config = NetconfSshConnectConfig::new(
+            auth,
+            host,
+            announce_caps,
+            ssh_handler,
+            Arc::clone(&cfg.client_config),
+        );
         // Empty subscription info returned in case of errors to keep track of peer and
         // subscription ID
         let empty = SubscriptionInfo::new_empty(peer, subscription_id);
-        let mut client = match tokio::time::timeout(timeout_duration, connect(config)).await {
+        let mut client = match tokio::time::timeout(cfg.timeout, connect(config)).await {
             Ok(Ok(c)) => c,
             Ok(Err(err)) => {
                 error!(host=%host,error=%err, "error connecting to device over SSH");
@@ -273,7 +316,7 @@ impl NetconfYangLibraryFetcher {
             .load_from_modules(&module_names, &PermissiveVersionChecker)
             .await
             .map_err(|err| (empty.clone(), err.into()))?;
-        match tokio::time::timeout(timeout_duration, client.close()).await {
+        match tokio::time::timeout(cfg.timeout, client.close()).await {
             Ok(Ok(_)) => {
                 info!(host=%host,"SSH connection closed successfully");
             }
@@ -312,30 +355,57 @@ impl NetconfYangLibraryFetcher {
             "YANG Library fetched from device");
         Ok((subscription_info, yang_lib, schemas))
     }
+
+    /// Retry `operation` with exponential backoff and equal jitter.
+    ///
+    /// `operation` is called up to `retry.max_retries + 1` times. Each failed
+    /// attempt waits `base * 2^(attempt-1)` (capped at `retry.max_backoff`)
+    /// with equal jitter before the next try.
+    async fn with_retry<F, Fut>(retry: RetryConfig, operation: F) -> FetcherResult
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output = FetcherResult>,
+    {
+        let mut last_err = None;
+        for attempt in 0..=retry.max_retries {
+            if attempt > 0 {
+                let backoff_secs = BASE_DELAY.as_secs_f64() * 2.0_f64.powi(attempt as i32 - 1);
+                let capped = backoff_secs.min(retry.max_backoff.as_secs_f64());
+                let half = capped / 2.0;
+                let jitter = rand::rng().random_range(0.0..=half);
+                let delay = std::time::Duration::from_secs_f64(half + jitter);
+                trace!(
+                    attempt,
+                    delay_ms = delay.as_millis() as u64,
+                    "retrying YANG Library fetch after backoff",
+                );
+                tokio::time::sleep(delay).await;
+            }
+            match operation().await {
+                Ok(result) => return Ok(result),
+                Err(err) => last_err = Some(err),
+            }
+        }
+        last_err.map(Err).unwrap()
+    }
 }
 
 impl YangLibraryFetcher for NetconfYangLibraryFetcher {
     async fn fetch(&self, subscription_info: SubscriptionInfo) -> JoinHandle<FetcherResult> {
-        let f = Self::fetch_from_device(
-            self.default_timeout,
-            subscription_info,
-            self.user.clone(),
-            Arc::clone(&self.private_key),
-            self.client_config.clone(),
-            self.default_port,
-        );
-        tokio::spawn(f)
+        let fetch_cfg = self.fetch_cfg.clone();
+        let retry_cfg = self.retry_cfg;
+        tokio::spawn(async move {
+            Self::with_retry(retry_cfg, || {
+                Self::fetch_from_device(&fetch_cfg, subscription_info.clone())
+            })
+            .await
+        })
     }
 
     async fn fetch_blocking(&self, subscription_info: SubscriptionInfo) -> FetcherResult {
-        Self::fetch_from_device(
-            self.default_timeout,
-            subscription_info,
-            self.user.clone(),
-            Arc::clone(&self.private_key),
-            self.client_config.clone(),
-            self.default_port,
-        )
+        Self::with_retry(self.retry_cfg, || {
+            Self::fetch_from_device(&self.fetch_cfg, subscription_info.clone())
+        })
         .await
     }
 
@@ -344,16 +414,14 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
         peer: SocketAddr,
         subscription_id: SubscriptionId,
     ) -> JoinHandle<FetcherResult> {
-        let f = Self::fetch_from_device_by_id(
-            self.default_timeout,
-            peer,
-            subscription_id,
-            self.user.clone(),
-            Arc::clone(&self.private_key),
-            self.client_config.clone(),
-            self.default_port,
-        );
-        tokio::spawn(f)
+        let fetch_cfg = self.fetch_cfg.clone();
+        let retry_cfg = self.retry_cfg;
+        tokio::spawn(async move {
+            Self::with_retry(retry_cfg, || {
+                Self::fetch_from_device_by_id(&fetch_cfg, peer, subscription_id)
+            })
+            .await
+        })
     }
 
     async fn fetch_by_subscription_id_blocking(
@@ -361,15 +429,9 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
         peer: SocketAddr,
         subscription_id: SubscriptionId,
     ) -> FetcherResult {
-        Self::fetch_from_device_by_id(
-            self.default_timeout,
-            peer,
-            subscription_id,
-            self.user.clone(),
-            Arc::clone(&self.private_key),
-            self.client_config.clone(),
-            self.default_port,
-        )
+        Self::with_retry(self.retry_cfg, || {
+            Self::fetch_from_device_by_id(&self.fetch_cfg, peer, subscription_id)
+        })
         .await
     }
 }
@@ -520,5 +582,143 @@ pub(crate) mod tests {
         ) -> FetcherResult {
             self.get_from_cache_by_id(peer, subscription_id)
         }
+    }
+}
+
+#[cfg(test)]
+mod retry_tests {
+    use super::*;
+    use netgauze_netconf_proto::yanglib::YangLibrary;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    fn retry_cfg(max_retries: u32) -> RetryConfig {
+        RetryConfig {
+            max_retries,
+            max_backoff: std::time::Duration::from_millis(1),
+        }
+    }
+
+    fn dummy_peer() -> SocketAddr {
+        "127.0.0.1:0".parse().unwrap()
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn make_ok() -> FetcherResult {
+        let info = SubscriptionInfo::new_empty(dummy_peer(), 1);
+        let yang_lib = YangLibrary::new("test-content-id".into(), vec![], vec![], vec![]);
+        Ok((info, yang_lib, HashMap::new()))
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn make_err(msg: &'static str) -> FetcherResult {
+        let info = SubscriptionInfo::new_empty(dummy_peer(), 1);
+        Err((
+            info,
+            YangLibraryCacheError::IoError(std::io::Error::other(msg)),
+        ))
+    }
+
+    /// A single attempt that succeeds immediately — no retries should happen.
+    #[tokio::test]
+    async fn test_succeeds_on_first_attempt() {
+        let call_count = Arc::new(AtomicU32::new(0));
+        let cc = Arc::clone(&call_count);
+
+        let result = NetconfYangLibraryFetcher::with_retry(retry_cfg(5), || {
+            let cc = Arc::clone(&cc);
+            async move {
+                cc.fetch_add(1, Ordering::SeqCst);
+                make_ok()
+            }
+        })
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            1,
+            "should not retry on success"
+        );
+    }
+
+    /// max_retries = 0 means exactly one attempt; failure is returned
+    /// immediately.
+    #[tokio::test]
+    async fn test_no_retry_when_max_retries_zero() {
+        let call_count = Arc::new(AtomicU32::new(0));
+        let cc = Arc::clone(&call_count);
+
+        let result = NetconfYangLibraryFetcher::with_retry(retry_cfg(0), || {
+            let cc = Arc::clone(&cc);
+            async move {
+                cc.fetch_add(1, Ordering::SeqCst);
+                make_err("always fails")
+            }
+        })
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            1,
+            "should try exactly once"
+        );
+    }
+
+    /// All attempts fail: the last error is returned and total calls ==
+    /// max_retries + 1.
+    #[tokio::test]
+    async fn test_all_retries_exhausted_returns_last_error() {
+        let call_count = Arc::new(AtomicU32::new(0));
+        let cc = Arc::clone(&call_count);
+        const MAX_RETRIES: u32 = 3;
+
+        let result = NetconfYangLibraryFetcher::with_retry(retry_cfg(MAX_RETRIES), || {
+            let cc = Arc::clone(&cc);
+            async move {
+                let n = cc.fetch_add(1, Ordering::SeqCst);
+                make_err(if n == MAX_RETRIES {
+                    "last error"
+                } else {
+                    "transient"
+                })
+            }
+        })
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            MAX_RETRIES + 1,
+            "should attempt max_retries + 1 times total"
+        );
+    }
+
+    /// Succeeds on the N-th attempt — prior failures must not be surfaced.
+    #[tokio::test]
+    async fn test_succeeds_after_transient_failures() {
+        let call_count = Arc::new(AtomicU32::new(0));
+        let cc = Arc::clone(&call_count);
+        const FAIL_FIRST: u32 = 2; // fail twice, succeed on the 3rd call
+
+        let result = NetconfYangLibraryFetcher::with_retry(retry_cfg(5), || {
+            let cc = Arc::clone(&cc);
+            async move {
+                let n = cc.fetch_add(1, Ordering::SeqCst);
+                if n < FAIL_FIRST {
+                    make_err("transient")
+                } else {
+                    make_ok()
+                }
+            }
+        })
+        .await;
+
+        assert!(result.is_ok(), "should ultimately succeed");
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            FAIL_FIRST + 1,
+            "should stop retrying once it succeeds"
+        );
     }
 }
