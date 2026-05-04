@@ -867,7 +867,7 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
-    use netgauze_netconf_proto::yang_push::subscription::UpdateTrigger;
+    use netgauze_netconf_proto::yang_push::subscription::{UpdateTrigger, YangPushModuleVersion};
     use netgauze_netconf_proto::yang_push::types::CentiSeconds;
     use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
     use netgauze_udp_notif_pkt::notification::Target;
@@ -1069,7 +1069,11 @@ mod tests {
                 "ds:operational".to_string(),
                 either::Right("/ietf-interfaces".to_string()),
             ),
-            vec!["ietf-interfaces".to_string()],
+            Box::new([YangPushModuleVersion::new(
+                "ietf-interfaces".into(),
+                Some("2018-02-20".into()),
+                None,
+            )]),
         );
         // Attempt to decode the packet (should succeed)
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();

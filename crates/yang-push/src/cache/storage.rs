@@ -94,6 +94,7 @@
 
 use crate::ContentId;
 use netgauze_netconf_proto::xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter};
+use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_netconf_proto::yanglib::{SchemaLoadingError, YangLibrary};
 use netgauze_udp_notif_pkt::notification::Target;
@@ -778,7 +779,7 @@ pub struct SubscriptionInfo {
     content_id: ContentId,
     target: Target,
     // TODO: add Module revision
-    models: Vec<String>,
+    models: Box<[YangPushModuleVersion]>,
 }
 
 impl SubscriptionInfo {
@@ -787,7 +788,7 @@ impl SubscriptionInfo {
         id: SubscriptionId,
         content_id: ContentId,
         target: Target,
-        models: Vec<String>,
+        models: Box<[YangPushModuleVersion]>,
     ) -> Self {
         Self {
             peer,
@@ -807,7 +808,7 @@ impl SubscriptionInfo {
             id,
             content_id: "EMPTY".to_string(),
             target: Target::new_datastore("EMPTY".to_string(), either::Right("EMPTY".to_string())),
-            models: vec![],
+            models: Box::new([]),
         }
     }
 
@@ -839,7 +840,7 @@ impl SubscriptionInfo {
     }
 
     /// The list of YANG modules associated with the subscription.
-    pub fn models(&self) -> &[String] {
+    pub fn models(&self) -> &[YangPushModuleVersion] {
         &self.models
     }
 }
@@ -1165,7 +1166,10 @@ mod tests {
                 "ds:operational".to_string(),
                 either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
             ),
-            vec!["ietf-interfaces".to_string(), "ietf-ip".to_string()],
+            Box::new([
+                YangPushModuleVersion::new("ietf-interfaces".into(), Some("2018-02-20".into()), None),
+                YangPushModuleVersion::new("ietf-ip".into(), None, None),
+            ]),
         )
     }
 
@@ -1360,8 +1364,11 @@ mod tests {
             "ds:operational".to_string(),
             either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
         );
-        let models = vec!["model1".to_string(), "model2".to_string()];
 
+        let models = Box::new([
+            YangPushModuleVersion::new("model1".into(), None, None),
+            YangPushModuleVersion::new("model2".into(), None, None),
+        ]);
         let info = SubscriptionInfo::new(peer, 1, content_id.clone(), Target::new_datastore(
             "ds:operational".to_string(),
             either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
@@ -1612,7 +1619,11 @@ mod tests {
                 "ds:operational".to_string(),
                 either::Right("/ietf-routing:routing/routing-protocols".to_string()),
             ),
-            vec!["ietf-routing".to_string()],
+            Box::new([YangPushModuleVersion::new(
+                "ietf-routing".into(),
+                None,
+                None,
+            )]),
         );
         let subscription_info3 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 102)), 830),
@@ -1622,7 +1633,11 @@ mod tests {
                 "ds:operational".to_string(),
                 either::Right("/ietf-routing:routing/routing-protocols".to_string()),
             ),
-            vec!["ietf-routing".to_string()],
+            Box::new([YangPushModuleVersion::new(
+                "ietf-routing".into(),
+                None,
+                None,
+            )]),
         );
         setup_yang_library_on_disk(
             &temp_dir,
@@ -1691,7 +1706,11 @@ mod tests {
                 "ds:operational".to_string(),
                 either::Right("/ietf-routing:routing/routing-protocols".to_string()),
             ),
-            vec!["ietf-routing".to_string()],
+            Box::new([YangPushModuleVersion::new(
+                "ietf-routing".into(),
+                None,
+                None,
+            )]),
         );
 
         // Test appending new subscription info
@@ -1733,7 +1752,10 @@ mod tests {
                 "ds:operational".to_string(),
                 either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
             ),
-            vec!["ietf-interfaces".to_string(), "ietf-ip".to_string()],
+            Box::new([
+                YangPushModuleVersion::new("ietf-interfaces".into(), Some("2018-02-20".into()), None),
+                YangPushModuleVersion::new("ietf-ip".into(), None, None),
+            ]),
         );
 
         // Create YANG library and schemas
@@ -1772,7 +1794,11 @@ mod tests {
                 "ds:operational".to_string(),
                 either::Right("/ietf-routing:routing/routing-protocols".to_string()),
             ),
-            vec!["ietf-routing".to_string()],
+            Box::new([YangPushModuleVersion::new(
+                "ietf-routing".into(),
+                None,
+                None,
+            )]),
         );
 
         // Put a second subscription with the same YANG library

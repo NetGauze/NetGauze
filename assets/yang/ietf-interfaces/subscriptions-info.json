@@ -8,8 +8,13 @@
       "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces"
     },
     "models": [
-      "ietf-interfaces",
-      "ietf-subscribed-notifications"
+      {
+        "name": "ietf-interfaces",
+        "revision": "2018-02-20"
+      },
+      {
+        "name": "ietf-subscribed-notifications"
+      }
     ]
   }
 ]
