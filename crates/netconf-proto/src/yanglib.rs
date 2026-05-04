@@ -110,6 +110,26 @@ impl YangLibrary {
         None
     }
 
+    pub fn find_module_by_datastore_and_ns(
+        &self,
+        datastore_name: &DatastoreName,
+        ns: &str,
+    ) -> Option<&Module> {
+        let datastore = self.datastores().get(datastore_name)?;
+        let schema = self.schemas().get(datastore.schema())?;
+        for module_set_name in schema.modules_sets() {
+            let module_set = self.module_sets().get(module_set_name)?;
+            if let Some(module) = module_set
+                .modules()
+                .values()
+                .find(|module| module.namespace() == ns)
+            {
+                return Some(module);
+            }
+        }
+        None
+    }
+
     /// Register the YANG Lib to in the Confluent Schema Registry.
     ///
     /// `root_schema_name` is the name of the root module to register.
@@ -2751,5 +2771,49 @@ mod tests {
         assert_eq!(not_found_import_module, None);
         assert_eq!(found_submodule.map(|x| x.name()), Some("example-submodule"));
         assert_eq!(not_found_submodule, None);
+    }
+
+    #[test]
+    fn test_find_module_by_datastore_and_ns() {
+        let input = get_example_yang_lib();
+        assert_eq!(
+            input
+                .find_module_by_datastore_and_ns(
+                    &DatastoreName::Operational,
+                    "urn:ietf:params:xml:ns:yang:ietf-interfaces"
+                )
+                .map(|x| x.name()),
+            Some("ietf-interfaces")
+        );
+
+        assert_eq!(
+            input
+                .find_module_by_datastore_and_ns(
+                    &DatastoreName::Operational,
+                    "urn:ietf:params:xml:ns:yang:ietf-routing"
+                )
+                .map(|x| x.name()),
+            Some("ietf-routing")
+        );
+
+        assert_eq!(
+            input
+                .find_module_by_datastore_and_ns(
+                    &DatastoreName::Running,
+                    "urn:ietf:params:xml:ns:yang:ietf-interfaces"
+                )
+                .map(|x| x.name()),
+            None
+        );
+
+        assert_eq!(
+            input
+                .find_module_by_datastore_and_ns(
+                    &DatastoreName::Operational,
+                    "urn:ietf:params:xml:exmaple-does-not-exist"
+                )
+                .map(|x| x.name()),
+            None
+        );
     }
 }
