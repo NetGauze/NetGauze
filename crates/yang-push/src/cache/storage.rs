@@ -1142,6 +1142,7 @@ impl YangLibraryCache {
             });
         debug!(
             peer_ip=%peer_ip,
+            subscription_id,
             hit = result.is_some(),
             "cache lookup by subscription id"
         );
