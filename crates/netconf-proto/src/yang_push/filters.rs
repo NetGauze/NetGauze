@@ -300,6 +300,15 @@ pub enum DatastoreFilterSpec {
     Xpath(DatastoreXPathFilter),
 }
 
+impl DatastoreFilterSpec {
+    pub fn namespaces(&self) -> &[(Box<str>, Box<str>)] {
+        match self {
+            Self::Subtree(subtree) => &subtree.namespaces,
+            Self::Xpath(xpath) => &xpath.namespaces,
+        }
+    }
+}
+
 impl XmlSerialize for DatastoreFilterSpec {
     fn xml_serialize<T: io::Write>(
         &self,
@@ -475,6 +484,15 @@ pub enum StreamFilterSpec {
 
     /// XPath 1.0 filter expression
     Xpath(StreamXPathFilter),
+}
+
+impl StreamFilterSpec {
+    pub fn namespaces(&self) -> &[(Box<str>, Box<str>)] {
+        match self {
+            Self::Subtree(subtree) => &subtree.namespaces,
+            Self::Xpath(xpath) => &xpath.namespaces,
+        }
+    }
 }
 
 impl XmlSerialize for StreamFilterSpec {
