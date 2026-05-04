@@ -290,9 +290,13 @@ impl NetconfYangLibraryFetcher {
         let subscription_info = SubscriptionInfo::new(
             peer,
             subscription_id,
-            router_yang_library.content_id().to_string(),
             subscription_target,
+            subscription.stop_time,
+            subscription.transport,
+            subscription.encoding,
+            subscription.purpose,
             modules.into_boxed_slice(),
+            router_yang_library.content_id().to_string(),
         );
         info!( host = %host,
             peer=%peer,

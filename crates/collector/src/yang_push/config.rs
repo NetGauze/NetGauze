@@ -143,6 +143,7 @@ impl
 mod tests {
     use super::*;
     use chrono::TimeZone;
+    use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
     use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
     use netgauze_yang_push::model::telemetry::*;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -151,12 +152,16 @@ mod tests {
         SubscriptionInfo::new(
             SocketAddr::new(ip, 8080),
             1,
-            "test-content-id".to_string(),
             netgauze_udp_notif_pkt::notification::Target::new_datastore(
                 "ietf-datastores:operational".to_string(),
                 either::Right("/test-path".to_string()),
             ),
+            None,
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            None,
             Box::new([YangPushModuleVersion::new("test-module".into(), None, None)]),
+            "test-content-id".to_string(),
         )
     }
 

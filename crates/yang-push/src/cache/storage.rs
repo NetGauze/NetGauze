@@ -93,7 +93,9 @@
 //! ```
 
 use crate::ContentId;
+use chrono::{DateTime, Utc};
 use netgauze_netconf_proto::xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter};
+use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
 use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_netconf_proto::yanglib::{SchemaLoadingError, YangLibrary};
@@ -776,26 +778,48 @@ impl YangLibraryReference {
 pub struct SubscriptionInfo {
     peer: SocketAddr,
     id: SubscriptionId,
-    content_id: ContentId,
     target: Target,
-    // TODO: add Module revision
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stop_time: Option<DateTime<Utc>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    transport: Option<Transport>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    encoding: Option<Encoding>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    purpose: Option<Box<str>>,
+
     models: Box<[YangPushModuleVersion]>,
+
+    content_id: ContentId,
 }
 
 impl SubscriptionInfo {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         peer: SocketAddr,
         id: SubscriptionId,
-        content_id: ContentId,
         target: Target,
+        stop_time: Option<DateTime<Utc>>,
+        transport: Option<Transport>,
+        encoding: Option<Encoding>,
+        purpose: Option<Box<str>>,
         models: Box<[YangPushModuleVersion]>,
+        content_id: ContentId,
     ) -> Self {
         Self {
             peer,
             id,
-            content_id,
             target,
+            stop_time,
+            transport,
+            encoding,
+            purpose,
             models,
+            content_id,
         }
     }
 
@@ -806,9 +830,13 @@ impl SubscriptionInfo {
         Self {
             peer,
             id,
-            content_id: "EMPTY".to_string(),
             target: Target::new_datastore("EMPTY".to_string(), either::Right("EMPTY".to_string())),
+            stop_time: None,
+            transport: None,
+            encoding: None,
+            purpose: None,
             models: Box::new([]),
+            content_id: "EMPTY".to_string(),
         }
     }
 
@@ -826,6 +854,22 @@ impl SubscriptionInfo {
     /// identifier for the subscription within each peer
     pub const fn id(&self) -> SubscriptionId {
         self.id
+    }
+
+    pub const fn stop_time(&self) -> Option<DateTime<Utc>> {
+        self.stop_time
+    }
+
+    pub const fn transport(&self) -> Option<Transport> {
+        self.transport
+    }
+
+    pub const fn encoding(&self) -> Option<Encoding> {
+        self.encoding
+    }
+
+    pub fn purpose(&self) -> Option<&str> {
+        self.purpose.as_deref()
     }
 
     /// The YANG Library content ID associated with the subscription by the
@@ -1161,15 +1205,19 @@ mod tests {
         SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 830),
             1,
-            ContentId::from(content_id.to_string()),
             Target::new_datastore(
                 "ds:operational".to_string(),
                 either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
             ),
+            None,
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            Some("test subscription".into()),
             Box::new([
                 YangPushModuleVersion::new("ietf-interfaces".into(), Some("2018-02-20".into()), None),
                 YangPushModuleVersion::new("ietf-ip".into(), None, None),
             ]),
+            ContentId::from(content_id.to_string()),
         )
     }
 
@@ -1369,10 +1417,20 @@ mod tests {
             YangPushModuleVersion::new("model1".into(), None, None),
             YangPushModuleVersion::new("model2".into(), None, None),
         ]);
-        let info = SubscriptionInfo::new(peer, 1, content_id.clone(), Target::new_datastore(
-            "ds:operational".to_string(),
-            either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
-        ), models.clone());
+        let info = SubscriptionInfo::new(
+            peer,
+            1,
+            Target::new_datastore(
+                "ds:operational".to_string(),
+                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+            ),
+            None,
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            Some("test subscription".into()),
+            models.clone(),
+            content_id.clone(),
+        );
 
         assert_eq!(info.peer(), peer);
         assert_eq!(info.content_id(), &content_id);
@@ -1614,30 +1672,38 @@ mod tests {
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 101)), 830),
             2,
-            ContentId::from("content_id2".to_string()),
             Target::new_datastore(
                 "ds:operational".to_string(),
                 either::Right("/ietf-routing:routing/routing-protocols".to_string()),
             ),
+            None,
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            Some("test subscription".into()),
             Box::new([YangPushModuleVersion::new(
                 "ietf-routing".into(),
                 None,
                 None,
             )]),
+            ContentId::from("content_id2".to_string()),
         );
         let subscription_info3 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 102)), 830),
             2,
-            ContentId::from("content_id3".to_string()),
             Target::new_datastore(
                 "ds:operational".to_string(),
                 either::Right("/ietf-routing:routing/routing-protocols".to_string()),
             ),
+            None,
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            Some("test subscription".into()),
             Box::new([YangPushModuleVersion::new(
                 "ietf-routing".into(),
                 None,
                 None,
             )]),
+            ContentId::from("content_id3".to_string()),
         );
         setup_yang_library_on_disk(
             &temp_dir,
@@ -1701,16 +1767,20 @@ mod tests {
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 101)), 830),
             2,
-            ContentId::from(content_id.to_string()),
             Target::new_datastore(
                 "ds:operational".to_string(),
                 either::Right("/ietf-routing:routing/routing-protocols".to_string()),
             ),
+            None,
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            Some("test subscription".into()),
             Box::new([YangPushModuleVersion::new(
                 "ietf-routing".into(),
                 None,
                 None,
             )]),
+            ContentId::from(content_id.to_string()),
         );
 
         // Test appending new subscription info
@@ -1747,15 +1817,19 @@ mod tests {
         let subscription_info1 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 830),
             1,
-            ContentId::from(content_id.to_string()),
             Target::new_datastore(
                 "ds:operational".to_string(),
                 either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
             ),
+            None,
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            Some("test subscription".into()),
             Box::new([
                 YangPushModuleVersion::new("ietf-interfaces".into(), Some("2018-02-20".into()), None),
                 YangPushModuleVersion::new("ietf-ip".into(), None, None),
             ]),
+            ContentId::from(content_id.to_string()),
         );
 
         // Create YANG library and schemas
@@ -1789,16 +1863,20 @@ mod tests {
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 101)), 830),
             2,
-            ContentId::from(content_id.to_string()),
             Target::new_datastore(
                 "ds:operational".to_string(),
                 either::Right("/ietf-routing:routing/routing-protocols".to_string()),
             ),
+            None,
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            Some("test subscription".into()),
             Box::new([YangPushModuleVersion::new(
                 "ietf-routing".into(),
                 None,
                 None,
             )]),
+            ContentId::from(content_id.to_string()),
         );
 
         // Put a second subscription with the same YANG library

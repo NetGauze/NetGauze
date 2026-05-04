@@ -998,12 +998,16 @@ impl ValidationActor {
         Some(SubscriptionInfo::new(
             peer,
             sub_started.id(),
+            sub_started.target().clone(),
+            sub_started.stop_time().cloned(),
+            sub_started.transport().cloned(),
+            sub_started.encoding().cloned(),
+            sub_started.purpose().map(|x| x.into()),
+            modules,
             sub_started
                 .yang_library_content_id()
                 .map(|x| x.to_string())
                 .unwrap_or_default(),
-            sub_started.target().clone(),
-            modules,
         ))
     }
 
@@ -1178,6 +1182,7 @@ mod tests {
                             "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces",
                             "transport": "ietf-udp-notif-transport:udp-notif",
                             "encoding": "encode-json",
+                            "purpose": "test subscription",
                             "ietf-distributed-notif:message-publisher-id": [
                                 16843789
                             ],
