@@ -412,6 +412,18 @@ pub struct SubscriptionStartedModified {
     #[serde(skip_serializing_if = "Option::is_none")]
     stop_time: Option<DateTime<Utc>>,
 
+    #[serde(rename = "dscp")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dscp: Option<u8>,
+
+    #[serde(rename = "weighting")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    weighting: Option<u8>,
+
+    #[serde(rename = "dependency")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dependency: Option<SubscriptionId>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     transport: Option<Transport>,
 
@@ -420,6 +432,12 @@ pub struct SubscriptionStartedModified {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     purpose: Option<String>,
+
+    #[serde(
+        rename = "ietf-distributed-notif:message-publisher-id",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub message_publisher_id: Option<Box<[u32]>>,
 
     #[serde(flatten)]
     update_trigger: Option<UpdateTrigger>,
@@ -442,9 +460,13 @@ impl SubscriptionStartedModified {
         id: SubscriptionId,
         target: Target,
         stop_time: Option<DateTime<Utc>>,
+        dscp: Option<u8>,
+        weighting: Option<u8>,
+        dependency: Option<SubscriptionId>,
         transport: Option<Transport>,
         encoding: Option<Encoding>,
         purpose: Option<String>,
+        message_publisher_id: Option<Box<[u32]>>,
         update_trigger: Option<UpdateTrigger>,
         module_version: Option<Vec<YangPushModuleVersion>>,
         yang_library_content_id: Option<String>,
@@ -454,9 +476,13 @@ impl SubscriptionStartedModified {
             id,
             target,
             stop_time,
+            dscp,
+            weighting,
+            dependency,
             transport,
             encoding,
             purpose,
+            message_publisher_id,
             update_trigger,
             module_version,
             yang_library_content_id,
@@ -476,6 +502,18 @@ impl SubscriptionStartedModified {
         self.stop_time.as_ref()
     }
 
+    pub const fn dscp(&self) -> Option<u8> {
+        self.dscp
+    }
+
+    pub const fn weighting(&self) -> Option<u8> {
+        self.weighting
+    }
+
+    pub const fn dependency(&self) -> Option<SubscriptionId> {
+        self.dependency
+    }
+
     pub const fn transport(&self) -> Option<&Transport> {
         self.transport.as_ref()
     }
@@ -486,6 +524,10 @@ impl SubscriptionStartedModified {
 
     pub fn purpose(&self) -> Option<&str> {
         self.purpose.as_deref()
+    }
+
+    pub fn message_publisher_id(&self) -> Option<&[u32]> {
+        self.message_publisher_id.as_deref()
     }
 
     pub const fn update_trigger(&self) -> Option<&UpdateTrigger> {
@@ -832,7 +874,11 @@ mod tests {
             encoding: Some(Encoding::Json),
             transport: Some(Transport::UDPNotif),
             stop_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
+            dscp: None,
+            weighting: None,
+            dependency: None,
             purpose: Some("test-purpose".to_string()),
+            message_publisher_id: None,
             update_trigger: Some(UpdateTrigger::OnChange {
                 dampening_period: Some(CentiSeconds::new(100)),
                 sync_on_start: Some(true),
@@ -928,7 +974,11 @@ mod tests {
             encoding: Some(Encoding::Json),
             transport: Some(Transport::UDPNotif),
             stop_time: Some(Utc.timestamp_millis_opt(10000).unwrap()),
+            dscp: None,
+            weighting: None,
+            dependency: None,
             purpose: Some("test-purpose".to_string()),
+            message_publisher_id: None,
             update_trigger: Some(UpdateTrigger::OnChange {
                 dampening_period: Some(CentiSeconds::new(100)),
                 sync_on_start: Some(true),

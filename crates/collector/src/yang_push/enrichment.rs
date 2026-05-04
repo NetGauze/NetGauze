@@ -893,9 +893,13 @@ mod tests {
                 Some("/example/datastore/xpath".to_string()),
             ),
             None,
+            None,
+            None,
+            None,
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some(purpose),
+            None,
             Some(UpdateTrigger::Periodic {
                 period: Some(CentiSeconds::new(100)),
                 anchor_time: None,
