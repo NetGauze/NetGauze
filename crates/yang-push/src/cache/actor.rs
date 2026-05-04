@@ -705,15 +705,21 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                         None
                     }
                 };
-                let pending_senders = self.pending_requests.remove(&subscription_info);
+                // First, remove all pending requests for this subscription info that are
+                // requested with full subscription info
+                let empty =
+                    SubscriptionInfo::new_empty(subscription_info.peer(), subscription_info.id());
+                let mut pending_senders = self
+                    .pending_requests
+                    .remove(&subscription_info)
+                    .unwrap_or(vec![]);
+                let pending_sender_by_id = self.pending_requests.remove(&empty).unwrap_or(vec![]);
+                pending_senders.extend(pending_sender_by_id);
                 self.stats
                     .pending_cache_requests
                     .record(self.pending_requests.len() as u64, &[]);
-                if let Some(pending_senders) = pending_senders {
-                    for sender in pending_senders {
-                        Self::send_yang_lib_ref(&subscription_info, yang_lib_ref.clone(), sender)
-                            .await;
-                    }
+                for sender in pending_senders {
+                    Self::send_yang_lib_ref(&subscription_info, yang_lib_ref.clone(), sender).await;
                 }
             }
         }
@@ -920,7 +926,11 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     ),
                 ];
                 self.stats.requests_received.add(1, &otel_tags);
-                debug!(peer=%peer, subscription_id, "processing cache lookup by subscription id request");
+                debug!(
+                    peer=%peer,
+                    subscription_id,
+                    "processing cache lookup by subscription id request"
+                );
                 let response = self
                     .schema_cache
                     .get_by_subscription_id(peer.ip(), subscription_id);
@@ -928,13 +938,67 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     self.stats.cache_hits.add(1, &otel_tags);
                     Self::send_yang_lib_ref(&subscription_info, yang_lib_ref, tx).await;
                 } else {
-                    // TODO: lookup subscription direction from router config
-                    self.stats.cache_misses.add(1, &otel_tags);
                     warn!(
                         peer=%peer,
                         subscription_id,
                         "cache miss: subscription id not found in cache"
                     );
+                    self.stats.cache_misses.add(1, &otel_tags);
+                    let subscription_info = SubscriptionInfo::new_empty(peer, subscription_id);
+                    let entry = self
+                        .pending_requests
+                        .entry(subscription_info.clone())
+                        .or_default();
+                    let should_fetch = entry.is_empty();
+                    entry.push(tx);
+
+                    if should_fetch {
+                        info!(
+                            peer=%subscription_info.peer(),
+                            subscription_id=subscription_info.id(),
+                            "cache miss: starting fetch from device by subscription id"
+                        );
+                        self.stats.device_fetch_request.add(1, &otel_tags);
+                        let job_result = tokio::time::timeout(
+                            self.fetcher_timeout,
+                            self.fetcher.fetch_by_subscription_id(peer, subscription_id),
+                        )
+                        .await;
+                        let job = match job_result {
+                            Ok(worker_result) => worker_result,
+                            Err(err) => {
+                                warn!(
+                                    peer=%subscription_info.peer(),
+                                    subscription_id=subscription_info.id(),
+                                    router_content_id=subscription_info.content_id(),
+                                    target=%subscription_info.target(),
+                                    error=%err,
+                                    "failed to fetch yang library from device"
+                                );
+                                // remove the sender we just added since the fetch failed to
+                                // start
+                                entry.remove(entry.len() - 1);
+                                self.stats.device_fetch_failed.add(1, &otel_tags);
+                                return;
+                            }
+                        };
+                        self.workers_queue.push(job);
+                        self.stats
+                            .device_fetch_queue
+                            .record(self.workers_queue.len() as u64, &[]);
+                    } else {
+                        debug!(
+                            peer=%subscription_info.peer(),
+                            subscription_id=subscription_info.id(),
+                            router_content_id=subscription_info.content_id(),
+                            target=%subscription_info.target(),
+                            pending_requests_count=entry.len(),
+                            "cache miss: fetch request in progress from the router, queuing request to avoid duplicate requests to the router"
+                        );
+                    }
+                    self.stats
+                        .pending_cache_requests
+                        .record(self.pending_requests.len() as u64, &otel_tags);
                 }
             }
             CacheLookupCommand::LookupBySubscriptionIdOneShot {
@@ -942,7 +1006,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 subscription_id,
                 tx,
             } => {
-                let otel_tags = [
+                let mut otel_tags = vec![
                     opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
                     opentelemetry::KeyValue::new(
                         "network.peer.port",
@@ -965,13 +1029,36 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     self.stats.cache_hits.add(1, &otel_tags);
                     Self::send_yang_lib_ref_oneshot(&subscription_info, yang_lib_ref, tx);
                 } else {
-                    // TODO: lookup subscription direction from router config
-                    self.stats.cache_misses.add(1, &otel_tags);
                     warn!(
                         peer=%peer,
                         subscription_id,
                         "cache miss: subscription id not found in cache"
                     );
+                    self.stats.cache_misses.add(1, &otel_tags);
+                    self.stats.device_fetch_request.add(1, &otel_tags);
+
+                    let worker_result = tokio::time::timeout(
+                        self.fetcher_timeout,
+                        self.fetcher
+                            .fetch_by_subscription_id_blocking(peer, subscription_id),
+                    )
+                    .await;
+                    let worker_result = match worker_result {
+                        Ok(worker_result) => {
+                            self.stats.device_fetch_succeeded.add(1, &otel_tags);
+                            worker_result
+                        }
+                        Err(err) => {
+                            otel_tags.push(opentelemetry::KeyValue::new(
+                                "error.message",
+                                format!("{err}"),
+                            ));
+                            self.stats.device_fetch_failed.add(1, &otel_tags);
+                            let empty = SubscriptionInfo::new_empty(peer, subscription_id);
+                            Err((empty.clone(), err.into()))
+                        }
+                    };
+                    self.process_worker_result(Ok(worker_result)).await;
                 }
             }
             CacheLookupCommand::LookupByContentId(content_id, sender) => {
@@ -1311,7 +1398,6 @@ pub(crate) mod tests {
         assert_eq!(response.yang_lib_ref(), None);
 
         // check that the fetcher was called
-
         {
             let hits_counts = fetcher_count
                 .lock()
@@ -1425,6 +1511,200 @@ pub(crate) mod tests {
                 let (tx, rx) = async_channel::unbounded();
                 h.request_tx()
                     .send(CacheLookupCommand::LookupBySubscriptionInfo(sub, tx))
+                    .await
+                    .unwrap();
+                rx.recv().await.unwrap()
+            }));
+        }
+
+        let results = tasks
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(|res| res.unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(results.len(), 10);
+
+        // Verify only ONE fetch occurred
+        {
+            let count = fetcher_count.lock().unwrap();
+            assert_eq!(count.get(&subscription_info), Some(&1));
+        }
+
+        // Cleanup
+        tokio::time::timeout(Duration::from_millis(100), handle.shutdown())
+            .await
+            .expect("timeout during shutdown")
+            .expect("failed to shutdown actor");
+        tokio::time::timeout(Duration::from_millis(100), join_handle)
+            .await
+            .expect("timeout during join")
+            .expect("failed to join actor")
+            .expect("cache actor failed");
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_cache_miss_device_fail_by_id() {
+        let (join_handle, handle, _cached_lib_ref, _cached_subscription_info, fetcher_count) =
+            setup_actor_with_loaded_cache();
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 0);
+        }
+        let subscription_info = test_subscription_info();
+
+        let (tx, rx) = async_channel::unbounded();
+        handle
+            .request_tx()
+            .send(CacheLookupCommand::LookupBySubscriptionId {
+                peer: subscription_info.peer(),
+                subscription_id: subscription_info.id(),
+                tx,
+            })
+            .await
+            .unwrap();
+
+        tokio::task::yield_now().await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let response = tokio::time::timeout(Duration::from_millis(1000), rx.recv())
+            .await
+            .expect("timeout waiting for response")
+            .expect("failed to receive response");
+        assert_eq!(
+            response.subscription_info(),
+            &SubscriptionInfo::new_empty(subscription_info.peer(), subscription_info.id())
+        );
+        assert_eq!(response.yang_lib_ref(), None);
+
+        // check that the fetcher was called
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 1);
+            assert_eq!(
+                hits_counts.get(&SubscriptionInfo::new_empty(
+                    subscription_info.peer(),
+                    subscription_info.id()
+                )),
+                Some(&1)
+            );
+        }
+
+        tokio::time::timeout(Duration::from_millis(100), handle.shutdown())
+            .await
+            .expect("timeout during shutdown")
+            .expect("failed to shutdown actor");
+        tokio::time::timeout(Duration::from_millis(100), join_handle)
+            .await
+            .expect("timeout during join")
+            .expect("failed to join actor")
+            .expect("cache actor failed");
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_cache_miss_triggers_fetch_by_id() {
+        let (join_handle, handle, subscription_info, fetcher_count) =
+            setup_actor_with_empty_cache();
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 0);
+        }
+
+        let (tx, rx) = async_channel::unbounded();
+        handle
+            .request_tx()
+            .send(CacheLookupCommand::LookupBySubscriptionId {
+                peer: subscription_info.peer(),
+                subscription_id: subscription_info.id(),
+                tx,
+            })
+            .await
+            .unwrap();
+
+        tokio::task::yield_now().await;
+        let response = tokio::time::timeout(Duration::from_millis(1000), rx.recv())
+            .await
+            .expect("timeout waiting for response")
+            .expect("failed to receive response");
+        assert_eq!(response.subscription_info(), &subscription_info);
+        assert!(response.yang_lib_ref().is_some());
+
+        // check that the fetcher was called
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 1);
+            assert_eq!(hits_counts.get(&subscription_info), Some(&1));
+        }
+
+        let (tx, rx) = async_channel::unbounded();
+        handle
+            .request_tx()
+            .send(CacheLookupCommand::LookupBySubscriptionInfo(
+                subscription_info.clone(),
+                tx,
+            ))
+            .await
+            .unwrap();
+
+        tokio::task::yield_now().await;
+        let response = tokio::time::timeout(Duration::from_millis(1000), rx.recv())
+            .await
+            .expect("timeout waiting for response")
+            .expect("failed to receive response");
+        assert_eq!(response.subscription_info(), &subscription_info);
+        assert!(response.yang_lib_ref().is_some());
+
+        // check that the fetcher was NOT called
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 1);
+            assert_eq!(hits_counts.get(&subscription_info), Some(&1));
+        }
+
+        tokio::time::timeout(Duration::from_millis(100), handle.shutdown())
+            .await
+            .expect("timeout during shutdown")
+            .expect("failed to shutdown actor");
+        tokio::time::timeout(Duration::from_millis(100), join_handle)
+            .await
+            .expect("timeout during join")
+            .expect("failed to join actor")
+            .expect("cache actor failed");
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_fetch_deduplication_by_id() {
+        let (join_handle, handle, subscription_info, fetcher_count) =
+            setup_actor_with_empty_cache();
+
+        let mut tasks = FuturesOrdered::new();
+        for _ in 0..10 {
+            let h = handle.clone();
+            let sub = subscription_info.clone();
+            tasks.push_back(tokio::spawn(async move {
+                let (tx, rx) = async_channel::unbounded();
+                h.request_tx()
+                    .send(CacheLookupCommand::LookupBySubscriptionId {
+                        peer: sub.peer(),
+                        subscription_id: sub.id(),
+                        tx,
+                    })
                     .await
                     .unwrap();
                 rx.recv().await.unwrap()
