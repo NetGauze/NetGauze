@@ -1,6 +1,7 @@
 [
   {
     "peer": "0.0.0.0:830",
+    "collector": "127.0.0.1:12345",
     "id": 1,
     "content_id": "test-content-id-1",
     "target": {
