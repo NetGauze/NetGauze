@@ -34,6 +34,7 @@ rustc-hash = { workspace = true }
 quick-xml = { workspace = true }
 futures-util = { workspace = true }
 russh = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 tracing-test = { workspace = true }

@@ -38,7 +38,7 @@ use netgauze_udp_notif_service::UdpNotifRequest;
 use netgauze_udp_notif_service::supervisor::UdpNotifSupervisorHandle;
 use netgauze_yang_push::ContentId;
 use netgauze_yang_push::cache::actor::CacheActorHandle;
-use netgauze_yang_push::cache::fetcher::NetconfYangLibraryFetcher;
+use netgauze_yang_push::cache::fetcher::{NetconfYangLibraryFetcher, RetryConfig};
 use netgauze_yang_push::cache::storage::SubscriptionInfo;
 use netgauze_yang_push::model::telemetry::{Manifest, TelemetryMessageWrapper};
 use netgauze_yang_push::validation::ValidationActorHandle;
@@ -1017,6 +1017,10 @@ fn netconf_fetcher(config: &NetconfConfig) -> Result<NetconfYangLibraryFetcher, 
         ssh_config,
         config.port,
         Duration::from_secs(100),
+        RetryConfig::new(
+            config.max_retries,
+            Duration::from_secs(config.max_backoff_secs),
+        ),
     );
     Ok(fetcher)
 }
