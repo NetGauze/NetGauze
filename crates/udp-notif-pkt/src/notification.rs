@@ -207,8 +207,13 @@
 //!   additional fields to ensure compatibility with YANG augmentations
 
 use chrono::{DateTime, Utc};
+use netgauze_netconf_proto::yang_push::filters::{
+    DatastoreFilterSpec, StreamFilterSpec, StreamSelectionFilterObjects,
+};
 use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
-use netgauze_netconf_proto::yang_push::subscription::{UpdateTrigger, YangPushModuleVersion};
+use netgauze_netconf_proto::yang_push::subscription::{
+    DatastoreSelectionFilterObjects, Subscription, UpdateTrigger, YangPushModuleVersion,
+};
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -549,6 +554,112 @@ impl SubscriptionStartedModified {
     }
 }
 
+#[derive(Debug, Display, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
+pub enum SubscriptionConvertError {
+    #[strum(to_string = "Unsupported stream filter by reference: {0}")]
+    UnsupportedStreamFilterByReference(String),
+
+    #[strum(to_string = "Unsupported stream filter by subtree: {0}")]
+    UnsupportedStreamSubtreeFilter(String),
+
+    #[strum(to_string = "Unsupported datastore filter by reference: {0}")]
+    UnsupportedDatastoreFilterByReference(String),
+
+    #[strum(to_string = "Unsupported datastore filter by subtree: {0}")]
+    UnsupportedDatastoreSubtreeFilter(String),
+}
+
+impl TryFrom<netgauze_netconf_proto::yang_push::subscription::Target> for Target {
+    type Error = SubscriptionConvertError;
+
+    fn try_from(
+        value: netgauze_netconf_proto::yang_push::subscription::Target,
+    ) -> Result<Self, Self::Error> {
+        let target = match value {
+            netgauze_netconf_proto::yang_push::subscription::Target::Stream(stream_target) => {
+                match stream_target.filter {
+                    StreamSelectionFilterObjects::ByReference(name) => {
+                        return Err(
+                            SubscriptionConvertError::UnsupportedStreamFilterByReference(
+                                name.into_string(),
+                            ),
+                        );
+                    }
+                    StreamSelectionFilterObjects::WithInSubscription(filter) => match filter {
+                        StreamFilterSpec::Subtree(subtree) => {
+                            return Err(SubscriptionConvertError::UnsupportedStreamSubtreeFilter(
+                                subtree.subtree.into(),
+                            ));
+                        }
+                        StreamFilterSpec::Xpath(xpath) => Target {
+                            stream: Some(stream_target.stream.into_string()),
+                            stream_subtree_filter: None,
+                            stream_xpath_filter: Some(xpath.path.into_string()),
+                            replay_start_time: stream_target.replay_start_time,
+                            datastore: None,
+                            datastore_subtree_filter: None,
+                            datastore_xpath_filter: None,
+                        },
+                    },
+                }
+            }
+            netgauze_netconf_proto::yang_push::subscription::Target::Datastore(
+                datastore_target,
+            ) => match datastore_target.selection {
+                DatastoreSelectionFilterObjects::ByReference(name) => {
+                    return Err(
+                        SubscriptionConvertError::UnsupportedDatastoreFilterByReference(
+                            name.into_string(),
+                        ),
+                    );
+                }
+                DatastoreSelectionFilterObjects::WithInSubscription(filter) => match filter {
+                    DatastoreFilterSpec::Subtree(subtree) => {
+                        return Err(SubscriptionConvertError::UnsupportedDatastoreSubtreeFilter(
+                            subtree.subtree.into(),
+                        ));
+                    }
+                    DatastoreFilterSpec::Xpath(xpath) => Target {
+                        stream: None,
+                        stream_subtree_filter: None,
+                        stream_xpath_filter: None,
+                        replay_start_time: None,
+                        datastore: Some(datastore_target.datastore.to_string()),
+                        datastore_subtree_filter: None,
+                        datastore_xpath_filter: Some(xpath.path.into_string()),
+                    },
+                },
+            },
+        };
+        Ok(target)
+    }
+}
+
+impl TryFrom<Subscription> for SubscriptionStartedModified {
+    type Error = SubscriptionConvertError;
+
+    fn try_from(value: Subscription) -> Result<Self, Self::Error> {
+        let target = Target::try_from(value.target)?;
+        let value = SubscriptionStartedModified::new(
+            value.id,
+            target,
+            value.stop_time,
+            value.dscp,
+            value.weighting,
+            value.dependency,
+            value.transport,
+            value.encoding,
+            value.purpose.map(|p| p.into()),
+            value.message_publisher_id,
+            value.update_trigger,
+            value.module_version.map(|v| v.into_vec()),
+            value.yang_library_content_id,
+            serde_json::json!({}), // No extra fields in this conversion
+        );
+        Ok(value)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubscriptionTerminated {
     id: SubscriptionId,
@@ -699,6 +810,30 @@ impl Target {
         }
     }
 
+    /// Creates a new Target for a stream subscription.
+    ///
+    /// Simplifies instantiating the target without having to specify the
+    /// stream-specific fields.
+    pub fn new_stream(
+        stream: String,
+        replay_start_time: Option<DateTime<Utc>>,
+        filter: either::Either<Value, String>,
+    ) -> Self {
+        let (stream_subtree_filter, stream_xpath_filter) = match filter {
+            either::Either::Left(value) => (Some(value), None),
+            either::Either::Right(xpath_filter) => (None, Some(xpath_filter)),
+        };
+        Self {
+            stream: Some(stream),
+            stream_subtree_filter,
+            stream_xpath_filter,
+            replay_start_time,
+            datastore: None,
+            datastore_subtree_filter: None,
+            datastore_xpath_filter: None,
+        }
+    }
+
     /// Creates a new Target for a datastore subscription.
     ///
     /// Simplifies instantiating the target without having to specify the
@@ -789,8 +924,13 @@ mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
 
+    use netgauze_netconf_proto::yang_push::filters::{
+        DatastoreSubtreeFilter, DatastoreXPathFilter,
+    };
     use netgauze_netconf_proto::yang_push::identities::ChangeType;
+    use netgauze_netconf_proto::yang_push::subscription::DatastoreTarget;
     use netgauze_netconf_proto::yang_push::types::CentiSeconds;
+    use netgauze_netconf_proto::yanglib::DatastoreName;
     use serde_json;
 
     #[test]
@@ -1332,5 +1472,165 @@ mod tests {
 
         assert!(!stream_target.is_datastore_only());
         assert!(datastore_target.is_datastore_only());
+    }
+
+    #[test]
+    fn test_target_conversion() {
+        let stream_xpath_input = netgauze_netconf_proto::yang_push::subscription::Target::Stream(
+            netgauze_netconf_proto::yang_push::subscription::StreamTarget {
+                stream: "example-stream".into(),
+                filter: StreamSelectionFilterObjects::WithInSubscription(StreamFilterSpec::Xpath(
+                    netgauze_netconf_proto::yang_push::filters::StreamXPathFilter {
+                        namespaces: Box::new([]),
+                        path: "/openconfig-platform:components/component/state".into(),
+                    },
+                )),
+                replay_start_time: None,
+                configured_reply: false,
+            },
+        );
+        let stream_xpath_expected = Target::new_stream(
+            "example-stream".into(),
+            None,
+            either::Either::Right("/openconfig-platform:components/component/state".into()),
+        );
+        let stream_subtree_input = netgauze_netconf_proto::yang_push::subscription::Target::Stream(
+            netgauze_netconf_proto::yang_push::subscription::StreamTarget {
+                stream: "example-stream".into(),
+                filter: StreamSelectionFilterObjects::WithInSubscription(
+                    StreamFilterSpec::Subtree(
+                        netgauze_netconf_proto::yang_push::filters::StreamSubtreeFilter {
+                            namespaces: Box::new([]),
+                            subtree: "<openconfig-platform:components />".into(),
+                        },
+                    ),
+                ),
+                replay_start_time: None,
+                configured_reply: false,
+            },
+        );
+        let stream_subtree_expected = SubscriptionConvertError::UnsupportedStreamSubtreeFilter(
+            "<openconfig-platform:components />".into(),
+        );
+
+        let datastore_xpath_input =
+            netgauze_netconf_proto::yang_push::subscription::Target::Datastore(DatastoreTarget {
+                datastore: DatastoreName::Operational,
+                selection: DatastoreSelectionFilterObjects::WithInSubscription(
+                    DatastoreFilterSpec::Xpath(DatastoreXPathFilter {
+                        namespaces: Box::new([]),
+                        path: "/openconfig-platform:components/component/state".into(),
+                    }),
+                ),
+            });
+
+        let datastore_xpath_expected = Target::new_datastore(
+            "ietf-datastores:operational".to_string(),
+            either::Either::Right("/openconfig-platform:components/component/state".to_string()),
+        );
+
+        let datastore_subtree_input =
+            netgauze_netconf_proto::yang_push::subscription::Target::Datastore(DatastoreTarget {
+                datastore: DatastoreName::Operational,
+                selection: DatastoreSelectionFilterObjects::WithInSubscription(
+                    DatastoreFilterSpec::Subtree(DatastoreSubtreeFilter {
+                        namespaces: Box::new([]),
+                        subtree: "<openconfig-platform:components />".into(),
+                    }),
+                ),
+            });
+        let datastore_subtree_expected =
+            SubscriptionConvertError::UnsupportedDatastoreSubtreeFilter(
+                "<openconfig-platform:components />".into(),
+            );
+
+        let stream_xpath_converted: Result<Target, SubscriptionConvertError> =
+            stream_xpath_input.try_into();
+        let stream_subtree_converted: Result<Target, SubscriptionConvertError> =
+            stream_subtree_input.try_into();
+        let datastore_xpath_converted: Result<Target, SubscriptionConvertError> =
+            datastore_xpath_input.try_into();
+        let datastore_subtree_converted: Result<Target, SubscriptionConvertError> =
+            datastore_subtree_input.try_into();
+
+        assert_eq!(stream_xpath_converted, Ok(stream_xpath_expected));
+        assert_eq!(stream_subtree_converted, Err(stream_subtree_expected));
+        assert_eq!(datastore_xpath_converted, Ok(datastore_xpath_expected));
+        assert_eq!(datastore_subtree_converted, Err(datastore_subtree_expected));
+    }
+
+    #[test]
+    fn test_subscription_conversion() {
+        let input = Subscription {
+            id: 3,
+            target: netgauze_netconf_proto::yang_push::subscription::Target::Datastore(
+                DatastoreTarget {
+                    datastore: DatastoreName::Operational,
+                    selection: DatastoreSelectionFilterObjects::WithInSubscription(
+                        DatastoreFilterSpec::Xpath(DatastoreXPathFilter {
+                            namespaces: Box::new([]),
+                            path: "openconfig-platform:components/component/state".into(),
+                        }),
+                    ),
+                },
+            ),
+            stop_time: None,
+            dscp: Some(0),
+            weighting: None,
+            dependency: None,
+            transport: Some(Transport::UDPNotif),
+            encoding: Some(Encoding::Json),
+            purpose: Some("Some purpose".into()),
+            configured_subscription_state: None,
+            message_publisher_id: Some(Box::new([1, 2, 3])),
+            update_trigger: Some(UpdateTrigger::Periodic {
+                period: Some(CentiSeconds::new(360000)),
+                anchor_time: Some(
+                    DateTime::parse_from_rfc3339("2025-01-01T00:00:30+00:00")
+                        .unwrap()
+                        .with_timezone(&Utc),
+                ),
+            }),
+            module_version: Some(Box::new([YangPushModuleVersion {
+                name: "example-module".into(),
+                revision: Some("2025-04-25".into()),
+                version: None,
+            }])),
+            yang_library_content_id: Some("content-id".to_string()),
+        };
+
+        let expected = SubscriptionStartedModified {
+            id: 3,
+            target: Target::new_datastore(
+                "ietf-datastores:operational".to_string(),
+                either::Either::Right("openconfig-platform:components/component/state".to_string()),
+            ),
+            stop_time: None,
+            dscp: Some(0),
+            weighting: None,
+            dependency: None,
+            transport: Some(Transport::UDPNotif),
+            encoding: Some(Encoding::Json),
+            purpose: Some("Some purpose".into()),
+            message_publisher_id: Some(Box::new([1, 2, 3])),
+            update_trigger: Some(UpdateTrigger::Periodic {
+                period: Some(CentiSeconds::new(360000)),
+                anchor_time: Some(
+                    DateTime::parse_from_rfc3339("2025-01-01T00:00:30+00:00")
+                        .unwrap()
+                        .with_timezone(&Utc),
+                ),
+            }),
+            module_version: Some(vec![YangPushModuleVersion {
+                name: "example-module".into(),
+                revision: Some("2025-04-25".into()),
+                version: None,
+            }]),
+            yang_library_content_id: Some("content-id".to_string()),
+            extra_fields: serde_json::json!({}),
+        };
+        let converted: Result<SubscriptionStartedModified, SubscriptionConvertError> =
+            input.try_into();
+        assert_eq!(converted, Ok(expected));
     }
 }
