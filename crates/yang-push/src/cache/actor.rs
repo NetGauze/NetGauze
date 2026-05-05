@@ -1251,7 +1251,7 @@ pub(crate) mod tests {
     use crate::cache::fetcher::tests::TestYangLibFetcher;
     use futures_util::stream::FuturesOrdered;
     use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
-    use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
+    use netgauze_netconf_proto::yang_push::subscription::{UpdateTrigger, YangPushModuleVersion};
     use netgauze_udp_notif_pkt::notification::Target;
     use std::collections::HashMap;
     use std::net::{IpAddr, Ipv4Addr};
@@ -1270,6 +1270,11 @@ pub(crate) mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some("test subscription".into()),
+            Some(UpdateTrigger::OnChange {
+                dampening_period: None,
+                sync_on_start: Some(true),
+                excluded_change: None,
+            }),
             Box::new([
                 YangPushModuleVersion::new("ietf-interfaces".into(), Some("2018-02-20".into()), None),
                 YangPushModuleVersion::new("ietf-ip".into(), None, None),

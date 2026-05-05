@@ -378,13 +378,13 @@ impl From<SubscriptionInfo> for YangPushSubscriptionMetadata {
         Self {
             id: Some(info.id()),
             filter_spec: info.target().clone().into(),
-            stop_time: None,
+            stop_time: info.stop_time(),
             transport: Some(Transport::UDPNotif),
             encoding: Some(Encoding::Json),
-            purpose: None,
-            update_trigger: None,
-            module: vec![],
-            yang_library_content_id: None,
+            purpose: info.purpose().map(String::from),
+            update_trigger: info.update_trigger().cloned().map(UpdateTrigger::from),
+            module: info.models().to_vec(),
+            yang_library_content_id: Some(info.content_id().clone()),
         }
     }
 }

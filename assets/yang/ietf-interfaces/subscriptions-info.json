@@ -9,6 +9,11 @@
     "transport": "ietf-udp-notif-transport:udp-notif",
     "encoding": "ietf-subscribed-notifications:encode-json",
     "purpose": "test subscription",
+    "update_trigger": {
+      "ietf-yang-push:periodic": {
+        "period": 6000
+      }
+    },
     "models": [
       {
         "name": "ietf-interfaces",

@@ -183,7 +183,7 @@ pub struct DatastoreTarget {
 ///         ├── Move
 ///         └── Replace
 /// ```
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum UpdateTrigger {
     #[serde(rename = "ietf-yang-push:periodic")]
     #[serde(rename_all = "kebab-case")]

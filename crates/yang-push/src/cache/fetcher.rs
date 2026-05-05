@@ -295,6 +295,7 @@ impl NetconfYangLibraryFetcher {
             subscription.transport,
             subscription.encoding,
             subscription.purpose,
+            subscription.update_trigger,
             modules.into_boxed_slice(),
             router_yang_library.content_id().to_string(),
         );
