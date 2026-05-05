@@ -264,7 +264,10 @@ impl NetconfYangLibraryFetcher {
             ret
         };
 
-        let module_names = modules.iter().map(|x| x.name()).collect::<Vec<_>>();
+        let mut module_names = modules.iter().map(|x| x.name()).collect::<Vec<_>>();
+        if !module_names.contains(&"ietf-subscribed-notifications") {
+            module_names.push("ietf-subscribed-notifications");
+        }
         // TODO: add timeout to loading YANG Library from the device
         let (yang_lib, schemas) = client
             .load_from_modules(&module_names, &PermissiveVersionChecker)
