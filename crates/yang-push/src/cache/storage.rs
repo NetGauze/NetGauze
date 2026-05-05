@@ -776,28 +776,28 @@ impl YangLibraryReference {
 /// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SubscriptionInfo {
-    peer: SocketAddr,
-    id: SubscriptionId,
-    target: Target,
+    pub peer: SocketAddr,
+    pub id: SubscriptionId,
+    pub target: Target,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    stop_time: Option<DateTime<Utc>>,
+    pub stop_time: Option<DateTime<Utc>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    transport: Option<Transport>,
+    pub transport: Option<Transport>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    encoding: Option<Encoding>,
+    pub encoding: Option<Encoding>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    purpose: Option<Box<str>>,
+    pub purpose: Option<Box<str>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    update_trigger: Option<UpdateTrigger>,
+    pub update_trigger: Option<UpdateTrigger>,
 
-    models: Box<[YangPushModuleVersion]>,
+    pub models: Box<[YangPushModuleVersion]>,
 
-    content_id: ContentId,
+    pub content_id: ContentId,
 }
 
 impl SubscriptionInfo {

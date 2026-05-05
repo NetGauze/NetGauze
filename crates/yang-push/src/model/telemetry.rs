@@ -376,15 +376,15 @@ impl YangPushSubscriptionMetadata {
 impl From<SubscriptionInfo> for YangPushSubscriptionMetadata {
     fn from(info: SubscriptionInfo) -> Self {
         Self {
-            id: Some(info.id()),
-            filter_spec: info.target().clone().into(),
-            stop_time: info.stop_time(),
+            id: Some(info.id),
+            filter_spec: info.target.into(),
+            stop_time: info.stop_time,
             transport: Some(Transport::UDPNotif),
             encoding: Some(Encoding::Json),
-            purpose: info.purpose().map(String::from),
-            update_trigger: info.update_trigger().cloned().map(UpdateTrigger::from),
-            module: info.models().to_vec(),
-            yang_library_content_id: Some(info.content_id().clone()),
+            purpose: info.purpose.map(String::from),
+            update_trigger: info.update_trigger.map(UpdateTrigger::from),
+            module: info.models.to_vec(),
+            yang_library_content_id: Some(info.content_id),
         }
     }
 }
@@ -435,19 +435,19 @@ impl FilterSpec {
 
 impl From<Target> for FilterSpec {
     fn from(target: Target) -> Self {
-        let xpath_filter = if let Some(xpath_filter) = target.stream_xpath_filter() {
+        let xpath_filter = if let Some(xpath_filter) = target.stream_xpath_filter {
             Some(xpath_filter.to_string())
         } else {
-            target.datastore_xpath_filter().map(String::from)
+            target.datastore_xpath_filter
         };
-        let subtree_filter = if let Some(subtree) = target.stream_subtree_filter() {
-            Some(subtree.clone())
+        let subtree_filter = if let Some(subtree) = target.stream_subtree_filter {
+            Some(subtree)
         } else {
-            target.datastore_subtree_filter().cloned()
+            target.datastore_subtree_filter
         };
         Self {
-            stream: target.stream().map(String::from),
-            datastore: target.datastore().map(String::from),
+            stream: target.stream,
+            datastore: target.datastore,
             xpath_filter,
             subtree_filter,
         }
