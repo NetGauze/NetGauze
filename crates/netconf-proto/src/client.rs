@@ -38,6 +38,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::TcpSocket;
 use tokio_util::codec::Framed;
 use tracing::{debug, error, info, trace, warn};
 
@@ -116,6 +117,12 @@ impl From<ParsingError> for NetConfSshClientError {
     }
 }
 
+impl From<std::io::Error> for NetConfSshClientError {
+    fn from(err: std::io::Error) -> Self {
+        NetConfSshClientError::SshError(russh::Error::IO(err))
+    }
+}
+
 /// SSH authentication methods supported by the NetConfSshClient
 ///
 /// TODO: add support for more authentication methods, such as SSH agent auth.
@@ -135,7 +142,9 @@ pub enum SshAuth {
 
 pub struct NetconfSshConnectConfig<H> {
     auth: SshAuth,
-    host: SocketAddr,
+    peer_address: SocketAddr,
+    local_address: Option<SocketAddr>,
+    local_interface: Option<String>,
     announce_caps: HashSet<Capability>,
     handler: H,
     config: Arc<russh::client::Config>,
@@ -144,14 +153,18 @@ pub struct NetconfSshConnectConfig<H> {
 impl<H: russh::client::Handler> NetconfSshConnectConfig<H> {
     pub const fn new(
         auth: SshAuth,
-        host: SocketAddr,
+        peer_address: SocketAddr,
+        local_address: Option<SocketAddr>,
+        local_interface: Option<String>,
         announce_caps: HashSet<Capability>,
         handler: H,
         config: Arc<russh::client::Config>,
     ) -> Self {
         Self {
             auth,
-            host,
+            peer_address,
+            local_address,
+            local_interface,
             announce_caps,
             handler,
             config,
@@ -162,8 +175,16 @@ impl<H: russh::client::Handler> NetconfSshConnectConfig<H> {
         &self.auth
     }
 
-    pub const fn host(&self) -> SocketAddr {
-        self.host
+    pub const fn peer_address(&self) -> SocketAddr {
+        self.peer_address
+    }
+
+    pub const fn local_address(&self) -> Option<SocketAddr> {
+        self.local_address
+    }
+
+    pub fn local_interface(&self) -> Option<&str> {
+        self.local_interface.as_deref()
     }
 
     pub const fn announce_caps(&self) -> &HashSet<Capability> {
@@ -185,14 +206,45 @@ pub async fn connect<H: russh::client::Handler + 'static>(
 where
     NetConfSshClientError: From<<H as russh::client::Handler>::Error>,
 {
-    let peer = config.host;
-    debug!("[{peer}] Initiating TCP connection");
-    let mut session = russh::client::connect(config.config, config.host, config.handler).await?;
-    debug!("[{peer}] TCP connected");
+    let peer_addr = config.peer_address;
+    let local_addr = config.local_address;
+    let interface = config.local_interface;
+
+    // create a TCP socket and bind to a local address when it is set
+    debug!("[{peer_addr}] Initiate TCP connection");
+    let socket = if peer_addr.is_ipv4() {
+        TcpSocket::new_v4()?
+    } else {
+        TcpSocket::new_v6()?
+    };
+    if let Some(local_addr) = local_addr {
+        debug!("[{peer_addr}] Bind to local address `{local_addr}`");
+        socket.bind(local_addr)?;
+    }
+
+    // Sets the value for the `SO_BINDTODEVICE` option on this socket
+    //
+    // If a socket is bound to an interface, only packets received from that
+    // particular interface are processed by the socket. Note that this only
+    // works for some socket types, particularly `AF_INET` sockets.
+    //
+    // If `interface` is `None` or an empty string it removes the binding.
+    #[allow(unused_variables)]
+    if let Some(name) = interface {
+        debug!("[{peer_addr}] Bind to network interface `{name}`");
+        #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
+        socket.bind_device(Some(name.as_bytes()))?
+    }
+
+    let stream = socket.connect(peer_addr).await?;
+
+    // create an SSH session
+    let mut session = russh::client::connect_stream(config.config, stream, config.handler).await?;
+    debug!("[{peer_addr}] TCP connected");
 
     let (user, auth_result) = match &config.auth {
         SshAuth::Password { user, password } => {
-            debug!("[{peer}] Using password authentication for user `{user}`");
+            debug!("[{peer_addr}] Using password authentication for user `{user}`");
             (
                 user,
                 session
@@ -201,13 +253,13 @@ where
             )
         }
         SshAuth::Key { user, private_key } => {
-            debug!("[{peer}] Using private key authentication for user `{user}`");
+            debug!("[{peer_addr}] Using private key authentication for user `{user}`");
             let private_key = russh::keys::PrivateKeyWithHashAlg::new(
                 Arc::clone(private_key),
                 session.best_supported_rsa_hash().await?.flatten(),
             );
             debug!(
-                "[{peer}] Negotiated private key and using `{}` hashing algorithm",
+                "[{peer_addr}] Negotiated private key and using `{}` hashing algorithm",
                 private_key.algorithm()
             );
             (
@@ -217,23 +269,23 @@ where
         }
     };
     if !auth_result.success() {
-        error!("[{peer}] Authentication failed");
+        error!("[{peer_addr}] Authentication failed");
         return Err(NetConfSshClientError::SshError(
             russh::Error::NotAuthenticated,
         ));
     }
     debug!(
-        "[{peer}] Authentication successful to `{user}@{}`, requesting the NETCONF subsystem",
-        config.host
+        "[{peer_addr}] Authentication successful to `{user}@{}`, requesting the NETCONF subsystem",
+        config.peer_address
     );
     let channel = session.channel_open_session().await?;
     channel.request_subsystem(true, "netconf").await?;
     info!(
-        "[{peer}] NETCONF subsystem connected to `{user}@{}`",
-        config.host
+        "[{peer_addr}] NETCONF subsystem connected to `{user}@{}`",
+        config.peer_address
     );
     let stream = channel.into_stream();
-    NetConfSshClient::connect(config.host, stream, config.announce_caps).await
+    NetConfSshClient::connect(config.peer_address, stream, config.announce_caps).await
 }
 
 pub struct NetConfSshClient<T> {

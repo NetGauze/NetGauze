@@ -222,9 +222,7 @@ use crate::{
 };
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
-use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use rustc_hash::FxHashMap;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -309,14 +307,12 @@ pub enum CacheLookupCommand {
     LookupBySubscriptionInfoOneShot(SubscriptionInfo, oneshot::Sender<CacheResponse>),
 
     LookupBySubscriptionId {
-        peer: SocketAddr,
-        subscription_id: SubscriptionId,
+        subscription_info: SubscriptionInfo,
         tx: async_channel::Sender<CacheResponse>,
     },
 
     LookupBySubscriptionIdOneShot {
-        peer: SocketAddr,
-        subscription_id: SubscriptionId,
+        subscription_info: SubscriptionInfo,
         tx: oneshot::Sender<CacheResponse>,
     },
 
@@ -344,23 +340,25 @@ impl std::fmt::Display for CacheLookupCommand {
                 )
             }
             Self::LookupBySubscriptionId {
-                peer,
-                subscription_id,
+                subscription_info,
                 tx: _tx,
             } => {
                 write!(
                     f,
-                    "lookup by subscription id {subscription_id} from peer {peer}"
+                    "lookup by subscription id {subscription_id} from peer {peer}",
+                    subscription_id = subscription_info.id(),
+                    peer = subscription_info.peer()
                 )
             }
             Self::LookupBySubscriptionIdOneShot {
-                peer,
-                subscription_id,
+                subscription_info,
                 tx: _tx,
             } => {
                 write!(
                     f,
-                    "lookup by subscription id {subscription_id} from peer {peer} (one shot)"
+                    "lookup by subscription id {subscription_id} from peer {peer} (one shot)",
+                    subscription_id = subscription_info.id(),
+                    peer = subscription_info.peer()
                 )
             }
             Self::LookupByContentId(content_id, _) => {
@@ -707,8 +705,12 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 };
                 // First, remove all pending requests for this subscription info that are
                 // requested with full subscription info
-                let empty =
-                    SubscriptionInfo::new_empty(subscription_info.peer(), subscription_info.id());
+                let empty = SubscriptionInfo::new_empty(
+                    subscription_info.collector(),
+                    subscription_info.interface(),
+                    subscription_info.peer(),
+                    subscription_info.id(),
+                );
                 let mut pending_senders = self
                     .pending_requests
                     .remove(&subscription_info)
@@ -910,10 +912,13 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 Self::send_yang_lib_ref_oneshot(&subscription_info, yang_lib_ref, sender);
             }
             CacheLookupCommand::LookupBySubscriptionId {
-                peer,
-                subscription_id,
+                subscription_info,
                 tx,
             } => {
+                let peer = subscription_info.peer();
+                let subscription_id = subscription_info.id();
+                let collector = subscription_info.collector();
+                let interface = subscription_info.interface();
                 let otel_tags = [
                     opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
                     opentelemetry::KeyValue::new(
@@ -944,7 +949,8 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                         "cache miss: subscription id not found in cache"
                     );
                     self.stats.cache_misses.add(1, &otel_tags);
-                    let subscription_info = SubscriptionInfo::new_empty(peer, subscription_id);
+                    let subscription_info =
+                        SubscriptionInfo::new_empty(collector, interface, peer, subscription_id);
                     let entry = self
                         .pending_requests
                         .entry(subscription_info.clone())
@@ -954,23 +960,24 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
 
                     if should_fetch {
                         info!(
-                            peer=%subscription_info.peer(),
-                            subscription_id=subscription_info.id(),
+                            peer=%peer,
+                            subscription_id,
                             "cache miss: starting fetch from device by subscription id"
                         );
                         self.stats.device_fetch_request.add(1, &otel_tags);
                         let job_result = tokio::time::timeout(
                             self.fetcher_timeout,
-                            self.fetcher.fetch_by_subscription_id(peer, subscription_id),
+                            self.fetcher
+                                .fetch_by_subscription_id(subscription_info.clone()),
                         )
                         .await;
                         let job = match job_result {
                             Ok(worker_result) => worker_result,
                             Err(err) => {
                                 warn!(
-                                    peer=%subscription_info.peer(),
-                                    subscription_id=subscription_info.id(),
-                                    router_content_id=subscription_info.content_id(),
+                                    peer=%peer,
+                                    subscription_id,
+                                    router_content_id=subscription_info.clone().content_id().clone(),
                                     target=%subscription_info.target(),
                                     error=%err,
                                     "failed to fetch yang library from device"
@@ -1002,10 +1009,13 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 }
             }
             CacheLookupCommand::LookupBySubscriptionIdOneShot {
-                peer,
-                subscription_id,
+                subscription_info,
                 tx,
             } => {
+                let peer = subscription_info.peer();
+                let subscription_id = subscription_info.id();
+                let collector = subscription_info.collector();
+                let interface = subscription_info.interface();
                 let mut otel_tags = vec![
                     opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
                     opentelemetry::KeyValue::new(
@@ -1040,7 +1050,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     let worker_result = tokio::time::timeout(
                         self.fetcher_timeout,
                         self.fetcher
-                            .fetch_by_subscription_id_blocking(peer, subscription_id),
+                            .fetch_by_subscription_id_blocking(subscription_info),
                     )
                     .await;
                     let worker_result = match worker_result {
@@ -1054,7 +1064,12 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                                 format!("{err}"),
                             ));
                             self.stats.device_fetch_failed.add(1, &otel_tags);
-                            let empty = SubscriptionInfo::new_empty(peer, subscription_id);
+                            let empty = SubscriptionInfo::new_empty(
+                                collector,
+                                interface,
+                                peer,
+                                subscription_id,
+                            );
                             Err((empty.clone(), err.into()))
                         }
                     };
@@ -1252,13 +1267,14 @@ pub(crate) mod tests {
     use futures_util::stream::FuturesOrdered;
     use netgauze_udp_notif_pkt::notification::Target;
     use std::collections::HashMap;
-    use std::net::{IpAddr, Ipv4Addr};
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::path::Path;
     use std::time::Duration;
 
     pub(crate) fn test_subscription_info() -> SubscriptionInfo {
         SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 830),
+            None,
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 200)), 12345),
             1,
             ContentId::from("ietf-interfaces-lib".to_string()),
@@ -1562,8 +1578,7 @@ pub(crate) mod tests {
         handle
             .request_tx()
             .send(CacheLookupCommand::LookupBySubscriptionId {
-                peer: subscription_info.peer(),
-                subscription_id: subscription_info.id(),
+                subscription_info: subscription_info.clone(),
                 tx,
             })
             .await
@@ -1577,7 +1592,12 @@ pub(crate) mod tests {
             .expect("failed to receive response");
         assert_eq!(
             response.subscription_info(),
-            &SubscriptionInfo::new_empty(subscription_info.peer(), subscription_info.id())
+            &SubscriptionInfo::new_empty(
+                subscription_info.collector(),
+                subscription_info.interface(),
+                subscription_info.peer(),
+                subscription_info.id(),
+            )
         );
         assert_eq!(response.yang_lib_ref(), None);
 
@@ -1590,6 +1610,8 @@ pub(crate) mod tests {
             assert_eq!(hits_counts.len(), 1);
             assert_eq!(
                 hits_counts.get(&SubscriptionInfo::new_empty(
+                    subscription_info.collector(),
+                    subscription_info.interface(),
                     subscription_info.peer(),
                     subscription_info.id()
                 )),
@@ -1625,8 +1647,7 @@ pub(crate) mod tests {
         handle
             .request_tx()
             .send(CacheLookupCommand::LookupBySubscriptionId {
-                peer: subscription_info.peer(),
-                subscription_id: subscription_info.id(),
+                subscription_info: subscription_info.clone(),
                 tx,
             })
             .await
@@ -1702,8 +1723,7 @@ pub(crate) mod tests {
                 let (tx, rx) = async_channel::unbounded();
                 h.request_tx()
                     .send(CacheLookupCommand::LookupBySubscriptionId {
-                        peer: sub.peer(),
-                        subscription_id: sub.id(),
+                        subscription_info: sub.clone(),
                         tx,
                     })
                     .await
