@@ -40,13 +40,15 @@ use netgauze_yang_push::ContentId;
 use netgauze_yang_push::cache::actor::CacheActorHandle;
 use netgauze_yang_push::cache::fetcher::NetconfYangLibraryFetcher;
 use netgauze_yang_push::cache::storage::SubscriptionInfo;
-use netgauze_yang_push::model::telemetry::TelemetryMessageWrapper;
+use netgauze_yang_push::model::telemetry::{Manifest, TelemetryMessageWrapper};
 use netgauze_yang_push::validation::ValidationActorHandle;
+use shadow_rs::shadow;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::str::Utf8Error;
 use std::sync::Arc;
 use std::time::Duration;
+use sysinfo::System;
 use tracing::{debug, info, warn};
 
 pub mod bmp;
@@ -55,6 +57,8 @@ pub mod flow;
 pub mod inputs;
 pub mod publishers;
 pub mod yang_push;
+
+shadow!(build);
 
 pub async fn init_flow_collection(
     flow_config: FlowConfig,
@@ -627,8 +631,8 @@ pub async fn init_udp_notif_collection(
                     let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
                         publisher_config.buffer_size,
                         validated_rx,
+                        fetch_sysinfo_manifest(Some(config.writer_id.clone())),
                         either::Left(meter.clone()),
-                        config.writer_id.clone(),
                     );
                     join_set.push(enrichment_join);
                     publisher_enrichment_handles.push(enrichment_handle.clone());
@@ -702,8 +706,8 @@ pub async fn init_udp_notif_collection(
                     let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
                         publisher_config.buffer_size,
                         validated_rx,
+                        fetch_sysinfo_manifest(Some(config.writer_id.clone())),
                         either::Left(meter.clone()),
-                        config.writer_id.clone(),
                     );
                     join_set.push(enrichment_join);
                     publisher_enrichment_handles.push(enrichment_handle.clone());
@@ -1015,6 +1019,29 @@ fn netconf_fetcher(config: &NetconfConfig) -> Result<NetconfYangLibraryFetcher, 
         Duration::from_secs(100),
     );
     Ok(fetcher)
+}
+
+/// Fetches local system information into a Manifest object.
+/// (host name, OS version, software version, build info, etc.)
+pub(crate) fn fetch_sysinfo_manifest(name: Option<String>) -> Manifest {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    Manifest::new(
+        name.filter(|n| !n.is_empty()).or_else(|| {
+            Some(format!(
+                "{}@{}",
+                build::PROJECT_NAME,
+                System::host_name().unwrap_or_else(|| "unknown".to_string())
+            ))
+        }),
+        Some("NetGauze".to_string()),
+        Some(3746), // Swisscom AG (temp until NetGauze has its own PEN number)
+        Some(format!("{} ({})", build::PKG_VERSION, build::SHORT_COMMIT)),
+        Some(build::BUILD_RUST_CHANNEL.to_string()),
+        System::os_version(),
+        System::name(),
+    )
 }
 
 #[cfg(test)]
