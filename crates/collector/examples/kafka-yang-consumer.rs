@@ -848,6 +848,7 @@ async fn main() -> Result<()> {
     // Create placeholder subscription info (reused for all schemas)
     let subscription_info = SubscriptionInfo::new_empty(
         SocketAddr::new(IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)), 0),
+        None,
         SocketAddr::new(IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)), 0),
         0,
     );

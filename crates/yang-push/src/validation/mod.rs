@@ -330,6 +330,7 @@ impl ValidationActor {
         &mut self,
         peer: SocketAddr,
         collector: SocketAddr,
+        interface: Option<String>,
         decoded: &UdpNotifPacketDecoded,
     ) -> Option<(SubscriptionInfo, Option<Option<String>>)> {
         let message_id = decoded.message_id();
@@ -356,6 +357,7 @@ impl ValidationActor {
             let subscription_info = if let Some(subscription_info) = self.build_subscription_info(
                 peer,
                 collector,
+                interface,
                 message_id,
                 publisher_id,
                 subscription_started,
@@ -774,6 +776,7 @@ impl ValidationActor {
         decoded: &UdpNotifPacketDecoded,
     ) -> Result<Option<SubscriptionInfo>, ValidationActorError> {
         let collector = message.collector_address();
+        let interface = message.collector_interface();
         let packet = message.packet();
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
         let message_id = decoded.message_id();
@@ -783,7 +786,7 @@ impl ValidationActor {
             .map(|x| x.to_string())
             .unwrap_or("UNKNOWN".to_string());
 
-        match self.get_subscription_info(peer, *collector, decoded) {
+        match self.get_subscription_info(peer, *collector, interface.cloned(), decoded) {
             Some((subscription_info, cached_content_id)) => {
                 Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut peer_tags);
                 if cached_content_id.is_some() {
@@ -841,18 +844,20 @@ impl ValidationActor {
                     self.stats
                         .cache_request_by_subscription_info
                         .add(1, &peer_tags);
+                    let subscription_info = SubscriptionInfo::new_empty(
+                        *collector,
+                        interface.cloned(),
+                        peer,
+                        subscription_id,
+                    );
                     self.cache_cmd_tx
                         .send(CacheLookupCommand::LookupBySubscriptionId {
-                            peer,
-                            subscription_id,
+                            subscription_info: subscription_info.clone(),
                             tx: self.cache_tx.clone(),
                         })
                         .await
                         .map_err(|_| ValidationActorError::CacheLookupSendError)?;
-                    self.cache_packet(
-                        SubscriptionInfo::new_empty(peer, *collector, subscription_id),
-                        message,
-                    );
+                    self.cache_packet(subscription_info.clone(), message);
                     return Ok(None);
                 }
                 warn!(
@@ -977,6 +982,7 @@ impl ValidationActor {
         &self,
         peer: SocketAddr,
         collector: SocketAddr,
+        interface: Option<String>,
         message_id: u32,
         publisher_id: u32,
         sub_started: &SubscriptionStartedModified,
@@ -1002,8 +1008,9 @@ impl ValidationActor {
         };
 
         Some(SubscriptionInfo::new(
-            peer,
             collector,
+            interface,
+            peer,
             sub_started.id(),
             sub_started
                 .yang_library_content_id()
