@@ -124,7 +124,7 @@ use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
 use netgauze_udp_notif_pkt::notification::{NotificationVariant, SubscriptionStartedModified};
 use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
-use netgauze_udp_notif_service::OTL_UDP_NOTIF_PUBLISHER_ID_KEY;
+use netgauze_udp_notif_service::{OTL_UDP_NOTIF_PUBLISHER_ID_KEY, UdpNotifRequest};
 use rustc_hash::FxHashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
@@ -137,7 +137,7 @@ struct CachedSubscription {
     cached_content_id: Option<ContentId>,
     subscription_info: SubscriptionInfo,
     yang_ctx: Option<yang4::context::Context>,
-    cached_packets: Vec<Arc<(SocketAddr, UdpNotifPacket)>>,
+    cached_packets: Vec<Arc<UdpNotifRequest>>,
 }
 
 #[derive(Debug, Default)]
@@ -280,7 +280,7 @@ struct ValidationActor {
     max_cached_packets_per_subscription: usize,
     peer_cache: FxHashMap<IpAddr, CachedPeerSubscriptions>,
     cmd_rx: mpsc::Receiver<ValidationActorCommand>,
-    rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
+    rx: async_channel::Receiver<Arc<UdpNotifRequest>>,
     tx: async_channel::Sender<(Option<ContentId>, SubscriptionInfo, UdpNotifPacketDecoded)>,
     cache_cmd_tx: async_channel::Sender<CacheLookupCommand>,
     cache_tx: async_channel::Sender<CacheResponse>,
@@ -329,6 +329,7 @@ impl ValidationActor {
     fn get_subscription_info(
         &mut self,
         peer: SocketAddr,
+        collector: SocketAddr,
         decoded: &UdpNotifPacketDecoded,
     ) -> Option<(SubscriptionInfo, Option<Option<String>>)> {
         let message_id = decoded.message_id();
@@ -352,9 +353,13 @@ impl ValidationActor {
             subscription_started,
         ) = notif_contents
         {
-            let subscription_info = if let Some(subscription_info) =
-                self.build_subscription_info(peer, message_id, publisher_id, subscription_started)
-            {
+            let subscription_info = if let Some(subscription_info) = self.build_subscription_info(
+                peer,
+                collector,
+                message_id,
+                publisher_id,
+                subscription_started,
+            ) {
                 subscription_info
             } else {
                 warn!(
@@ -399,10 +404,10 @@ impl ValidationActor {
     fn cache_packet(
         &mut self,
         subscription_info: SubscriptionInfo,
-        message: Arc<(SocketAddr, UdpNotifPacket)>,
+        message: Arc<UdpNotifRequest>,
     ) -> bool {
-        let (peer, packet) = message.as_ref();
-        let peer = *peer;
+        let peer = *message.peer_address();
+        let packet = message.packet();
         let message_id = packet.message_id();
         let publisher_id = packet.publisher_id();
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
@@ -565,10 +570,10 @@ impl ValidationActor {
 
     async fn process_udp_notif_msg(
         &mut self,
-        message: Arc<(SocketAddr, UdpNotifPacket)>,
+        message: Arc<UdpNotifRequest>,
     ) -> Result<(), ValidationActorError> {
-        let (peer, packet) = message.as_ref();
-        let peer = *peer;
+        let peer = *message.peer_address();
+        let packet = message.packet();
         let decoded = match self.decode_message(peer, packet) {
             Ok(decoded) => decoded,
             // Decoding errors are logged in the [Self::decode_message], and packets are dropped
@@ -764,11 +769,12 @@ impl ValidationActor {
     /// send a cache request and return none for the subscription info
     async fn extract_subscription_info(
         &mut self,
-        message: Arc<(SocketAddr, UdpNotifPacket)>,
+        message: Arc<UdpNotifRequest>,
         peer: SocketAddr,
         decoded: &UdpNotifPacketDecoded,
     ) -> Result<Option<SubscriptionInfo>, ValidationActorError> {
-        let (_, packet) = message.as_ref();
+        let collector = message.collector_address();
+        let packet = message.packet();
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
         let message_id = decoded.message_id();
         let publisher_id = decoded.publisher_id();
@@ -777,7 +783,7 @@ impl ValidationActor {
             .map(|x| x.to_string())
             .unwrap_or("UNKNOWN".to_string());
 
-        match self.get_subscription_info(peer, decoded) {
+        match self.get_subscription_info(peer, *collector, decoded) {
             Some((subscription_info, cached_content_id)) => {
                 Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut peer_tags);
                 if cached_content_id.is_some() {
@@ -843,7 +849,10 @@ impl ValidationActor {
                         })
                         .await
                         .map_err(|_| ValidationActorError::CacheLookupSendError)?;
-                    self.cache_packet(SubscriptionInfo::new_empty(peer, subscription_id), message);
+                    self.cache_packet(
+                        SubscriptionInfo::new_empty(peer, *collector, subscription_id),
+                        message,
+                    );
                     return Ok(None);
                 }
                 warn!(
@@ -944,8 +953,8 @@ impl ValidationActor {
         }
         let cached_packets = std::mem::take(&mut subscription_cache.cached_packets);
         for msg in cached_packets {
-            let (peer, packet) = msg.as_ref();
-            let peer = *peer;
+            let peer = *msg.peer_address();
+            let packet = msg.packet();
             let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
             Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut peer_tags);
             self.stats.cache_drain.add(1, &peer_tags);
@@ -967,6 +976,7 @@ impl ValidationActor {
     fn build_subscription_info(
         &self,
         peer: SocketAddr,
+        collector: SocketAddr,
         message_id: u32,
         publisher_id: u32,
         sub_started: &SubscriptionStartedModified,
@@ -993,6 +1003,7 @@ impl ValidationActor {
 
         Some(SubscriptionInfo::new(
             peer,
+            collector,
             sub_started.id(),
             sub_started
                 .yang_library_content_id()
@@ -1076,7 +1087,7 @@ impl ValidationActorHandle {
         buffer_size: usize,
         max_cached_packets_per_peer: usize,
         max_cached_packets_per_subscription: usize,
-        rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
+        rx: async_channel::Receiver<Arc<UdpNotifRequest>>,
         tx: async_channel::Sender<(Option<ContentId>, SubscriptionInfo, UdpNotifPacketDecoded)>,
         cache_cmd_tx: async_channel::Sender<CacheLookupCommand>,
         stats: either::Either<opentelemetry::metrics::Meter, ValidationStats>,
@@ -1203,7 +1214,12 @@ mod tests {
 
         // Send SubscriptionStarted packet
         udp_notif_tx
-            .send(Arc::new((peer, subscription_started_packet)))
+            .send(Arc::new(UdpNotifRequest::new(
+                SocketAddr::from(([127, 0, 0, 1], 12345)),
+                None,
+                peer,
+                subscription_started_packet,
+            )))
             .await
             .unwrap();
 
@@ -1306,7 +1322,12 @@ mod tests {
 
         // Send SubscriptionStarted packet
         udp_notif_tx
-            .send(Arc::new((peer, subscription_started_packet)))
+            .send(Arc::new(UdpNotifRequest::new(
+                SocketAddr::from(([127, 0, 0, 1], 12345)),
+                None,
+                peer,
+                subscription_started_packet,
+            )))
             .await
             .unwrap();
 

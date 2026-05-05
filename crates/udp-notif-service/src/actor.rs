@@ -112,8 +112,8 @@
 //! ```
 
 use crate::{
-    ActorId, OTL_UDP_NOTIF_PUBLISHER_ID_KEY, SubscriberId, Subscription, UdpNotifReceiver,
-    UdpNotifRequest, UdpNotifSender, create_udp_notif_channel,
+    ActorId, OTL_UDP_NOTIF_PUBLISHER_ID_KEY, SubscriberId, Subscription, UdpNotifPacket,
+    UdpNotifReceiver, UdpNotifRequest, UdpNotifSender, create_udp_notif_channel,
 };
 use bytes::{Bytes, BytesMut};
 use futures_util::StreamExt;
@@ -273,7 +273,10 @@ impl UdpNotifActor {
     /// This function decodes a udp-notif packet and returns the message when
     /// successful. For minor errors (e.g. buffer not long enough or a
     /// decoding error), it logs the error and returns None.
-    pub fn decode_pkt(&mut self, next: (BytesMut, SocketAddr)) -> Option<UdpNotifRequest> {
+    pub fn decode_pkt(
+        &mut self,
+        next: (BytesMut, SocketAddr),
+    ) -> Option<(SocketAddr, UdpNotifPacket)> {
         let (mut buf, addr) = next;
         // If we haven't seen the client before, create a new UdpPacketCodec for it.
         // UdpPacketCodec handles the decoding/encoding of packets.
@@ -368,8 +371,8 @@ impl UdpNotifActor {
         // subscriber.
         let ref_clone = msg.clone();
         let drop_counter_clone = drop_counter.clone();
-        let (peer, pkt) = ref_clone.as_ref();
-        let peer = *peer;
+        let peer = msg.peer_address();
+        let pkt = &msg.packet();
         let message_id = pkt.message_id();
         let publisher_id = pkt.publisher_id();
         let timeout_ret = tokio::time::timeout(timeout, async move {
@@ -531,7 +534,7 @@ impl UdpNotifActor {
 
     /// This function handles a decoded udp-notif message. In the current
     /// implementation, it sends the message to all subscribers.
-    async fn handle_decoded_msg(&mut self, next: Option<UdpNotifRequest>) {
+    async fn handle_decoded_msg(&mut self, next: Option<(SocketAddr, UdpNotifPacket)>) {
         if let Some((peer, msg)) = next {
             let message_id = msg.message_id();
             let publisher_id = msg.publisher_id();
@@ -569,7 +572,12 @@ impl UdpNotifActor {
                 self.socket_addr,
             );
             let mut send_handlers = vec![];
-            let udp_notif_request = Arc::new((peer, msg));
+            let request = Arc::new(UdpNotifRequest::new(
+                self.socket_addr,
+                self.interface_bind.clone(),
+                peer,
+                msg,
+            ));
             for (id, tx) in &self.subscribers {
                 // We fire and run all the send operations to the subscribers
                 // in parallel
@@ -577,7 +585,7 @@ impl UdpNotifActor {
                 let send_handler = Self::send_to_subscriber(
                     self.actor_id,
                     self.socket_addr,
-                    udp_notif_request.clone(),
+                    request.clone(),
                     *id,
                     tx.clone(),
                     self.subscriber_timeout,
@@ -1158,10 +1166,10 @@ mod tests {
         // Receive the packet
         let received = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
         assert!(received.is_ok());
-        let received_packet = received.unwrap();
+        let r = received.unwrap().unwrap();
         assert_eq!(
-            received_packet,
-            Ok(Arc::new((socket.local_addr().unwrap(), pkt)))
+            (r.peer_address(), r.packet()),
+            (&socket.local_addr().unwrap(), &pkt)
         );
     }
 
@@ -1188,8 +1196,10 @@ mod tests {
         // Receive packets
         let rec1 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
         let rec2 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
-        assert_eq!(rec1, Ok(Ok(Arc::new((local_addr1, pkt1)))));
-        assert_eq!(rec2, Ok(Ok(Arc::new((local_addr2, pkt2)))));
+        let r1 = rec1.unwrap().unwrap();
+        assert_eq!((r1.peer_address(), r1.packet()), (&local_addr1, &pkt1));
+        let r2 = rec2.unwrap().unwrap();
+        assert_eq!((r2.peer_address(), r2.packet()), (&local_addr2, &pkt2));
     }
 
     #[tokio::test]
@@ -1208,9 +1218,10 @@ mod tests {
         let handled_pkt = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv())
             .await
             .unwrap();
+        let r = handled_pkt.unwrap();
         assert_eq!(
-            handled_pkt,
-            Ok(Arc::new((socket.local_addr().unwrap(), pkt)))
+            (r.peer_address(), r.packet()),
+            (&socket.local_addr().unwrap(), &pkt)
         );
 
         // Get peers
@@ -1237,9 +1248,10 @@ mod tests {
             .await
             .unwrap();
         // Ensure the packet was handled
+        let r = handled_pkt.unwrap();
         assert_eq!(
-            handled_pkt,
-            Ok(Arc::new((socket.local_addr().unwrap(), pkt)))
+            (r.peer_address(), r.packet()),
+            (&socket.local_addr().unwrap(), &pkt)
         );
 
         // Purge the specific peer
