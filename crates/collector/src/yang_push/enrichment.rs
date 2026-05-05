@@ -1062,6 +1062,8 @@ mod tests {
         );
 
         let subscription_info = SubscriptionInfo::new(
+            SocketAddr::from(([127, 0, 0, 1], 12345)),
+            None,
             peer,
             1,
             "test-content-id".to_string(),

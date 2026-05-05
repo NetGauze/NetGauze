@@ -148,6 +148,8 @@ mod tests {
 
     fn create_test_subscription_info(ip: IpAddr) -> SubscriptionInfo {
         SubscriptionInfo::new(
+            SocketAddr::from(([127, 0, 0, 1], 12345)),
+            None,
             SocketAddr::new(ip, 8080),
             1,
             "test-content-id".to_string(),
