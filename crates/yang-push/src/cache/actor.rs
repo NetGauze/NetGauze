@@ -793,6 +793,27 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             .await;
                     }
                     None => {
+                        // Port-agnostic fallback via subscription ID before fetching
+                        // (in case router is using a different source port)
+                        let fallback = self.schema_cache.get_by_subscription_id(
+                            subscription_info.peer().ip(),
+                            subscription_info.id(),
+                        );
+                        if let Some((_stored_sub_info, yang_lib_ref)) = fallback {
+                            self.stats.cache_hits.add(1, &otl_tags);
+                            info!(
+                                peer=%subscription_info.peer(),
+                                subscription_id=subscription_info.id(),
+                                router_content_id=subscription_info.content_id(),
+                                target=%subscription_info.target(),
+                                "cache hit (by subscription id fallback): yang library reference found in cache"
+                            );
+                            Self::send_yang_lib_ref(&subscription_info, yang_lib_ref, sender).await;
+                            return;
+                        }
+
+                        // No match → proceed with fetching from router
+
                         // YANG Library Reference is not found in the cache.
                         // Start a new worker to fetch the YANG Library from the server.
                         self.stats.cache_misses.add(1, &otl_tags);
