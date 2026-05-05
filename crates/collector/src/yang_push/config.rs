@@ -160,6 +160,13 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             None,
+            Some(
+                netgauze_netconf_proto::yang_push::subscription::UpdateTrigger::OnChange {
+                    dampening_period: None,
+                    sync_on_start: Some(true),
+                    excluded_change: None,
+                },
+            ),
             Box::new([YangPushModuleVersion::new("test-module".into(), None, None)]),
             "test-content-id".to_string(),
         )

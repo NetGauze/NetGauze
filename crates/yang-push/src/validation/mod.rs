@@ -1003,6 +1003,7 @@ impl ValidationActor {
             sub_started.transport().cloned(),
             sub_started.encoding().cloned(),
             sub_started.purpose().map(|x| x.into()),
+            sub_started.update_trigger().cloned(),
             modules,
             sub_started
                 .yang_library_content_id()

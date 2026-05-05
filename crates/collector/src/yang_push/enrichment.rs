@@ -597,7 +597,7 @@ mod tests {
     use bytes::Bytes;
     use chrono::TimeZone;
     use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
-    use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
+    use netgauze_netconf_proto::yang_push::subscription::{UpdateTrigger, YangPushModuleVersion};
     use netgauze_netconf_proto::yang_push::types::SubscriptionId;
     use netgauze_netconf_proto::yanglib::DatastoreName;
     use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
@@ -698,6 +698,11 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             None,
+            Some(UpdateTrigger::OnChange {
+                dampening_period: None,
+                sync_on_start: Some(true),
+                excluded_change: None,
+            }),
             Box::new([YangPushModuleVersion::new(
                 "openconfig-interface".into(),
                 Some("2025-06-10".into()),

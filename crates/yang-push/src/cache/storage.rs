@@ -96,7 +96,7 @@ use crate::ContentId;
 use chrono::{DateTime, Utc};
 use netgauze_netconf_proto::xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter};
 use netgauze_netconf_proto::yang_push::identities::{Encoding, Transport};
-use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
+use netgauze_netconf_proto::yang_push::subscription::{UpdateTrigger, YangPushModuleVersion};
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_netconf_proto::yanglib::{SchemaLoadingError, YangLibrary};
 use netgauze_udp_notif_pkt::notification::Target;
@@ -792,6 +792,9 @@ pub struct SubscriptionInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     purpose: Option<Box<str>>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    update_trigger: Option<UpdateTrigger>,
+
     models: Box<[YangPushModuleVersion]>,
 
     content_id: ContentId,
@@ -807,6 +810,7 @@ impl SubscriptionInfo {
         transport: Option<Transport>,
         encoding: Option<Encoding>,
         purpose: Option<Box<str>>,
+        update_trigger: Option<UpdateTrigger>,
         models: Box<[YangPushModuleVersion]>,
         content_id: ContentId,
     ) -> Self {
@@ -818,6 +822,7 @@ impl SubscriptionInfo {
             transport,
             encoding,
             purpose,
+            update_trigger,
             models,
             content_id,
         }
@@ -836,6 +841,7 @@ impl SubscriptionInfo {
             encoding: None,
             purpose: None,
             models: Box::new([]),
+            update_trigger: None,
             content_id: "EMPTY".to_string(),
         }
     }
@@ -881,6 +887,10 @@ impl SubscriptionInfo {
     /// The [Target] associated with the subscription.
     pub const fn target(&self) -> &Target {
         &self.target
+    }
+
+    pub const fn update_trigger(&self) -> Option<&UpdateTrigger> {
+        self.update_trigger.as_ref()
     }
 
     /// The list of YANG modules associated with the subscription.
@@ -1198,6 +1208,7 @@ impl YangLibraryCache {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use netgauze_netconf_proto::yang_push::types::CentiSeconds;
     use std::net::{IpAddr, Ipv4Addr};
     use tempfile::TempDir;
 
@@ -1213,6 +1224,11 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some("test subscription".into()),
+            Some(UpdateTrigger::OnChange {
+                dampening_period: None,
+                sync_on_start: Some(true),
+                excluded_change: None,
+            }),
             Box::new([
                 YangPushModuleVersion::new("ietf-interfaces".into(), Some("2018-02-20".into()), None),
                 YangPushModuleVersion::new("ietf-ip".into(), None, None),
@@ -1428,6 +1444,11 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some("test subscription".into()),
+            Some(UpdateTrigger::OnChange {
+                dampening_period: None,
+                sync_on_start: Some(true),
+                excluded_change: None,
+            }),
             models.clone(),
             content_id.clone(),
         );
@@ -1680,6 +1701,11 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some("test subscription".into()),
+            Some(UpdateTrigger::OnChange {
+                dampening_period: None,
+                sync_on_start: Some(true),
+                excluded_change: None,
+            }),
             Box::new([YangPushModuleVersion::new(
                 "ietf-routing".into(),
                 None,
@@ -1698,6 +1724,10 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some("test subscription".into()),
+            Some(UpdateTrigger::Periodic {
+                period: Some(CentiSeconds::new(300)),
+                anchor_time: None,
+            }),
             Box::new([YangPushModuleVersion::new(
                 "ietf-routing".into(),
                 None,
@@ -1775,6 +1805,11 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some("test subscription".into()),
+            Some(UpdateTrigger::OnChange {
+                dampening_period: None,
+                sync_on_start: Some(true),
+                excluded_change: None,
+            }),
             Box::new([YangPushModuleVersion::new(
                 "ietf-routing".into(),
                 None,
@@ -1825,6 +1860,11 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some("test subscription".into()),
+            Some(UpdateTrigger::OnChange {
+                dampening_period: None,
+                sync_on_start: Some(true),
+                excluded_change: None,
+            }),
             Box::new([
                 YangPushModuleVersion::new("ietf-interfaces".into(), Some("2018-02-20".into()), None),
                 YangPushModuleVersion::new("ietf-ip".into(), None, None),
@@ -1871,6 +1911,11 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some("test subscription".into()),
+            Some(UpdateTrigger::OnChange {
+                dampening_period: None,
+                sync_on_start: Some(true),
+                excluded_change: None,
+            }),
             Box::new([YangPushModuleVersion::new(
                 "ietf-routing".into(),
                 None,
