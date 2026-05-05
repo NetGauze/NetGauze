@@ -371,7 +371,7 @@ impl UdpNotifActor {
         // subscriber.
         let ref_clone = msg.clone();
         let drop_counter_clone = drop_counter.clone();
-        let peer = msg.peer_addr();
+        let peer = msg.peer_address();
         let pkt = &msg.packet();
         let message_id = pkt.message_id();
         let publisher_id = pkt.publisher_id();
@@ -1168,7 +1168,7 @@ mod tests {
         assert!(received.is_ok());
         let r = received.unwrap().unwrap();
         assert_eq!(
-            (r.peer_addr(), r.packet()),
+            (r.peer_address(), r.packet()),
             (&socket.local_addr().unwrap(), &pkt)
         );
     }
@@ -1197,9 +1197,9 @@ mod tests {
         let rec1 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
         let rec2 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
         let r1 = rec1.unwrap().unwrap();
-        assert_eq!((r1.peer_addr(), r1.packet()), (&local_addr1, &pkt1));
+        assert_eq!((r1.peer_address(), r1.packet()), (&local_addr1, &pkt1));
         let r2 = rec2.unwrap().unwrap();
-        assert_eq!((r2.peer_addr(), r2.packet()), (&local_addr2, &pkt2));
+        assert_eq!((r2.peer_address(), r2.packet()), (&local_addr2, &pkt2));
     }
 
     #[tokio::test]
@@ -1220,7 +1220,7 @@ mod tests {
             .unwrap();
         let r = handled_pkt.unwrap();
         assert_eq!(
-            (r.peer_addr(), r.packet()),
+            (r.peer_address(), r.packet()),
             (&socket.local_addr().unwrap(), &pkt)
         );
 
@@ -1250,7 +1250,7 @@ mod tests {
         // Ensure the packet was handled
         let r = handled_pkt.unwrap();
         assert_eq!(
-            (r.peer_addr(), r.packet()),
+            (r.peer_address(), r.packet()),
             (&socket.local_addr().unwrap(), &pkt)
         );
 

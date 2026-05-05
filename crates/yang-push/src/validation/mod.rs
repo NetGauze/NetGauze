@@ -406,7 +406,7 @@ impl ValidationActor {
         subscription_info: SubscriptionInfo,
         message: Arc<UdpNotifRequest>,
     ) -> bool {
-        let peer = *message.peer_addr();
+        let peer = *message.peer_address();
         let packet = message.packet();
         let message_id = packet.message_id();
         let publisher_id = packet.publisher_id();
@@ -572,7 +572,7 @@ impl ValidationActor {
         &mut self,
         message: Arc<UdpNotifRequest>,
     ) -> Result<(), ValidationActorError> {
-        let peer = *message.peer_addr();
+        let peer = *message.peer_address();
         let packet = message.packet();
         let decoded = match self.decode_message(peer, packet) {
             Ok(decoded) => decoded,
@@ -773,7 +773,7 @@ impl ValidationActor {
         peer: SocketAddr,
         decoded: &UdpNotifPacketDecoded,
     ) -> Result<Option<SubscriptionInfo>, ValidationActorError> {
-        let collector = message.col_addr();
+        let collector = message.collector_address();
         let packet = message.packet();
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
         let message_id = decoded.message_id();
@@ -953,7 +953,7 @@ impl ValidationActor {
         }
         let cached_packets = std::mem::take(&mut subscription_cache.cached_packets);
         for msg in cached_packets {
-            let peer = *msg.peer_addr();
+            let peer = *msg.peer_address();
             let packet = msg.packet();
             let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
             Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut peer_tags);
