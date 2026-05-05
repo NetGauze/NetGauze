@@ -762,31 +762,31 @@ impl YangPushChangeUpdate {
 pub struct Target {
     #[serde(rename = "stream")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    stream: Option<String>,
+    pub stream: Option<String>,
 
     #[serde(rename = "stream-subtree-filter")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    stream_subtree_filter: Option<Value>,
+    pub stream_subtree_filter: Option<Value>,
 
     #[serde(rename = "stream-xpath-filter")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    stream_xpath_filter: Option<String>,
+    pub stream_xpath_filter: Option<String>,
 
     #[serde(rename = "replay-start-time")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    replay_start_time: Option<DateTime<Utc>>,
+    pub replay_start_time: Option<DateTime<Utc>>,
 
     #[serde(rename = "ietf-yang-push:datastore")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    datastore: Option<String>,
+    pub datastore: Option<String>,
 
     #[serde(rename = "datastore-subtree-filter")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    datastore_subtree_filter: Option<Value>,
+    pub datastore_subtree_filter: Option<Value>,
 
     #[serde(rename = "ietf-yang-push:datastore-xpath-filter")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    datastore_xpath_filter: Option<String>,
+    pub datastore_xpath_filter: Option<String>,
 }
 
 impl Target {
