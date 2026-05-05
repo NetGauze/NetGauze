@@ -122,7 +122,7 @@ use crate::{
 };
 use netgauze_netconf_proto::yang_push::subscription::YangPushModuleVersion;
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
-use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
+use netgauze_udp_notif_pkt::decoded::{UdpNotifPacketDecoded, UdpNotifPayload};
 use netgauze_udp_notif_pkt::notification::{NotificationVariant, SubscriptionStartedModified};
 use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
 use netgauze_udp_notif_service::OTL_UDP_NOTIF_PUBLISHER_ID_KEY;
@@ -583,7 +583,7 @@ impl ValidationActor {
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
         let message_id = decoded.message_id();
         let publisher_id = decoded.publisher_id();
-
+        let is_legacy = matches!(decoded.payload(), UdpNotifPayload::NotificationLegacy(_));
         let extract_sub_info = self
             .extract_subscription_info(Arc::clone(&message), peer, &decoded)
             .await?;
@@ -615,6 +615,7 @@ impl ValidationActor {
                 cached_content_id.clone(),
                 &notification_type,
                 yang_ctx,
+                is_legacy,
             );
             // logging of error is handled in the [Self::validate_message]
             if validation_result.is_err() {
@@ -680,6 +681,7 @@ impl ValidationActor {
         cached_content_id: ContentId,
         notification_type: &String,
         yang_ctx: &yang4::context::Context,
+        is_legacy: bool,
     ) -> Result<(), yang4::Error> {
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
         Self::extend_peer_targs_with_subscription_info(subscription_info, &mut peer_tags);
@@ -692,7 +694,9 @@ impl ValidationActor {
         {
             envelope_ext = Some(ext);
         }
-        if let Some(envelope_ext) = envelope_ext {
+        if let Some(envelope_ext) = envelope_ext
+            && !is_legacy
+        {
             let validation_result = yang4::data::DataTree::parse_ext_string(
                 &envelope_ext,
                 packet.payload(),
@@ -701,6 +705,9 @@ impl ValidationActor {
                 DataValidationFlags::PRESENT,
             );
             if let Err(err) = validation_result {
+                let v = packet.payload().clone();
+                let packet_payload =
+                    str::from_utf8(v.as_ref()).unwrap_or("unserializable packet payload");
                 warn!(
                     peer=%peer,
                     message_id,
@@ -711,6 +718,7 @@ impl ValidationActor {
                     cached_content_id,
                     notification_type,
                     error=%err,
+                    packet=packet_payload,
                     "Failed to validate UDP-Notif payload using draft-ietf-netconf-notif-envelope, dropping packet"
                 );
                 return Err(err);
