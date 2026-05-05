@@ -40,35 +40,35 @@ pub type SubscriberId = u32;
 /// The UDP-Notif packet and the peer [SocketAddr] that sent it.
 #[derive(Debug, Clone)]
 pub struct UdpNotifRequest {
-    col_addr: SocketAddr,
-    col_bind: Option<String>,
-    peer_addr: SocketAddr,
+    collector_address: SocketAddr,
+    collector_interface: Option<String>,
+    peer_address: SocketAddr,
     packet: UdpNotifPacket,
 }
 
 impl UdpNotifRequest {
     pub fn new(
-        col_addr: SocketAddr,
-        col_bind: Option<String>,
-        peer_addr: SocketAddr,
+        collector_address: SocketAddr,
+        collector_interface: Option<String>,
+        peer_address: SocketAddr,
         packet: UdpNotifPacket,
     ) -> Self {
         Self {
-            col_addr,
-            col_bind,
-            peer_addr,
+            collector_address,
+            collector_interface,
+            peer_address,
             packet,
         }
     }
 
-    pub fn col_addr(&self) -> &SocketAddr {
-        &self.col_addr
+    pub fn collector_address(&self) -> &SocketAddr {
+        &self.collector_address
     }
-    pub fn col_bind(&self) -> Option<&String> {
-        self.col_bind.as_ref()
+    pub fn collector_interface(&self) -> Option<&String> {
+        self.collector_interface.as_ref()
     }
-    pub fn peer_addr(&self) -> &SocketAddr {
-        &self.peer_addr
+    pub fn peer_address(&self) -> &SocketAddr {
+        &self.peer_address
     }
     pub fn packet(&self) -> &UdpNotifPacket {
         &self.packet

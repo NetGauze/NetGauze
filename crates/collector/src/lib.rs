@@ -881,7 +881,7 @@ fn serialize_udp_notif(
     input: Arc<UdpNotifRequest>,
     writer_id: String,
 ) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
-    let peer = input.peer_addr();
+    let peer = input.peer_address();
     let msg = input.packet();
     let mut value = serde_json::to_value(msg)?;
     if let serde_json::Value::Object(val) = &mut value {
