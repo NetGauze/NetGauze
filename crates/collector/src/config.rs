@@ -74,6 +74,14 @@ pub(crate) const fn default_netconf_port() -> u16 {
     830
 }
 
+pub(crate) const fn default_max_retries() -> u32 {
+    10
+}
+
+pub(crate) const fn default_max_backoff_secs() -> u64 {
+    60
+}
+
 pub(crate) const fn default_ansi_log() -> bool {
     false
 }
@@ -247,6 +255,14 @@ pub struct NetconfConfig {
     pub password: Option<String>,
     #[serde(default = "default_netconf_port")]
     pub port: u16,
+    /// Maximum number of retry attempts for YANG Library fetching.
+    /// Uses exponential backoff with jitter (factor 2). Set to 0 to disable
+    /// retries. Defaults to 10.
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+    /// Maximum backoff duration in seconds between retries. Defaults to 60.
+    #[serde(default = "default_max_backoff_secs")]
+    pub max_backoff_secs: u64,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
