@@ -74,7 +74,7 @@ arbitrary = { version = "1" }
 arbitrary_ext = { version = "0.3" }
 rstest = "0.26"
 pcap-parser = { version = "0.17" }
-clap = { version = "4.5", default-features = true }
+clap = { version = "4.6", default-features = true }
 socket2 = { version = "0.6" }
 either = { version = "1.15" }
 opentelemetry = { version = "0.31" }
