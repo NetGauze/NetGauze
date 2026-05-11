@@ -95,7 +95,7 @@ pdu = { version = "1.5" }
 pin-utils = { version = "0.1" }
 serde_yaml = { version = "0.9" }
 ciborium = { version = "0.2" }
-ordered-float = { version = "5.1", default-features = false }
+ordered-float = { version = "5.3", default-features = false }
 proc-macro2 = { version = "1.0" }
 prettyplease = { version = "0.2" }
 sysinfo = { version = "0.39", default-features = false }
