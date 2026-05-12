@@ -71,15 +71,15 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpLsAttributeParsingError<'a>
         buf: Span<'a>,
         extended_length: bool,
     ) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
-        let (_buf, ls_buf) = if extended_length {
+        let (buf, ls_buf) = if extended_length {
             nom::multi::length_data(be_u16)(buf)?
         } else {
             nom::multi::length_data(be_u8)(buf)?
         };
 
-        let (span, attributes) = parse_till_empty_into_located(ls_buf)?;
+        let (_, attributes) = parse_till_empty_into_located(ls_buf)?;
 
-        Ok((span, BgpLsAttribute { attributes }))
+        Ok((buf, BgpLsAttribute { attributes }))
     }
 }
 
