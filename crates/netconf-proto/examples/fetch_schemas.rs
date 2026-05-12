@@ -143,7 +143,15 @@ pub async fn main() -> anyhow::Result<()> {
     let auth = get_auth(&args)?;
 
     let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
-    let config = NetconfSshConnectConfig::new(auth, host, announce_caps, ssh_handler, ssh_config);
+    let config = NetconfSshConnectConfig::new(
+        auth,
+        host,
+        None,
+        None,
+        announce_caps,
+        ssh_handler,
+        ssh_config,
+    );
     let mut client = connect(config).await?;
     info!("connected to {}", args.host);
 

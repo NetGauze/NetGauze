@@ -38,7 +38,42 @@ pub type ActorId = u32;
 pub type SubscriberId = u32;
 
 /// The UDP-Notif packet and the peer [SocketAddr] that sent it.
-pub type UdpNotifRequest = (SocketAddr, UdpNotifPacket);
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct UdpNotifRequest {
+    collector_address: SocketAddr,
+    collector_interface: Option<Box<str>>,
+    peer_address: SocketAddr,
+    packet: UdpNotifPacket,
+}
+
+impl UdpNotifRequest {
+    pub fn new(
+        collector_address: SocketAddr,
+        collector_interface: Option<Box<str>>,
+        peer_address: SocketAddr,
+        packet: UdpNotifPacket,
+    ) -> Self {
+        Self {
+            collector_address,
+            collector_interface,
+            peer_address,
+            packet,
+        }
+    }
+
+    pub const fn collector_address(&self) -> SocketAddr {
+        self.collector_address
+    }
+    pub fn collector_interface(&self) -> Option<&str> {
+        self.collector_interface.as_deref()
+    }
+    pub const fn peer_address(&self) -> SocketAddr {
+        self.peer_address
+    }
+    pub const fn packet(&self) -> &UdpNotifPacket {
+        &self.packet
+    }
+}
 
 pub type UdpNotifSender = async_channel::Sender<Arc<UdpNotifRequest>>;
 pub type UdpNotifReceiver = async_channel::Receiver<Arc<UdpNotifRequest>>;

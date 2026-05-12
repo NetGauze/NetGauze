@@ -32,7 +32,6 @@ use netgauze_netconf_proto::yang_push::filters::StreamSelectionFilterObjects;
 use netgauze_netconf_proto::yang_push::subscription::{
     DatastoreSelectionFilterObjects, Target, YangPushModuleVersion,
 };
-use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_netconf_proto::yanglib::{DatastoreName, PermissiveVersionChecker, YangLibrary};
 use rand::RngExt;
 use std::collections::{HashMap, HashSet};
@@ -64,14 +63,12 @@ pub trait YangLibraryFetcher {
 
     fn fetch_by_subscription_id(
         &self,
-        peer: SocketAddr,
-        subscription_id: SubscriptionId,
+        subscription_info: SubscriptionInfo,
     ) -> impl Future<Output = JoinHandle<FetcherResult>> + Send;
 
     fn fetch_by_subscription_id_blocking(
         &self,
-        peer: SocketAddr,
-        subscription_id: SubscriptionId,
+        subscription_info: SubscriptionInfo,
     ) -> impl Future<Output = FetcherResult> + Send;
 }
 
@@ -142,11 +139,17 @@ impl NetconfYangLibraryFetcher {
         cfg: &FetchConfig,
         subscription_info: SubscriptionInfo,
     ) -> FetcherResult {
-        let host = SocketAddr::new(subscription_info.peer().ip(), cfg.default_port);
+        let collector = subscription_info.collector();
+        let interface = subscription_info.interface();
+        let peer = subscription_info.peer();
+        let subscription_id = subscription_info.id();
+        let host = SocketAddr::new(peer.ip(), cfg.default_port);
         info!(
             host=%host,
-            peer=%subscription_info.peer(),
-            subscription_id=subscription_info.id(),
+            collector=%collector,
+            interface,
+            peer=%peer,
+            subscription_id,
             router_content_id=subscription_info.content_id(),
             target=%subscription_info.target(),
             "starting fetching YANG Library from device",
@@ -160,6 +163,8 @@ impl NetconfYangLibraryFetcher {
         let config = NetconfSshConnectConfig::new(
             auth,
             host,
+            Some(collector),
+            interface,
             announce_caps,
             ssh_handler,
             Arc::clone(&cfg.client_config),
@@ -195,25 +200,32 @@ impl NetconfYangLibraryFetcher {
                 warn!(host=%host, error=%err, "Timeout while closing SSH connection")
             }
         }
-        info!( host = %host,
-            peer=%subscription_info.peer(),
-            subscription_id=subscription_info.id(),
+        info!(
+            host=%host,
+            peer=%peer,
+            subscription_id,
             router_content_id=subscription_info.content_id(),
             target=%subscription_info.target(),
             cached_content_id=yang_lib.content_id(),
-            schema_count = schemas.len(),
-            "YANG Library fetched from device");
+            schema_count=schemas.len(),
+            "YANG Library fetched from device",
+        );
         Ok((subscription_info, yang_lib, schemas))
     }
 
     async fn fetch_from_device_by_id(
         cfg: &FetchConfig,
-        peer: SocketAddr,
-        subscription_id: SubscriptionId,
+        subscription_info: SubscriptionInfo,
     ) -> FetcherResult {
+        let collector = subscription_info.collector();
+        let interface = subscription_info.interface();
+        let peer = subscription_info.peer();
+        let subscription_id = subscription_info.id();
         let host = SocketAddr::new(peer.ip(), cfg.default_port);
         info!(
             host=%host,
+            collector=%collector,
+            interface,
             peer=%peer,
             subscription_id,
             "starting fetching YANG Library from device",
@@ -227,13 +239,16 @@ impl NetconfYangLibraryFetcher {
         let config = NetconfSshConnectConfig::new(
             auth,
             host,
+            Some(collector),
+            interface.clone(),
             announce_caps,
             ssh_handler,
             Arc::clone(&cfg.client_config),
         );
         // Empty subscription info returned in case of errors to keep track of peer and
         // subscription ID
-        let empty = SubscriptionInfo::new_empty(peer, subscription_id);
+        let empty =
+            SubscriptionInfo::new_empty(collector, interface.clone(), peer, subscription_id);
         let mut client = match tokio::time::timeout(cfg.timeout, connect(config)).await {
             Ok(Ok(c)) => c,
             Ok(Err(err)) => {
@@ -329,6 +344,8 @@ impl NetconfYangLibraryFetcher {
             )
         })?;
         let subscription_info = SubscriptionInfo::new(
+            collector,
+            interface,
             peer,
             subscription_id,
             subscription_target,
@@ -340,14 +357,16 @@ impl NetconfYangLibraryFetcher {
             modules.into_boxed_slice(),
             router_yang_library.content_id().to_string(),
         );
-        info!( host = %host,
+        info!(
+            host=%host,
             peer=%peer,
             subscription_id,
             router_content_id=yang_lib.content_id(),
             target=%subscription_info.target(),
             cached_content_id=yang_lib.content_id(),
             schema_count = schemas.len(),
-            "YANG Library fetched from device");
+            "YANG Library fetched from device",
+        );
         Ok((subscription_info, yang_lib, schemas))
     }
 
@@ -408,14 +427,14 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
 
     async fn fetch_by_subscription_id(
         &self,
-        peer: SocketAddr,
-        subscription_id: SubscriptionId,
+        subscription_info: SubscriptionInfo,
     ) -> JoinHandle<FetcherResult> {
+        let peer = subscription_info.peer();
         let fetch_cfg = self.fetch_cfg.clone();
         let retry_cfg = self.retry_cfg;
         tokio::spawn(async move {
             Self::with_retry(peer, retry_cfg, || {
-                Self::fetch_from_device_by_id(&fetch_cfg, peer, subscription_id)
+                Self::fetch_from_device_by_id(&fetch_cfg, subscription_info.clone())
             })
             .await
         })
@@ -423,11 +442,11 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
 
     async fn fetch_by_subscription_id_blocking(
         &self,
-        peer: SocketAddr,
-        subscription_id: SubscriptionId,
+        subscription_info: SubscriptionInfo,
     ) -> FetcherResult {
+        let peer = subscription_info.peer();
         Self::with_retry(peer, self.retry_cfg, || {
-            Self::fetch_from_device_by_id(&self.fetch_cfg, peer, subscription_id)
+            Self::fetch_from_device_by_id(&self.fetch_cfg, subscription_info.clone())
         })
         .await
     }
@@ -502,11 +521,11 @@ pub(crate) mod tests {
         }
 
         #[allow(clippy::result_large_err)]
-        fn get_from_cache_by_id(
-            &self,
-            peer: SocketAddr,
-            subscription_id: SubscriptionId,
-        ) -> FetcherResult {
+        fn get_from_cache_by_id(&self, subscription_info: SubscriptionInfo) -> FetcherResult {
+            let collector = subscription_info.collector();
+            let interface = subscription_info.interface();
+            let peer = subscription_info.peer();
+            let subscription_id = subscription_info.id();
             info!(
                 peer=%peer,
                 subscription_id,
@@ -519,7 +538,7 @@ pub(crate) mod tests {
             let subscription_info = if let Some(subscription_info) = subscription_info {
                 subscription_info.clone()
             } else {
-                SubscriptionInfo::new_empty(peer, subscription_id)
+                SubscriptionInfo::new_empty(collector, interface, peer, subscription_id)
             };
             // Increment counter in the instance state
             {
@@ -565,19 +584,17 @@ pub(crate) mod tests {
 
         async fn fetch_by_subscription_id(
             &self,
-            peer: SocketAddr,
-            subscription_id: SubscriptionId,
+            subscription_info: SubscriptionInfo,
         ) -> JoinHandle<FetcherResult> {
-            let result = self.get_from_cache_by_id(peer, subscription_id);
+            let result = self.get_from_cache_by_id(subscription_info);
             tokio::spawn(async move { result })
         }
 
         async fn fetch_by_subscription_id_blocking(
             &self,
-            peer: SocketAddr,
-            subscription_id: SubscriptionId,
+            subscription_info: SubscriptionInfo,
         ) -> FetcherResult {
-            self.get_from_cache_by_id(peer, subscription_id)
+            self.get_from_cache_by_id(subscription_info)
         }
     }
 }
@@ -592,20 +609,24 @@ mod retry_tests {
         RetryConfig::new(max_retries, std::time::Duration::from_millis(1))
     }
 
+    fn collector() -> SocketAddr {
+        SocketAddr::from(([127, 0, 0, 1], 10000))
+    }
+
     fn dummy_peer() -> SocketAddr {
         "127.0.0.1:0".parse().unwrap()
     }
 
     #[allow(clippy::result_large_err)]
     fn make_ok() -> FetcherResult {
-        let info = SubscriptionInfo::new_empty(dummy_peer(), 1);
+        let info = SubscriptionInfo::new_empty(collector(), None, dummy_peer(), 1);
         let yang_lib = YangLibrary::new("test-content-id".into(), vec![], vec![], vec![]);
         Ok((info, yang_lib, HashMap::new()))
     }
 
     #[allow(clippy::result_large_err)]
     fn make_err(msg: &'static str) -> FetcherResult {
-        let info = SubscriptionInfo::new_empty(dummy_peer(), 1);
+        let info = SubscriptionInfo::new_empty(collector(), None, dummy_peer(), 1);
         Err((
             info,
             YangLibraryCacheError::IoError(std::io::Error::other(msg)),

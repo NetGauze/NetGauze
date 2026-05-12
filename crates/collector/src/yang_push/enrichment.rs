@@ -678,6 +678,7 @@ mod tests {
             }
         });
 
+        let collector = SocketAddr::from(([127, 0, 0, 1], 10000));
         let packet = UdpNotifPacket::new(
             MediaType::YangDataJson,
             1234,
@@ -688,6 +689,8 @@ mod tests {
 
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();
         let subscription_info = SubscriptionInfo::new(
+            collector,
+            None,
             peer,
             id,
             Target::new_datastore(
@@ -718,9 +721,10 @@ mod tests {
     async fn test_process_payload_empty_subscription() {
         // Set up the enrichment actor and input test data
         let (msgs_tx, test_manifest, join_handle, actor_handle) = create_actor_handle();
-        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+        let collector = SocketAddr::from(([127, 0, 0, 1], 10000));
+        let peer = SocketAddr::from(([127, 0, 0, 1], 12345));
         let (_subscription_info, json_payload, decoded) = create_subscription_started(peer, 1);
-        let empty_subscription_info = SubscriptionInfo::new_empty(peer, 1);
+        let empty_subscription_info = SubscriptionInfo::new_empty(collector, None, peer, 1);
 
         msgs_tx
             .send((
@@ -780,7 +784,7 @@ mod tests {
     async fn test_process_payload_envelope() {
         // Set up the enrichment actor and input test data
         let (msgs_tx, test_manifest, join_handle, actor_handle) = create_actor_handle();
-        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+        let peer = SocketAddr::from(([127, 0, 0, 1], 12345));
         let (subscription_info, json_payload, decoded) = create_subscription_started(peer, 1);
 
         msgs_tx
@@ -840,7 +844,8 @@ mod tests {
     #[test]
     fn test_process_payload_envelope_without_content() {
         let mut actor = create_actor();
-        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+        let collector = SocketAddr::from(([127, 0, 0, 1], 10000));
+        let peer = SocketAddr::from(([127, 0, 0, 1], 12345));
 
         // Create a UdpNotifPayload without content
         let payload = json!({
@@ -861,7 +866,7 @@ mod tests {
             Bytes::from(payload),
         );
 
-        let subscription_info = SubscriptionInfo::new_empty(peer, 1);
+        let subscription_info = SubscriptionInfo::new_empty(collector, None, peer, 1);
         // Attempt to decode the packet (should succeed)
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();
 

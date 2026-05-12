@@ -885,7 +885,8 @@ fn serialize_udp_notif(
     input: Arc<UdpNotifRequest>,
     writer_id: String,
 ) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
-    let (peer, msg) = input.as_ref();
+    let peer = input.peer_address();
+    let msg = input.packet();
     let mut value = serde_json::to_value(msg)?;
     if let serde_json::Value::Object(val) = &mut value {
         // Add the writer ID to the message
@@ -1059,6 +1060,7 @@ mod tests {
     #[test]
     fn test_serialize_udp_notif_unknown_media_type() {
         let writer_id = String::from("writer_id");
+        let collector = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10000);
         let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let pkt = UdpNotifPacket::new(
             MediaType::Unknown(0xee),
@@ -1068,7 +1070,7 @@ mod tests {
             Bytes::from(&[0xffu8, 0xffu8][..]),
         );
 
-        let request = Arc::new((peer, pkt));
+        let request = Arc::new(UdpNotifRequest::new(collector, None, peer, pkt));
         let serialized = serialize_udp_notif(request.clone(), writer_id.clone());
         assert!(matches!(
             serialized,
@@ -1081,6 +1083,7 @@ mod tests {
     #[test]
     fn test_serialize_udp_notif_json() {
         let writer_id = String::from("writer_id");
+        let collector = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10000);
         let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let pkt = UdpNotifPacket::new(
             MediaType::YangDataJson,
@@ -1108,8 +1111,13 @@ mod tests {
                 "writer_id": "writer_id"
             }
         );
-        let request_invalid = Arc::new((peer, pkt_invalid_json));
-        let request_good = Arc::new((peer, pkt));
+        let request_invalid = Arc::new(UdpNotifRequest::new(
+            collector,
+            None,
+            peer,
+            pkt_invalid_json,
+        ));
+        let request_good = Arc::new(UdpNotifRequest::new(collector, None, peer, pkt));
         let result_invalid = serialize_udp_notif(request_invalid, writer_id.clone());
         let serialized =
             serialize_udp_notif(request_good, writer_id.clone()).expect("failed to serialize json");
@@ -1130,6 +1138,7 @@ mod tests {
     #[test]
     fn test_serialize_udp_notif_xml() {
         let writer_id = String::from("writer_id");
+        let collector = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10000);
         let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let pkt = UdpNotifPacket::new(
             MediaType::YangDataXml,
@@ -1158,8 +1167,13 @@ mod tests {
             }
         );
 
-        let request_invalid = Arc::new((peer, pkt_invalid_utf8));
-        let request_good = Arc::new((peer, pkt));
+        let request_invalid = Arc::new(UdpNotifRequest::new(
+            collector,
+            None,
+            peer,
+            pkt_invalid_utf8,
+        ));
+        let request_good = Arc::new(UdpNotifRequest::new(collector, None, peer, pkt));
         let result_invalid = serialize_udp_notif(request_invalid, writer_id.clone());
         let serialized =
             serialize_udp_notif(request_good, writer_id.clone()).expect("failed to serialize json");
@@ -1179,6 +1193,7 @@ mod tests {
     #[test]
     fn test_serialize_udp_notif_cbor() {
         let writer_id = String::from("writer_id");
+        let collector = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10000);
         let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
         let mut cursor = std::io::Cursor::new(vec![]);
         ciborium::ser::into_writer(&serde_json::json!({"id": 1}), &mut cursor)
@@ -1211,8 +1226,8 @@ mod tests {
             }
         );
 
-        let request_invalid = Arc::new((peer, pkt_invalid));
-        let request_good = Arc::new((peer, pkt));
+        let request_invalid = Arc::new(UdpNotifRequest::new(collector, None, peer, pkt_invalid));
+        let request_good = Arc::new(UdpNotifRequest::new(collector, None, peer, pkt));
         let result_invalid = serialize_udp_notif(request_invalid, writer_id.clone());
         let serialized =
             serialize_udp_notif(request_good, writer_id.clone()).expect("failed to serialize json");
