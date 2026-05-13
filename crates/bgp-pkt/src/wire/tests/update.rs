@@ -15,7 +15,8 @@
 
 use crate::nlri::{InvalidIpv4UnicastNetwork, Ipv4Unicast, Ipv4UnicastAddress};
 use crate::path_attribute::{
-    As4PathSegment, AsPath, AsPathSegmentType, NextHop, Origin, PathAttribute, PathAttributeValue,
+    As4PathSegment, AsPath, AsPathSegmentType, MpReach, NextHop, Origin, PathAttribute,
+    PathAttributeValue,
 };
 use crate::wire::deserializer::nlri::{
     Ipv4UnicastAddressParsingError, Ipv4UnicastParsingError, LocatedIpv4UnicastAddressParsingError,
@@ -29,11 +30,11 @@ use crate::wire::serializer::BgpMessageWritingError;
 use crate::wire::serializer::nlri::Ipv4UnicastAddressWritingError;
 use crate::{BgpMessage, BgpUpdateMessage};
 use ipnet::Ipv4Net;
-use netgauze_parse_utils::Span;
 use netgauze_parse_utils::test_helpers::{
     test_parse_error_with_one_input, test_parsed_completely, test_parsed_completely_with_one_input,
     test_write,
 };
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 use nom::error::ErrorKind;
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
@@ -323,4 +324,74 @@ fn test_update_bad_length() -> Result<(), BgpMessageWritingError> {
         &bad_withdraw_length_short,
     );
     Ok(())
+}
+
+#[test]
+fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes() {
+    let junos_bgp_ls_update: &[u8] = &[
+        // BGP header
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, //
+        0x00, 0xdf, // length = 223
+        0x02, // type = UPDATE
+        // Withdrawn routes length
+        0x00, 0x00, //
+        // Total path attribute length = 200
+        0x00, 0xc8, //
+        // PA: Origin (IGP)
+        0x40, 0x01, 0x01, 0x00, //
+        // PA: AS_PATH (empty as4)
+        0x40, 0x02, 0x00, //
+        // PA: LOCAL_PREF = 100
+        0x40, 0x05, 0x04, 0x00, 0x00, 0x00, 0x64, //
+        // PA: BGP_LS_ATTRIBUTE (TLV 29), extended-length=5, NodeFlagBits TLV 1024
+        0x90, 0x1d, 0x00, 0x05, 0x04, 0x00, 0x00, 0x01, 0x00, //
+        // PA: MP_REACH_NLRI (TLV 14), extended-length, length 173
+        0x90, 0x0e, 0x00, 0xad, //
+        //   AFI=16388 (BGP-LS), SAFI=71, NextHopLen=4, NextHop=100.100.100.1, Reserved
+        0x40, 0x04, 0x47, 0x04, 0x64, 0x64, 0x64, 0x01, 0x00, //
+        //   NLRI #1: Node NLRI for 100.100.100.1
+        0x00, 0x01, 0x00, 0x25, //
+        0x03, // ProtocolID OSPFv2
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Identifier
+        0x01, 0x00, 0x00, 0x18, // Local Node Descriptors TLV
+        0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0xfd, 0xe8, // AS = 65000
+        0x02, 0x02, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, // Area = 0
+        0x02, 0x03, 0x00, 0x04, 0x64, 0x64, 0x64, 0x01, // IGP Router-ID = 100.100.100.1
+        //   NLRIs #2-#4: same shape with router-ids 100.100.100.2/3/255
+        0x00, 0x01, 0x00, 0x25, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0x00, 0x18, 0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0xfd, 0xe8, 0x02, 0x02, 0x00, 0x04, 0x00,
+        0x00, 0x00, 0x00, 0x02, 0x03, 0x00, 0x04, 0x64, 0x64, 0x64, 0x02, //
+        0x00, 0x01, 0x00, 0x25, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0x00, 0x18, 0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0xfd, 0xe8, 0x02, 0x02, 0x00, 0x04, 0x00,
+        0x00, 0x00, 0x00, 0x02, 0x03, 0x00, 0x04, 0x64, 0x64, 0x64, 0x03, //
+        0x00, 0x01, 0x00, 0x25, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0x00, 0x18, 0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0xfd, 0xe8, 0x02, 0x02, 0x00, 0x04, 0x00,
+        0x00, 0x00, 0x00, 0x02, 0x03, 0x00, 0x04, 0x64, 0x64, 0x64, 0xff, //
+    ];
+
+    let mut ctx = BgpParsingContext::default();
+    let (_, msg) = BgpMessage::from_wire(Span::new(junos_bgp_ls_update), &mut ctx)
+        .expect("JunOS-captured BGP-LS UPDATE should parse");
+    let BgpMessage::Update(upd) = msg else {
+        panic!("expected UPDATE, got {msg:?}")
+    };
+
+    let mp_reach_present = upd.path_attributes().iter().any(|pa| {
+        matches!(
+            pa.value(),
+            PathAttributeValue::MpReach(MpReach::BgpLs { .. })
+        )
+    });
+
+    assert!(
+        mp_reach_present,
+        "MP_REACH(BgpLs) was silently dropped after BGP_LS_ATTRIBUTE — \
+         BgpLsAttribute::from_wire is returning the inner span instead of the outer remainder. \
+         Parsed attributes: {:?}",
+        upd.path_attributes()
+            .iter()
+            .map(|pa| pa.value())
+            .collect::<Vec<_>>(),
+    );
 }
