@@ -265,7 +265,7 @@ where
             }
             Err(err) => {
                 error!("Registering schema in schema registry {err}");
-                return Err(err)?;
+                Err(err)?
             }
         }
         Ok(())

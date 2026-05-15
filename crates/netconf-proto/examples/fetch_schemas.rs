@@ -131,7 +131,7 @@ pub async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let host = std::net::ToSocketAddrs::to_socket_addrs(&args.host)?
         .next()
-        .ok_or_else(|| anyhow::anyhow!("Failed to resolve host from: {}", &args.host))?;
+        .ok_or_else(|| anyhow::anyhow!("Failed to resolve host from: {}", args.host))?;
 
     let ssh_handler = SshHandler::default();
     let ssh_config = russh::client::Config {

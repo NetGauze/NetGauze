@@ -120,7 +120,7 @@ pub fn generate_enum(
         }
         InformationElementSubRegistry::ReasonCodeNestedRegistry(rec) => {
             let doc = generate_desc_and_refs_common(rec);
-            let display_name = format!("{} {{0}}", &rec.display_name);
+            let display_name = format!("{} {{0}}", rec.display_name);
             let name = Ident::new(&rec.name, Span::call_site());
             let reason = Ident::new(&format!("{enum_name}{}Reason", rec.name), Span::call_site());
             quote! {

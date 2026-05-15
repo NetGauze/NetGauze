@@ -393,15 +393,13 @@ impl<'a> YangParser<'a> {
 
         // YANG identifier: [a-zA-Z_][a-zA-Z0-9_.-]*
         // But dates are also read as identifiers: YYYY-MM-DD
-        if let Some(c) = self.peek_char() {
-            if c.is_alphabetic() || c == '_' {
-                self.advance();
-            } else if c.is_numeric() {
-                // Allow starting with digit for dates like 2013-07-15
-                self.advance();
-            } else {
-                return None;
-            }
+
+        let c = self.peek_char()?;
+        if c.is_alphabetic() || c == '_' {
+            self.advance();
+        } else if c.is_numeric() {
+            // Allow starting with digit for dates like 2013-07-15
+            self.advance();
         } else {
             return None;
         }
