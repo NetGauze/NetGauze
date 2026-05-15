@@ -861,7 +861,10 @@ impl ValidationActor {
                     );
                     self.cache_cmd_tx
                         .send(CacheLookupCommand::LookupBySubscriptionId {
-                            subscription_info: subscription_info.clone(),
+                            collector,
+                            interface: interface.map(String::from),
+                            peer,
+                            subscription_id,
                             tx: self.cache_tx.clone(),
                         })
                         .await

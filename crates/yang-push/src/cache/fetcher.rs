@@ -32,6 +32,7 @@ use netgauze_netconf_proto::yang_push::filters::StreamSelectionFilterObjects;
 use netgauze_netconf_proto::yang_push::subscription::{
     DatastoreSelectionFilterObjects, Target, YangPushModuleVersion,
 };
+use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use netgauze_netconf_proto::yanglib::{DatastoreName, PermissiveVersionChecker, YangLibrary};
 use rand::RngExt;
 use std::collections::{HashMap, HashSet};
@@ -63,12 +64,18 @@ pub trait YangLibraryFetcher {
 
     fn fetch_by_subscription_id(
         &self,
-        subscription_info: SubscriptionInfo,
+        collector: SocketAddr,
+        interface: Option<Box<str>>,
+        peer: SocketAddr,
+        subscription_id: SubscriptionId,
     ) -> impl Future<Output = JoinHandle<FetcherResult>> + Send;
 
     fn fetch_by_subscription_id_blocking(
         &self,
-        subscription_info: SubscriptionInfo,
+        collector: SocketAddr,
+        interface: Option<Box<str>>,
+        peer: SocketAddr,
+        subscription_id: SubscriptionId,
     ) -> impl Future<Output = FetcherResult> + Send;
 }
 
@@ -150,8 +157,6 @@ impl NetconfYangLibraryFetcher {
             interface,
             peer=%peer,
             subscription_id,
-            router_content_id=subscription_info.content_id(),
-            target=%subscription_info.target(),
             "starting fetching YANG Library from device",
         );
         let ssh_handler = SshHandler::default();
@@ -204,8 +209,6 @@ impl NetconfYangLibraryFetcher {
             host=%host,
             peer=%peer,
             subscription_id,
-            router_content_id=subscription_info.content_id(),
-            target=%subscription_info.target(),
             cached_content_id=yang_lib.content_id(),
             schema_count=schemas.len(),
             "YANG Library fetched from device",
@@ -215,12 +218,11 @@ impl NetconfYangLibraryFetcher {
 
     async fn fetch_from_device_by_id(
         cfg: &FetchConfig,
-        subscription_info: SubscriptionInfo,
+        collector: SocketAddr,
+        interface: Option<Box<str>>,
+        peer: SocketAddr,
+        subscription_id: SubscriptionId,
     ) -> FetcherResult {
-        let collector = subscription_info.collector();
-        let interface = subscription_info.interface();
-        let peer = subscription_info.peer();
-        let subscription_id = subscription_info.id();
         let host = SocketAddr::new(peer.ip(), cfg.default_port);
         info!(
             host=%host,
@@ -240,15 +242,19 @@ impl NetconfYangLibraryFetcher {
             auth,
             host,
             Some(collector),
-            interface.clone(),
+            interface.clone().map(String::from),
             announce_caps,
             ssh_handler,
             Arc::clone(&cfg.client_config),
         );
         // Empty subscription info returned in case of errors to keep track of peer and
         // subscription ID
-        let empty =
-            SubscriptionInfo::new_empty(collector, interface.clone(), peer, subscription_id);
+        let empty = SubscriptionInfo::new_empty(
+            collector,
+            interface.clone().map(String::from),
+            peer,
+            subscription_id,
+        );
         let mut client = match tokio::time::timeout(cfg.timeout, connect(config)).await {
             Ok(Ok(c)) => c,
             Ok(Err(err)) => {
@@ -345,7 +351,7 @@ impl NetconfYangLibraryFetcher {
         })?;
         let subscription_info = SubscriptionInfo::new(
             collector,
-            interface,
+            interface.map(String::from),
             peer,
             subscription_id,
             subscription_target,
@@ -409,9 +415,8 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
     async fn fetch(&self, subscription_info: SubscriptionInfo) -> JoinHandle<FetcherResult> {
         let fetch_cfg = self.fetch_cfg.clone();
         let retry_cfg = self.retry_cfg;
-        let peer = subscription_info.peer();
         tokio::spawn(async move {
-            Self::with_retry(peer, retry_cfg, || {
+            Self::with_retry(subscription_info.peer(), retry_cfg, || {
                 Self::fetch_from_device(&fetch_cfg, subscription_info.clone())
             })
             .await
@@ -427,14 +432,22 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
 
     async fn fetch_by_subscription_id(
         &self,
-        subscription_info: SubscriptionInfo,
+        collector: SocketAddr,
+        interface: Option<Box<str>>,
+        peer: SocketAddr,
+        subscription_id: SubscriptionId,
     ) -> JoinHandle<FetcherResult> {
-        let peer = subscription_info.peer();
         let fetch_cfg = self.fetch_cfg.clone();
         let retry_cfg = self.retry_cfg;
         tokio::spawn(async move {
             Self::with_retry(peer, retry_cfg, || {
-                Self::fetch_from_device_by_id(&fetch_cfg, subscription_info.clone())
+                Self::fetch_from_device_by_id(
+                    &fetch_cfg,
+                    collector,
+                    interface.clone(),
+                    peer,
+                    subscription_id,
+                )
             })
             .await
         })
@@ -442,11 +455,19 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
 
     async fn fetch_by_subscription_id_blocking(
         &self,
-        subscription_info: SubscriptionInfo,
+        collector: SocketAddr,
+        interface: Option<Box<str>>,
+        peer: SocketAddr,
+        subscription_id: SubscriptionId,
     ) -> FetcherResult {
-        let peer = subscription_info.peer();
         Self::with_retry(peer, self.retry_cfg, || {
-            Self::fetch_from_device_by_id(&self.fetch_cfg, subscription_info.clone())
+            Self::fetch_from_device_by_id(
+                &self.fetch_cfg,
+                collector,
+                interface.clone(),
+                peer,
+                subscription_id,
+            )
         })
         .await
     }
@@ -584,16 +605,34 @@ pub(crate) mod tests {
 
         async fn fetch_by_subscription_id(
             &self,
-            subscription_info: SubscriptionInfo,
+            collector: SocketAddr,
+            interface: Option<Box<str>>,
+            peer: SocketAddr,
+            subscription_id: SubscriptionId,
         ) -> JoinHandle<FetcherResult> {
+            let subscription_info = SubscriptionInfo::new_empty(
+                collector,
+                interface.map(String::from),
+                peer,
+                subscription_id,
+            );
             let result = self.get_from_cache_by_id(subscription_info);
             tokio::spawn(async move { result })
         }
 
         async fn fetch_by_subscription_id_blocking(
             &self,
-            subscription_info: SubscriptionInfo,
+            collector: SocketAddr,
+            interface: Option<Box<str>>,
+            peer: SocketAddr,
+            subscription_id: SubscriptionId,
         ) -> FetcherResult {
+            let subscription_info = SubscriptionInfo::new_empty(
+                collector,
+                interface.map(String::from),
+                peer,
+                subscription_id,
+            );
             self.get_from_cache_by_id(subscription_info)
         }
     }
