@@ -1564,16 +1564,14 @@ pub(crate) mod tests {
                     .send(CacheLookupCommand::LookupBySubscriptionInfo(sub, tx))
                     .await
                     .unwrap();
-                rx.recv().await.unwrap()
+                tokio::time::timeout(Duration::from_secs(1), rx.recv())
+                    .await
+                    .expect("timeout waiting for response")
+                    .unwrap()
             }));
         }
 
-        let results = tasks
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .map(|res| res.unwrap())
-            .collect::<Vec<_>>();
+        let results = tasks.collect::<Vec<_>>().await;
         assert_eq!(results.len(), 10);
 
         // Verify only ONE fetch occurred

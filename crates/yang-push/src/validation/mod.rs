@@ -1255,7 +1255,11 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Verify packet is validated
-        let (content_id, sub_info, _validated) = validated_rx.recv().await.unwrap();
+        let (content_id, sub_info, _validated) =
+            tokio::time::timeout(Duration::from_secs(1), validated_rx.recv())
+                .await
+                .expect("timeout waiting for response")
+                .unwrap();
         assert!(content_id.is_some());
         assert!(!sub_info.is_empty());
 
@@ -1366,7 +1370,7 @@ mod tests {
         let (content_id, sub_info, _validated) =
             tokio::time::timeout(Duration::from_secs(1), validated_rx.recv())
                 .await
-                .unwrap()
+                .expect("timeout waiting for response")
                 .unwrap();
         assert!(content_id.is_none());
         assert!(!sub_info.is_empty());
