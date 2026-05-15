@@ -1118,7 +1118,7 @@ impl<'a>
             Ok(addr_type @ AddressType::RouteTargetConstrains) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::L2Evpn { nlri }))
+                Ok((buf, MpUnreach::RouteTargetMembership { nlri }))
             }
             Ok(addr_type @ AddressType::BgpLs) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
