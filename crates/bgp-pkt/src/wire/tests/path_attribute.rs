@@ -2537,6 +2537,60 @@ fn test_path_attr_route_target_membership() -> Result<(), PathAttributeWritingEr
 }
 
 #[test]
+fn test_path_attr_mp_unreach_route_target_membership() -> Result<(), PathAttributeWritingError> {
+    // MP_UNREACH_NLRI carrying RFC 4684 Route Target Constraint withdrawals:
+    //   - Attribute flags 0x90 (Optional + Extended Length)
+    //   - Attribute type 0x0f (MP_UNREACH_NLRI = 15)
+    //   - Attribute length 0x001d (29 bytes of value: 3 AFI/SAFI + 2 * 13 NLRI)
+    //   - AFI 0x0001 (IPv4)
+    //   - SAFI 0x84 (132, Route Target Constraint)
+    //   - Two RTC NLRIs, each {prefix-len=96, origin AS=65484, RT 65484:4018 /
+    //     65484:4003}
+    let good_wire = [
+        0x90, 0x0f, 0x00, 0x1d, 0x00, 0x01, 0x84, 0x60, 0x00, 0x00, 0xff, 0xcc, 0x00, 0x02, 0xff,
+        0xcc, 0x00, 0x00, 0x0f, 0xb2, 0x60, 0x00, 0x00, 0xff, 0xcc, 0x00, 0x02, 0xff, 0xcc, 0x00,
+        0x00, 0x0f, 0xa3,
+    ];
+
+    let mp_unreach = MpUnreach::RouteTargetMembership {
+        nlri: vec![
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xb2],
+                )),
+            ),
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xa3],
+                )),
+            ),
+        ],
+    };
+
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MpUnreach(mp_unreach),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_one_input(
+        &good_wire,
+        &mut BgpParsingContext::asn2_default(),
+        &good,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_otc_path_attribute() -> Result<(), PathAttributeWritingError> {
     let good_wire = [0xc0, 0x23, 0x04, 0x00, 0x00, 0xfd, 0xe9];
     let good = PathAttribute::from(
