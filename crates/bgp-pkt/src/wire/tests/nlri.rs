@@ -374,6 +374,8 @@ fn test_l2_evpn_route() -> Result<(), L2EvpnRouteWritingError> {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x64,
     ];
 
+    let good_unknown_wire = [0xfe, 0x03, 0xaa, 0xbb, 0xcc];
+
     let good_ad = L2EvpnRoute::EthernetAutoDiscovery(EthernetAutoDiscovery::new(
         RouteDistinguisher::Ipv4Administrator {
             ip: Ipv4Addr::new(120, 0, 2, 1),
@@ -396,10 +398,18 @@ fn test_l2_evpn_route() -> Result<(), L2EvpnRouteWritingError> {
             Ipv4Addr::from(0),
             MplsLabel::new([0, 0, 100]),
         )));
+
+    let good_unknown = L2EvpnRoute::Unknown {
+        code: 0xfe,
+        value: vec![0xaa, 0xbb, 0xcc],
+    };
+
     test_parsed_completely(&good_ad_wire, &good_ad);
     test_parsed_completely(&good_ip_prefix_wire, &good_ip_prefix);
+    test_parsed_completely(&good_unknown_wire, &good_unknown);
     test_write(&good_ad, &good_ad_wire)?;
     test_write(&good_ip_prefix, &good_ip_prefix_wire)?;
+    test_write(&good_unknown, &good_unknown_wire)?;
     Ok(())
 }
 
