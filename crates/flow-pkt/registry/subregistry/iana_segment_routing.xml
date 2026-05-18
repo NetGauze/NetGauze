@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="segment-routing">
   <title>Segment Routing</title>
   <created>2021-01-08</created>
-  <updated>2026-01-26</updated>
+  <updated>2026-05-12</updated>
   
   <registry id="srv6-endpoint-behaviors">
     <title>SRv6 Endpoint Behaviors</title>
@@ -455,63 +455,63 @@
       <value>60</value>
       <hex>0x003C</hex>
       <description>uDX6 (End.DX6 with NEXT-CSID)</description>
-      <xref type="rfc" data="rfc9800"/>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
       <controller><xref type="person" data="Pablo_Camarillo"/></controller>
     </record>
     <record date="2021-03-12" updated="2025-07-24">
       <value>61</value>
       <hex>0x003D</hex>
       <description>uDX4 (End.DX4 with NEXT-CSID)</description>
-      <xref type="rfc" data="rfc9800"/>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
       <controller><xref type="person" data="Pablo_Camarillo"/></controller>
     </record>
     <record date="2021-03-12" updated="2025-07-24">
       <value>62</value>
       <hex>0x003E</hex>
       <description>uDT6 (End.DT6 with NEXT-CSID)</description>
-      <xref type="rfc" data="rfc9800"/>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
       <controller><xref type="person" data="Pablo_Camarillo"/></controller>
     </record>
     <record date="2021-03-12" updated="2025-07-24">
       <value>63</value>
       <hex>0x003F</hex>
       <description>uDT4 (End.DT4 with NEXT-CSID)</description>
-      <xref type="rfc" data="rfc9800"/>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
       <controller><xref type="person" data="Pablo_Camarillo"/></controller>
     </record>
     <record date="2021-03-12" updated="2025-07-24">
       <value>64</value>
       <hex>0x0040</hex>
       <description>uDT46 (End.DT46 with NEXT-CSID)</description>
-      <xref type="rfc" data="rfc9800"/>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
       <controller><xref type="person" data="Pablo_Camarillo"/></controller>
     </record>
     <record date="2021-03-12" updated="2025-07-24">
       <value>65</value>
       <hex>0x0041</hex>
       <description>uDX2 (End.DX2 with NEXT-CSID)</description>
-      <xref type="rfc" data="rfc9800"/>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
       <controller><xref type="person" data="Pablo_Camarillo"/></controller>
     </record>
     <record date="2021-03-12" updated="2025-07-24">
       <value>66</value>
       <hex>0x0042</hex>
       <description>uDX2V (End.DX2V with NEXT-CSID)</description>
-      <xref type="rfc" data="rfc9800"/>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
       <controller><xref type="person" data="Pablo_Camarillo"/></controller>
     </record>
     <record date="2021-03-12" updated="2025-07-24">
       <value>67</value>
       <hex>0x0043</hex>
       <description>uDT2U (End.DT2U with NEXT-CSID)</description>
-      <xref type="rfc" data="rfc9800"/>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
       <controller><xref type="person" data="Pablo_Camarillo"/></controller>
     </record>
     <record date="2021-03-12" updated="2025-07-24">
       <value>68</value>
       <hex>0x0044</hex>
       <description>uDT2M (End.DT2M with NEXT-CSID)</description>
-      <xref type="rfc" data="rfc9800"/>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
       <controller><xref type="person" data="Pablo_Camarillo"/></controller>
     </record>
     <record date="2021-03-12" updated="2023-02-23">
