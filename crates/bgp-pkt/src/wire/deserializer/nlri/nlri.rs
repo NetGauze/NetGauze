@@ -808,17 +808,13 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnRouteParsingError<'a>> for L2EvpnRoute {
                 let (buf, value) = parse_into_located(route_buf)?;
                 (buf, L2EvpnRoute::IpPrefixRoute(value))
             }
-            Ok(_) | Err(_) => {
-                let (buf, len) = be_u8(buf)?;
-                let (buf, value): (Span<'_>, Span<'_>) = nom::bytes::complete::take(len)(buf)?;
-                (
-                    buf,
-                    L2EvpnRoute::Unknown {
-                        code: typ_code,
-                        value: value.to_vec(),
-                    },
-                )
-            }
+            Ok(_) | Err(_) => (
+                buf,
+                L2EvpnRoute::Unknown {
+                    code: typ_code,
+                    value: route_buf.to_vec(),
+                },
+            ),
         };
         Ok((buf, value))
     }

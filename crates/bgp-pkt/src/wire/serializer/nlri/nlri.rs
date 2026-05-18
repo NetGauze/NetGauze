@@ -649,7 +649,6 @@ impl WritablePdu<L2EvpnRouteWritingError> for L2EvpnRoute {
             Self::EthernetSegmentRoute(value) => value.write(writer)?,
             Self::IpPrefixRoute(value) => value.write(writer)?,
             Self::Unknown { value, .. } => {
-                writer.write_u8((value.len() + 1) as u8)?;
                 writer.write_all(value)?;
             }
         }
