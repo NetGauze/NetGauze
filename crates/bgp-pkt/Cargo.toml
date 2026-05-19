@@ -43,7 +43,7 @@ serde = [
     "netgauze-serde-macros",
 ]
 codec = ["tracing", "tokio-util", "bytes"]
-bench = ["criterion"]
+bench = ["criterion", "codec"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 json-schema = ["schemars", "netgauze-iana/json-schema", "ipnet/schemars1"]
 
