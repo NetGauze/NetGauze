@@ -46,7 +46,7 @@ serde = [
     "netgauze-serde-macros",
 ]
 codec = ["tokio-util", "bytes"]
-bench = ["criterion"]
+bench = ["criterion", "codec"]
 fuzz = ["arbitrary", "arbitrary_ext", "bitflags/arbitrary"]
 json-schema = ["schemars", "netgauze-bgp-pkt/json-schema", "netgauze-iana/json-schema", "ipnet/schemars1"]
 
@@ -61,3 +61,8 @@ chrono = { workspace = true, default-features = false, features = [
 serde_json = { workspace = true }
 rstest = { workspace = true }
 pcap-parser = { workspace = true, features = ["data"] }
+
+[[bench]]
+name = "serde_benchmark"
+harness = false
+required-features = ["bench"]
