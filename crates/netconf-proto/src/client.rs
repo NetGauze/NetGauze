@@ -216,12 +216,6 @@ where
     } else {
         TcpSocket::new_v6()?
     };
-    if let Some(mut local_addr) = local_addr {
-        local_addr.set_port(0); // use any available port
-        debug!("[{peer_addr}] Bind to local address `{local_addr}`");
-        socket.bind(local_addr)?;
-    }
-
     // Sets the value for the `SO_BINDTODEVICE` option on this socket
     //
     // If a socket is bound to an interface, only packets received from that
@@ -229,10 +223,17 @@ where
     // works for some socket types, particularly `AF_INET` sockets.
     //
     // If `interface` is `None` or an empty string it removes the binding.
+    // NOTE: SO_BINDTODEVICE must be set before calling bind().
     #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
     if let Some(name) = config.local_interface {
         debug!("[{peer_addr}] Bind to network interface `{name}`");
         socket.bind_device(Some(name.as_bytes()))?
+    }
+
+    if let Some(mut local_addr) = local_addr {
+        local_addr.set_port(0); // use any available port
+        debug!("[{peer_addr}] Bind to local address `{local_addr}`");
+        socket.bind(local_addr)?;
     }
 
     let stream = socket.connect(peer_addr).await?;
