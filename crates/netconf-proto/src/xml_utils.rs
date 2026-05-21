@@ -248,6 +248,11 @@ pub enum ParsingError {
     #[strum(to_string = "Found EOF while expecting data")]
     Eof,
 
+    /// Mixed content (text interleaved with child elements) found where a
+    /// plain text leaf value was expected
+    #[strum(to_string = "Mixed content is not allowed in a leaf element")]
+    MixedContent,
+
     /// Error from quick-xml encoding
     #[strum(to_string = "{0}")]
     EncodingError(quick_xml::encoding::EncodingError),
@@ -275,6 +280,7 @@ impl PartialEq for ParsingError {
             (Self::QuickXml(left), Self::QuickXml(right)) => left.to_string() == right.to_string(),
             (Self::Int(left), Self::Int(right)) => left == right,
             (Self::Eof, Self::Eof) => true,
+            (Self::MixedContent, Self::MixedContent) => true,
             (Self::EncodingError(left), Self::EncodingError(right)) => left == right,
             _ => false,
         }
@@ -459,16 +465,11 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     }
 
     #[inline]
-    fn ensure_parent_has_child(&self) -> Result<(), ParsingError> {
-        match self.parent_has_child() {
-            true => Ok(()),
-            false => Err(ParsingError::Recoverable),
-        }
-    }
-
-    #[inline]
     pub fn tag_string(&mut self) -> Result<Box<str>, ParsingError> {
-        self.ensure_parent_has_child()?;
+        // Support self-closing tags (i.e. <tag />)
+        if !self.is_empty_element() {
+            return Ok("".into());
+        }
         let mut accumulator = String::new();
         loop {
             match self.peek() {
@@ -495,14 +496,12 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
                     accumulator.push_str(replaced);
                     self.next_event()?
                 }
-                Event::End(_) | Event::Start(_) | Event::Empty(_) => {
-                    if accumulator.is_empty() {
-                        return Err(ParsingError::WrongToken {
-                            expecting: "text".to_string(),
-                            found: self.peek().clone().into_owned(),
-                        });
-                    }
+                Event::End(_) => {
+                    // Support empty tags (i.e. <tag></tag>)
                     return Ok(accumulator.into());
+                }
+                Event::Start(_) | Event::Empty(_) => {
+                    return Err(ParsingError::MixedContent);
                 }
                 _ => self.next_event()?,
             };
@@ -531,13 +530,13 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     }
 
     #[inline]
-    pub fn parent_has_child(&self) -> bool {
+    pub fn is_empty_element(&self) -> bool {
         matches!(self.parents.last(), Some(Event::Start(_)) | None)
     }
 
     pub fn close(&mut self) -> Result<Event<'a>, ParsingError> {
         // Handle the empty case
-        if !self.parent_has_child() {
+        if !self.is_empty_element() {
             self.parents.pop();
             return self.next_event();
         }
@@ -672,7 +671,7 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     pub fn collect_xml_sequence<N: XmlDeserialize<'a, N> + fmt::Debug + PartialEq + Sync>(
         &mut self,
     ) -> Result<Vec<N>, ParsingError> {
-        if !self.parent_has_child() {
+        if !self.is_empty_element() {
             return Ok(vec![]);
         }
         let mut acc = Vec::new();
@@ -711,7 +710,7 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         } else {
             ResolveResult::Unbound
         };
-        if !self.parent_has_child() {
+        if !self.is_empty_element() {
             return Ok(acc);
         }
         loop {
@@ -1156,6 +1155,17 @@ mod tests {
     }
 
     #[test]
+    fn test_tag_string_on_mixed_content_fails() {
+        let xml = r#"<root><tag1>Hello <tag2>Hello2</tag2> </tag1></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+        parser.open(None, "tag1").unwrap();
+
+        let result = parser.tag_string();
+        assert_eq!(result, Err(ParsingError::MixedContent));
+    }
+
+    #[test]
     fn test_tag_string_on_non_text_fails() {
         let xml = r#"<root><child/></root>"#;
         let mut parser = create_parser(xml);
@@ -1163,13 +1173,7 @@ mod tests {
         parser.open(None, "root").expect("failed to open root");
 
         let result = parser.tag_string();
-        assert_eq!(
-            result,
-            Err(ParsingError::WrongToken {
-                expecting: "text".to_string(),
-                found: Event::Empty(BytesStart::new("child").into_owned())
-            })
-        );
+        assert_eq!(result, Err(ParsingError::MixedContent));
 
         parser.close().expect("failed to close root");
     }
@@ -1180,14 +1184,140 @@ mod tests {
         let mut parser = create_parser(xml);
 
         // Initially no parent
-        assert!(parser.parent_has_child());
+        assert!(parser.is_empty_element());
 
         parser.open(None, "root").unwrap();
-        assert!(parser.parent_has_child());
+        assert!(parser.is_empty_element());
 
         parser.open(None, "child").unwrap();
         // Empty element doesn't count as having children
-        assert!(!parser.parent_has_child());
+        assert!(!parser.is_empty_element());
+    }
+
+    // -------------------------------------------------------------------------
+    // Empty / self-closing tag tests
+    // -------------------------------------------------------------------------
+
+    /// `open()` on a self-closing `<child/>` must succeed and return the
+    /// correct `BytesStart` event.
+    #[test]
+    fn test_open_empty_self_closing_tag() {
+        let xml = r#"<root><child/></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+
+        let result = parser.open(None, "child");
+        assert_eq!(result, Ok(BytesStart::new("child")));
+    }
+
+    /// After `open()`-ing a self-closing tag, `parent_has_child()` must report
+    /// `false` because `<child/>` has no children.
+    #[test]
+    fn test_parent_has_child_false_for_empty_tag() {
+        let xml = r#"<root><child/></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+        parser.open(None, "child").unwrap();
+
+        assert!(!parser.is_empty_element());
+    }
+
+    /// `close()` on a self-closing tag must not block waiting for a closing
+    /// `</child>` token — it should advance past the empty element immediately.
+    #[test]
+    fn test_close_empty_self_closing_tag() {
+        let xml = r#"<root><child/></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+        parser.open(None, "child").unwrap();
+
+        // close() the empty element — should succeed without consuming </root>
+        let result = parser.close();
+        assert!(result.is_ok());
+
+        // next meaningful token must be </root>
+        parser.skip_text().unwrap();
+        assert_eq!(parser.peek(), &Event::End(BytesEnd::new("root")));
+    }
+
+    /// `tag_string()` called immediately after `open()`-ing a self-closing tag
+    /// must return an empty string (not an error), because `<purpose/>` is
+    /// semantically equivalent to `<purpose></purpose>`.
+    #[test]
+    fn test_tag_string_returns_empty_string_for_self_closing_tag() {
+        let xml = r#"<root><purpose/></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+        parser.open(None, "purpose").unwrap();
+
+        let result = parser.tag_string();
+        assert_eq!(result, Ok("".into()));
+    }
+
+    /// Same as above but using explicit empty content `<purpose></purpose>`.
+    #[test]
+    fn test_tag_string_returns_empty_string_for_explicit_empty_tag() {
+        let xml = r#"<root><purpose></purpose></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+        parser.open(None, "purpose").unwrap();
+
+        let result = parser.tag_string();
+        assert_eq!(result, Ok("".into()));
+    }
+
+    /// `maybe_open()` must succeed when the next element is a self-closing tag.
+    #[test]
+    fn test_maybe_open_on_empty_self_closing_tag() {
+        let xml = r#"<root><child/></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+
+        let result = parser.maybe_open(None, "child");
+        assert_eq!(result, Ok(Some(BytesStart::new("child"))));
+    }
+
+    /// Multiple consecutive self-closing siblings must each be open-able and
+    /// close-able in sequence without the parser losing its position.
+    #[test]
+    fn test_open_close_multiple_empty_siblings() {
+        let xml = r#"<root><a/><b/><c/></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+
+        for tag in ["a", "b", "c"] {
+            parser.open(None, tag).unwrap();
+            assert!(!parser.is_empty_element(), "{tag} should have no children");
+            parser.close().unwrap();
+        }
+
+        // After all siblings, only </root> should remain
+        parser.skip_text().unwrap();
+        assert_eq!(parser.peek(), &Event::End(BytesEnd::new("root")));
+    }
+
+    /// A self-closing tag with a namespace must be matched correctly by both
+    /// `open()` (with the right namespace) and rejected by a wrong namespace.
+    #[test]
+    fn test_open_empty_tag_with_namespace() {
+        let xml = r#"<root xmlns:ns="urn:example"><ns:leaf/></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+
+        // Wrong namespace must fail without advancing the cursor
+        let wrong = parser.open(Some(Namespace(b"urn:wrong")), "leaf");
+        assert!(
+            matches!(wrong, Err(ParsingError::WrongToken { .. })),
+            "expected WrongToken, got {wrong:?}"
+        );
+        // Cursor must still point at the leaf element
+        assert!(parser.is_tag(Some(Namespace(b"urn:example")), "leaf"));
+
+        // Correct namespace must succeed
+        let ok = parser.open(Some(Namespace(b"urn:example")), "leaf");
+        assert!(ok.is_ok());
+        assert!(!parser.is_empty_element());
+        parser.close().unwrap();
     }
 
     #[test]
