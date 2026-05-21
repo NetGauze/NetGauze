@@ -161,7 +161,7 @@ pub enum YangLibraryCacheError {
     #[strum(to_string = "serde json error: {0}")]
     SerdeJsonError(serde_json::Error),
 
-    #[strum(to_string = "failed to connect to netconf server: {0}")]
+    #[strum(to_string = "netconf client error: {0}")]
     NetConfClientError(netgauze_netconf_proto::client::NetConfSshClientError),
 }
 
