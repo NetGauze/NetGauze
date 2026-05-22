@@ -459,16 +459,11 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     }
 
     #[inline]
-    fn ensure_parent_has_child(&self) -> Result<(), ParsingError> {
-        match self.parent_has_child() {
-            true => Ok(()),
-            false => Err(ParsingError::Recoverable),
-        }
-    }
-
-    #[inline]
     pub fn tag_string(&mut self) -> Result<Box<str>, ParsingError> {
-        self.ensure_parent_has_child()?;
+        // Support self-closing tags (i.e. <tag />)
+        if !self.parent_has_child() {
+            return Ok("".into());
+        }
         let mut accumulator = String::new();
         loop {
             match self.peek() {
@@ -495,7 +490,11 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
                     accumulator.push_str(replaced);
                     self.next_event()?
                 }
-                Event::End(_) | Event::Start(_) | Event::Empty(_) => {
+                Event::End(_) => {
+                    // Support empty tags (i.e. <tag></tag>)
+                    return Ok(accumulator.into());
+                }
+                Event::Start(_) | Event::Empty(_) => {
                     if accumulator.is_empty() {
                         return Err(ParsingError::WrongToken {
                             expecting: "text".to_string(),
@@ -1188,6 +1187,32 @@ mod tests {
         parser.open(None, "child").unwrap();
         // Empty element doesn't count as having children
         assert!(!parser.parent_has_child());
+    }
+
+    /// `tag_string()` called immediately after `open()`-ing a self-closing tag
+    /// must return an empty string (not an error), because `<purpose/>` is
+    /// semantically equivalent to `<purpose></purpose>`.
+    #[test]
+    fn test_tag_string_returns_empty_string_for_self_closing_tag() {
+        let xml = r#"<root><purpose/></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+        parser.open(None, "purpose").unwrap();
+
+        let result = parser.tag_string();
+        assert_eq!(result, Ok("".into()));
+    }
+
+    /// Same as above but using explicit empty content `<purpose></purpose>`.
+    #[test]
+    fn test_tag_string_returns_empty_string_for_explicit_empty_tag() {
+        let xml = r#"<root><purpose></purpose></root>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").unwrap();
+        parser.open(None, "purpose").unwrap();
+
+        let result = parser.tag_string();
+        assert_eq!(result, Ok("".into()));
     }
 
     #[test]
