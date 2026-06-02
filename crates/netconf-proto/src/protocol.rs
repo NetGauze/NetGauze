@@ -20,6 +20,8 @@ use crate::xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, Xm
 use crate::yanglib::YangLibrary;
 use crate::{NETCONF_MONITORING_NS, NETCONF_NS, YANG_LIBRARY_NS};
 use indexmap::IndexMap;
+use quick_xml::XmlVersion;
+use quick_xml::escape::resolve_predefined_entity;
 use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::name::ResolveResult;
 use serde::{Deserialize, Serialize};
@@ -236,7 +238,11 @@ fn extract_attribute(bytes_start: &BytesStart<'_>, attribute_name: &[u8]) -> Opt
         .map(|attr| match attr {
             Ok(attr) => {
                 if attr.key.local_name().into_inner() == attribute_name {
-                    match attr.unescape_value() {
+                    match attr.normalized_value_with(
+                        XmlVersion::Implicit1_0,
+                        1,
+                        resolve_predefined_entity,
+                    ) {
                         Ok(value) => Some(value.to_string().into_boxed_str()),
                         Err(_) => None,
                     }
