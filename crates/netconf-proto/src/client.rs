@@ -599,7 +599,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             } else {
                 Err(NetConfSshClientError::DependencyError(
                     DependencyError::ModuleNotFound {
-                        module_name: name.to_string(),
+                        module_name: (*name).into(),
                     },
                 ))?;
             }

@@ -149,7 +149,7 @@ impl YangLibrary {
     ) -> Result<RegisteredSchema, SchemaConstructionError> {
         if self.find_module(root_schema_name).is_none() {
             return Err(SchemaConstructionError::ModuleNotFound {
-                module_name: root_schema_name.to_string(),
+                module_name: root_schema_name.into(),
             });
         }
         // Convert the YANG library into a dependency graph.
@@ -173,7 +173,7 @@ impl YangLibrary {
         }
         let topo_sorted = petgraph::algo::toposort(&graph, None).map_err(|x| {
             SchemaConstructionError::CycleDetected(
-                graph.node_weight(x.node_id()).unwrap().to_string(),
+                (*graph.node_weight(x.node_id()).unwrap()).into(),
             )
         })?;
 
@@ -200,7 +200,7 @@ impl YangLibrary {
             debug!("Starting process to register schema {name}");
             self.find_module(root_schema_name)
                 .ok_or(SchemaConstructionError::ModuleNotFound {
-                    module_name: name.to_string(),
+                    module_name: name.into(),
                 })?;
             // Extract features if this is a module (not a submodule)
             let tags = if let Some(module) = self.find_module(name) {
@@ -406,7 +406,7 @@ impl YangLibrary {
     pub fn to_graph(
         &self,
         yang_schemas: &HashMap<Box<str>, Box<str>>,
-    ) -> Result<petgraph::graph::DiGraph<&str, ()>, String> {
+    ) -> Result<petgraph::graph::DiGraph<&str, ()>, Box<str>> {
         let mut graph = petgraph::Graph::<&str, ()>::new();
         let mut node_indices = HashMap::new();
         // Add nodes for all modules
@@ -435,7 +435,7 @@ impl YangLibrary {
         graph: &mut petgraph::Graph<&str, ()>,
         node_indices: &mut HashMap<&str, petgraph::prelude::NodeIndex>,
         yang_schemas: &HashMap<Box<str>, Box<str>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Box<str>> {
         let a = *node_indices.get(import_only_module.name()).unwrap();
         let schema = yang_schemas.get(import_only_module.name()).ok_or(format!(
             "No schema for import only module {}",
@@ -453,7 +453,7 @@ impl YangLibrary {
         current_node_idx: petgraph::prelude::NodeIndex,
         node_indices: &mut HashMap<&str, petgraph::prelude::NodeIndex>,
         schemas: &HashMap<Box<str>, Box<str>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Box<str>> {
         for import in &deps.imports {
             self.check_module_exists(import.module_name.as_str())?;
             let b = *node_indices
@@ -491,7 +491,7 @@ impl YangLibrary {
         graph: &mut petgraph::Graph<&str, ()>,
         node_indices: &mut HashMap<&str, petgraph::prelude::NodeIndex>,
         yang_schemas: &HashMap<Box<str>, Box<str>>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Box<str>> {
         let a = *node_indices.get(module.name()).unwrap();
         let schema = yang_schemas
             .get(module.name())
@@ -520,10 +520,10 @@ impl YangLibrary {
     }
 
     /// Helper method to check if a module exists in the YANG Library.s
-    fn check_module_exists(&self, module_name: &str) -> Result<(), String> {
+    fn check_module_exists(&self, module_name: &str) -> Result<(), Box<str>> {
         if self.find_module(module_name).is_none() && self.find_import_module(module_name).is_none()
         {
-            Err(format!("No module {module_name} found in YANG Library"))
+            Err(format!("No module {module_name} found in YANG Library").into_boxed_str())
         } else {
             Ok(())
         }
@@ -680,7 +680,7 @@ impl YangLibrary {
         }
         // TODO: support other location types (http, https, etc)
         Err(SchemaLoadingError::NoValidLocationFound {
-            module_name: module_name.to_string(),
+            module_name: module_name.into(),
         })
     }
 
@@ -709,8 +709,8 @@ impl YangLibrary {
         }
         debug!("file doesn't exist to load yang schema {module_name} from {schema_path:?}");
         Err(SchemaLoadingError::SchemaNotFoundInSearchPath {
-            module_name: module_name.to_string(),
-            search_path: search_path.to_string_lossy().to_string().to_string(),
+            module_name: module_name.into(),
+            search_path: search_path.to_string_lossy().into(),
         })
     }
 
@@ -737,7 +737,7 @@ impl YangLibrary {
                 let module_schema = yang_schemas
                     .get(module.name())
                     .ok_or(DependencyError::SchemaNotFound {
-                        module_name: module_name.to_string(),
+                        module_name: module_name.clone(),
                     })?
                     .clone();
                 let mut submodules = Vec::with_capacity(module.submodule.len());
@@ -745,7 +745,7 @@ impl YangLibrary {
                     let submodule_schema = yang_schemas
                         .get(submodule.name())
                         .ok_or(DependencyError::SchemaNotFound {
-                            module_name: submodule.name().to_string(),
+                            module_name: submodule.name().into(),
                         })?
                         .clone();
                     submodules.push((submodule.clone(), submodule_schema));
@@ -766,7 +766,7 @@ impl YangLibrary {
                     let module_schema = yang_schemas
                         .get(import_only_module.name())
                         .ok_or(DependencyError::SchemaNotFound {
-                            module_name: module_name.to_string(),
+                            module_name: module_name.clone(),
                         })?
                         .clone();
                     let mut submodules = Vec::with_capacity(import_only_module.submodules.len());
@@ -774,7 +774,7 @@ impl YangLibrary {
                         let submodule_schema = yang_schemas
                             .get(submodule.name())
                             .ok_or(DependencyError::SchemaNotFound {
-                                module_name: submodule.name().to_string(),
+                                module_name: submodule.name().into(),
                             })?
                             .clone();
                         submodules.push((submodule.clone(), submodule_schema));
@@ -932,15 +932,17 @@ impl ModuleSet {
     pub fn into_module_set_builder(
         self,
         yang_schemas: HashMap<Box<str>, Box<str>>,
-    ) -> Result<ModuleSetBuilder, String> {
+    ) -> Result<ModuleSetBuilder, Box<str>> {
         let mut submodules = HashMap::new();
         for module in self.modules.values() {
             if !yang_schemas.contains_key(module.name()) {
-                return Err(format!("No schema for module {}", module.name()));
+                return Err(format!("No schema for module {}", module.name()).into_boxed_str());
             }
             for submodule in module.submodules() {
                 if !yang_schemas.contains_key(submodule.name()) {
-                    return Err(format!("No schema for submodule {}", submodule.name()));
+                    return Err(
+                        format!("No schema for submodule {}", submodule.name()).into_boxed_str()
+                    );
                 }
                 submodules.insert(submodule.name.clone(), submodule.clone());
             }
@@ -954,18 +956,21 @@ impl ModuleSet {
                         .next()
                         .map(|x| x.name())
                         .unwrap_or("ZERO-MODULES")
-                ));
+                )
+                .into_boxed_str());
             }
             for import_only_module in import_only_modules.values() {
                 if !yang_schemas.contains_key(import_only_module.name()) {
                     return Err(format!(
                         "No schema for import only module {}",
                         import_only_module.name()
-                    ));
+                    )
+                    .into_boxed_str());
                 }
                 for (_, submodule) in import_only_module.submodules() {
                     if !yang_schemas.contains_key(submodule.name()) {
-                        return Err(format!("No schema for submodule {}", submodule.name()));
+                        return Err(format!("No schema for submodule {}", submodule.name())
+                            .into_boxed_str());
                     }
                     submodules.insert(submodule.name.clone(), submodule.clone());
                 }
@@ -1820,8 +1825,8 @@ impl ModuleSetBuilder {
                 let merged_features: Vec<_> = merged_features.into_iter().collect();
                 module.feature = merged_features.clone().into_boxed_slice();
                 let result = AddResult::Updated {
-                    old_version: existing_module.revision().map(|s| s.to_string()),
-                    new_version: module.revision().map(|s| s.to_string()),
+                    old_version: existing_module.revision().map(|s| s.into()),
+                    new_version: module.revision().map(|s| s.into()),
                     old_features: existing_features,
                     new_features,
                 };
@@ -1832,21 +1837,23 @@ impl ModuleSetBuilder {
             CompatabilityResult::Incompatible | CompatabilityResult::SameIncompatibleFeatures => {
                 // Not backward compatible - conflict
                 Err(DependencyError::VersionConflict {
-                    module_name: name.to_string(),
-                    existing_version: existing_module.revision().map(|s| s.to_string()),
-                    new_version: module.revision().map(|s| s.to_string()),
+                    module_name: name,
+                    existing_version: existing_module.revision().map(|s| s.into()),
+                    new_version: module.revision().map(|s| s.into()),
                     existing_features: existing_module
                         .features()
                         .iter()
                         .map(|f| f.to_string())
                         .collect::<Vec<_>>()
-                        .join(","),
+                        .join(",")
+                        .into_boxed_str(),
                     new_features: module
                         .features()
                         .iter()
                         .map(|f| f.to_string())
                         .collect::<Vec<_>>()
-                        .join(","),
+                        .join(",")
+                        .into_boxed_str(),
                 })
             }
         }
@@ -1871,7 +1878,7 @@ impl ModuleSetBuilder {
             module
         } else {
             return Err(DependencyError::ModuleNotFound {
-                module_name: module_name.to_string(),
+                module_name: module_name.into(),
             });
         };
         let submodule_name = submodule.name.clone();
@@ -1882,8 +1889,8 @@ impl ModuleSetBuilder {
             .any(|submodule| submodule.name == submodule_name)
         {
             return Err(DependencyError::SubmoduleNotFound {
-                module_name: module_name.to_string(),
-                submodule_name: submodule_name.to_string(),
+                module_name: module_name.into(),
+                submodule_name,
             });
         }
         let existing_submodule =
@@ -1908,8 +1915,8 @@ impl ModuleSetBuilder {
             CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
             CompatabilityResult::Compatible | CompatabilityResult::SameCompatibleFeatures => {
                 // Backward compatible - update to the new version
-                let old_version = existing_submodule.revision().map(|s| s.to_string());
-                let new_version = submodule.revision().map(|s| s.to_string());
+                let old_version = existing_submodule.revision().map(|s| s.into());
+                let new_version = submodule.revision().map(|s| s.into());
                 self.yang_schemas.insert(submodule_name.clone(), schema);
                 self.submodules.insert(submodule_name, submodule);
                 Ok(AddResult::Updated {
@@ -1921,11 +1928,11 @@ impl ModuleSetBuilder {
             }
             CompatabilityResult::Incompatible | CompatabilityResult::SameIncompatibleFeatures => {
                 Err(DependencyError::VersionConflict {
-                    module_name: submodule_name.to_string(),
-                    existing_version: existing_submodule.revision().map(|s| s.to_string()),
-                    new_version: submodule.revision().map(|s| s.to_string()),
-                    existing_features: "".to_string(),
-                    new_features: "".to_string(),
+                    module_name: submodule_name,
+                    existing_version: existing_submodule.revision().map(|s| s.into()),
+                    new_version: submodule.revision().map(|s| s.into()),
+                    existing_features: "".into(),
+                    new_features: "".into(),
                 })
             }
         }
@@ -1953,9 +1960,7 @@ impl ModuleSetBuilder {
             match tmp {
                 Ok(tmp) => tmp,
                 Err(_) => {
-                    return Err(DependencyError::ModuleNotFound {
-                        module_name: name.to_string(),
-                    });
+                    return Err(DependencyError::ModuleNotFound { module_name: name });
                 }
             }
         } else {
@@ -1983,8 +1988,8 @@ impl ModuleSetBuilder {
             CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
             CompatabilityResult::Compatible | CompatabilityResult::SameCompatibleFeatures => {
                 // Backward compatible - update to the new version
-                let old_version = existing.revision().map(|s| s.to_string());
-                let new_version = import_only_module.revision().map(|s| s.to_string());
+                let old_version = existing.revision().map(|s| s.into());
+                let new_version = import_only_module.revision().map(|s| s.into());
                 self.yang_schemas.insert(name.clone(), schema);
                 self.module_set.import_only_modules.insert(
                     name,
@@ -2003,11 +2008,11 @@ impl ModuleSetBuilder {
             CompatabilityResult::Incompatible | CompatabilityResult::SameIncompatibleFeatures => {
                 // Not backward compatible - conflict
                 Err(DependencyError::VersionConflict {
-                    module_name: name.to_string(),
-                    existing_version: existing.revision().map(|s| s.to_string()),
-                    new_version: import_only_module.revision().map(|s| s.to_string()),
-                    existing_features: "".to_string(),
-                    new_features: "".to_string(),
+                    module_name: name,
+                    existing_version: existing.revision().map(|s| s.into()),
+                    new_version: import_only_module.revision().map(|s| s.into()),
+                    existing_features: "".into(),
+                    new_features: "".into(),
                 })
             }
         }
@@ -2033,7 +2038,7 @@ impl ModuleSetBuilder {
             .contains_key(import_only_module_name)
         {
             return Err(DependencyError::ModuleNotFound {
-                module_name: import_only_module_name.to_string(),
+                module_name: import_only_module_name.into(),
             });
         };
         let submodule_name = submodule.name.clone();
@@ -2058,8 +2063,8 @@ impl ModuleSetBuilder {
             CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
             CompatabilityResult::Compatible | CompatabilityResult::SameCompatibleFeatures => {
                 // Backward compatible - update to the new version
-                let old_version = existing.revision().map(|s| s.to_string());
-                let new_version = submodule.revision().map(|s| s.to_string());
+                let old_version = existing.revision().map(|s| s.into());
+                let new_version = submodule.revision().map(|s| s.into());
                 self.yang_schemas.insert(submodule_name.clone(), schema);
                 self.submodules.insert(submodule_name, submodule);
                 Ok(AddResult::Updated {
@@ -2071,11 +2076,11 @@ impl ModuleSetBuilder {
             }
             CompatabilityResult::Incompatible | CompatabilityResult::SameIncompatibleFeatures => {
                 Err(DependencyError::VersionConflict {
-                    module_name: submodule_name.to_string(),
-                    existing_version: existing.revision().map(|s| s.to_string()),
-                    new_version: submodule.revision().map(|s| s.to_string()),
-                    existing_features: "".to_string(),
-                    new_features: "".to_string(),
+                    module_name: submodule_name,
+                    existing_version: existing.revision().map(|s| s.into()),
+                    new_version: submodule.revision().map(|s| s.into()),
+                    existing_features: "".into(),
+                    new_features: "".into(),
                 })
             }
         }
@@ -2139,7 +2144,7 @@ impl ModuleSetBuilder {
                 let schema = yang_schemas
                     .get(module.name())
                     .ok_or(DependencyError::SchemaNotFound {
-                        module_name: module.name().to_string(),
+                        module_name: module.name().into(),
                     })?
                     .clone();
                 if let Some(existing) = self.module_set.modules.get_mut(module.name()) {
@@ -2157,7 +2162,7 @@ impl ModuleSetBuilder {
                     let schema = yang_schemas
                         .get(submodule.name())
                         .ok_or(DependencyError::SchemaNotFound {
-                            module_name: submodule.name().to_string(),
+                            module_name: submodule.name().into(),
                         })?
                         .clone();
                     let result = self.add_submodule_for_module(
@@ -2176,7 +2181,7 @@ impl ModuleSetBuilder {
                     let schema = yang_schemas
                         .get(import_only_module.name())
                         .ok_or(DependencyError::SchemaNotFound {
-                            module_name: import_only_module.name().to_string(),
+                            module_name: import_only_module.name().into(),
                         })?
                         .clone();
                     let result = self.add_import_only_module(
@@ -2189,7 +2194,7 @@ impl ModuleSetBuilder {
                     for (_, submodule) in import_only_module.submodules() {
                         let schema = yang_schemas.get(submodule.name()).ok_or(
                             DependencyError::SchemaNotFound {
-                                module_name: submodule.name().to_string(),
+                                module_name: submodule.name().into(),
                             },
                         )?;
                         let result = self.add_submodule_for_import_only_module(
@@ -2273,8 +2278,8 @@ impl BackwardCompatibilityChecker for PermissiveVersionChecker {
 pub enum AddResult {
     Added,
     Updated {
-        old_version: Option<String>,
-        new_version: Option<String>,
+        old_version: Option<Box<str>>,
+        new_version: Option<Box<str>>,
         old_features: Vec<Box<str>>,
         new_features: Vec<Box<str>>,
     },
@@ -2287,24 +2292,24 @@ pub enum DependencyError {
         to_string = "Version conflict for module '{module_name}': existing version {existing_version:?}, attempted to add incompatible version {new_version:?}"
     )]
     VersionConflict {
-        module_name: String,
-        existing_version: Option<String>,
-        new_version: Option<String>,
-        existing_features: String,
-        new_features: String,
+        module_name: Box<str>,
+        existing_version: Option<Box<str>>,
+        new_version: Option<Box<str>>,
+        existing_features: Box<str>,
+        new_features: Box<str>,
     },
 
     #[strum(to_string = "Module '{module_name}' not found")]
-    ModuleNotFound { module_name: String },
+    ModuleNotFound { module_name: Box<str> },
 
     #[strum(to_string = "Submodule '{submodule_name}' not found in module '{module_name}'")]
     SubmoduleNotFound {
-        module_name: String,
-        submodule_name: String,
+        module_name: Box<str>,
+        submodule_name: Box<str>,
     },
 
     #[strum(to_string = "YANG schema for module '{module_name}' is not found")]
-    SchemaNotFound { module_name: String },
+    SchemaNotFound { module_name: Box<str> },
 }
 
 impl std::error::Error for DependencyError {}
@@ -2312,13 +2317,13 @@ impl std::error::Error for DependencyError {}
 #[derive(Debug, strum_macros::Display)]
 pub enum SchemaConstructionError {
     #[strum(to_string = "Failed to convert schema to graph {0}")]
-    Graph(String),
+    Graph(Box<str>),
 
     #[strum(to_string = "Module '{module_name}' not found")]
-    ModuleNotFound { module_name: String },
+    ModuleNotFound { module_name: Box<str> },
 
     #[strum(to_string = "Dependency cycle detected at node {0}")]
-    CycleDetected(String),
+    CycleDetected(Box<str>),
 
     #[strum(to_string = "Schema registration error {0}")]
     RegistrationError(schema_registry_client::rest::apis::Error),
@@ -2329,14 +2334,14 @@ impl std::error::Error for SchemaConstructionError {}
 #[derive(Debug, strum_macros::Display)]
 pub enum SchemaLoadingError {
     #[strum(to_string = "no valid location found to the schema of the module `{module_name}`")]
-    NoValidLocationFound { module_name: String },
+    NoValidLocationFound { module_name: Box<str> },
 
     #[strum(
         to_string = "failed find the schema of the module `{module_name}` from search path {search_path}"
     )]
     SchemaNotFoundInSearchPath {
-        module_name: String,
-        search_path: String,
+        module_name: Box<str>,
+        search_path: Box<str>,
     },
 
     #[strum(to_string = "I/O error {0}")]
