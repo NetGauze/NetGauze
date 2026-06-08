@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="segment-routing">
   <title>Segment Routing</title>
   <created>2021-01-08</created>
-  <updated>2026-05-12</updated>
+  <updated>2026-06-02</updated>
   
   <registry id="srv6-endpoint-behaviors">
     <title>SRv6 Endpoint Behaviors</title>
@@ -1016,9 +1016,37 @@
       <xref type="rfc" data="rfc9800"/>
       <controller>IETF</controller>
     </record>
+    <record date="2026-06-02">
+      <value>142</value>
+      <hex>0x008E</hex>
+      <description>End.DTM46</description>
+      <xref type="draft" data="draft-ietf-spring-srv6-mpls-interworking-02"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2026-06-02">
+      <value>143</value>
+      <hex>0x008F</hex>
+      <description>End.DXM4</description>
+      <xref type="draft" data="draft-ietf-spring-srv6-mpls-interworking-02"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2026-06-02">
+      <value>144</value>
+      <hex>0x0090</hex>
+      <description>End.DXM6</description>
+      <xref type="draft" data="draft-ietf-spring-srv6-mpls-interworking-02"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2026-06-02">
+      <value>145</value>
+      <hex>0x0091</hex>
+      <description>End.DXM2</description>
+      <xref type="draft" data="draft-ietf-spring-srv6-mpls-interworking-02"/>
+      <controller>IETF</controller>
+    </record>
     <record>
-      <value>142-149</value>
-      <hex>0x008E-0x0095</hex>
+      <value>146-149</value>
+      <hex>0x0092-0x0095</hex>
       <description>Unassigned</description>
       <controller/>
     </record>
