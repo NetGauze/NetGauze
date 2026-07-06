@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="segment-routing">
   <title>Segment Routing</title>
   <created>2021-01-08</created>
-  <updated>2026-06-02</updated>
+  <updated>2026-07-02</updated>
   
   <registry id="srv6-endpoint-behaviors">
     <title>SRv6 Endpoint Behaviors</title>
@@ -1376,6 +1376,27 @@
       <value>K</value>
       <description>IPv6 Addresses for link endpoints as Local, Remote pair for SRv6</description>
       <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2026-07-02">
+      <value>L</value>
+      <description>IPv4 Node Address and Local Interface ID with optional SR Algorithm for SR-MPLS (TEMPORARY - registered 2026-07-02, expires 2027-07-02)</description>
+      <xref type="draft" data="draft-ietf-idr-sr-te-policy-attr-05"/>
+    </record>
+    <record date="2026-07-02">
+      <value>M</value>
+      <description>IPv4 Addresses for link endpoints as Local, Remote pair with optional SR Algorithm for SR-MPLS (TEMPORARY - registered 2026-07-02, expires 2027-07-02)</description>
+      <xref type="draft" data="draft-ietf-idr-sr-te-policy-attr-05"/>
+    </record>
+    <record date="2026-07-02">
+      <value>N</value>
+      <description>IPv6 Node Addresses and Interface ID for link endpoints as Local, 
+        Remote pair, with optional SR Algorithm for SR-MPLS (TEMPORARY - registered 2026-07-02, expires 2027-07-02)</description>
+      <xref type="draft" data="draft-ietf-idr-sr-te-policy-attr-05"/>
+    </record>
+    <record date="2026-07-02">
+      <value>O</value>
+      <description>IPv6 Addresses for link endpoints as Local, Remote pair, with optional SR Algorithm for SR-MPLS (TEMPORARY - registered 2026-07-02, expires 2027-07-02)</description>
+      <xref type="draft" data="draft-ietf-idr-sr-te-policy-attr-05"/>
     </record>
   </registry>
 
