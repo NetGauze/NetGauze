@@ -142,6 +142,7 @@ impl NetconfYangLibraryFetcher {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     async fn fetch_from_device(
         cfg: &FetchConfig,
         subscription_info: SubscriptionInfo,
@@ -216,6 +217,7 @@ impl NetconfYangLibraryFetcher {
         Ok((subscription_info, yang_lib, schemas))
     }
 
+    #[allow(clippy::result_large_err)]
     async fn fetch_from_device_by_id(
         cfg: &FetchConfig,
         collector: SocketAddr,
@@ -381,6 +383,7 @@ impl NetconfYangLibraryFetcher {
     /// `operation` is called up to `retry.max_retries + 1` times. Each failed
     /// attempt waits `base * 2^(attempt-1)` (capped at `retry.max_backoff`)
     /// with equal jitter before the next try.
+    #[allow(clippy::result_large_err)]
     async fn with_retry<F, Fut>(peer: SocketAddr, retry: RetryConfig, operation: F) -> FetcherResult
     where
         F: Fn() -> Fut,
