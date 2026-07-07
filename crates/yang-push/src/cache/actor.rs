@@ -1300,8 +1300,8 @@ pub(crate) mod tests {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 200)), 830),
             1,
             Target::new_datastore(
-                "ds:operational".to_string(),
-                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+                "ds:operational".into(),
+                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".into()),
             ),
             None,
             Some(Transport::UDPNotif),

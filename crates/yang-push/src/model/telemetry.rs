@@ -436,7 +436,7 @@ impl FilterSpec {
 impl From<Target> for FilterSpec {
     fn from(target: Target) -> Self {
         let xpath_filter = if let Some(xpath_filter) = target.stream_xpath_filter {
-            Some(xpath_filter.to_string())
+            Some(xpath_filter)
         } else {
             target.datastore_xpath_filter
         };
@@ -446,9 +446,9 @@ impl From<Target> for FilterSpec {
             target.datastore_subtree_filter
         };
         Self {
-            stream: target.stream,
-            datastore: target.datastore,
-            xpath_filter,
+            stream: target.stream.map(|x| x.to_string()),
+            datastore: target.datastore.map(|x| x.to_string()),
+            xpath_filter: xpath_filter.map(|x| x.to_string()),
             subtree_filter,
         }
     }
@@ -499,7 +499,7 @@ impl From<netgauze_netconf_proto::yang_push::subscription::UpdateTrigger> for Up
             } => UpdateTrigger::OnChange {
                 dampening_period,
                 sync_on_start,
-                excluded_change,
+                excluded_change: excluded_change.map(|x| x.to_vec()),
             },
         }
     }
