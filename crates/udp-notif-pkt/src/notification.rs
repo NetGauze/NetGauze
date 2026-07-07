@@ -592,9 +592,9 @@ impl TryFrom<netgauze_netconf_proto::yang_push::subscription::Target> for Target
                             ));
                         }
                         StreamFilterSpec::Xpath(xpath) => Target {
-                            stream: Some(stream_target.stream.into_string()),
+                            stream: Some(stream_target.stream),
                             stream_subtree_filter: None,
-                            stream_xpath_filter: Some(xpath.path.into_string()),
+                            stream_xpath_filter: Some(xpath.path),
                             replay_start_time: stream_target.replay_start_time,
                             datastore: None,
                             datastore_subtree_filter: None,
@@ -624,9 +624,9 @@ impl TryFrom<netgauze_netconf_proto::yang_push::subscription::Target> for Target
                         stream_subtree_filter: None,
                         stream_xpath_filter: None,
                         replay_start_time: None,
-                        datastore: Some(datastore_target.datastore.to_string()),
+                        datastore: Some(datastore_target.datastore.to_string().into_boxed_str()),
                         datastore_subtree_filter: None,
-                        datastore_xpath_filter: Some(xpath.path.into_string()),
+                        datastore_xpath_filter: Some(xpath.path),
                     },
                 },
             },
@@ -762,7 +762,7 @@ impl YangPushChangeUpdate {
 pub struct Target {
     #[serde(rename = "stream")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream: Option<String>,
+    pub stream: Option<Box<str>>,
 
     #[serde(rename = "stream-subtree-filter")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -770,7 +770,7 @@ pub struct Target {
 
     #[serde(rename = "stream-xpath-filter")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_xpath_filter: Option<String>,
+    pub stream_xpath_filter: Option<Box<str>>,
 
     #[serde(rename = "replay-start-time")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -778,7 +778,7 @@ pub struct Target {
 
     #[serde(rename = "ietf-yang-push:datastore")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub datastore: Option<String>,
+    pub datastore: Option<Box<str>>,
 
     #[serde(rename = "datastore-subtree-filter")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -786,18 +786,18 @@ pub struct Target {
 
     #[serde(rename = "ietf-yang-push:datastore-xpath-filter")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub datastore_xpath_filter: Option<String>,
+    pub datastore_xpath_filter: Option<Box<str>>,
 }
 
 impl Target {
     pub const fn new(
-        stream: Option<String>,
+        stream: Option<Box<str>>,
         stream_subtree_filter: Option<Value>,
-        stream_xpath_filter: Option<String>,
+        stream_xpath_filter: Option<Box<str>>,
         replay_start_time: Option<DateTime<Utc>>,
-        datastore: Option<String>,
+        datastore: Option<Box<str>>,
         datastore_subtree_filter: Option<Value>,
-        datastore_xpath_filter: Option<String>,
+        datastore_xpath_filter: Option<Box<str>>,
     ) -> Self {
         Self {
             stream,
@@ -815,9 +815,9 @@ impl Target {
     /// Simplifies instantiating the target without having to specify the
     /// stream-specific fields.
     pub fn new_stream(
-        stream: String,
+        stream: Box<str>,
         replay_start_time: Option<DateTime<Utc>>,
-        filter: either::Either<Value, String>,
+        filter: either::Either<Value, Box<str>>,
     ) -> Self {
         let (stream_subtree_filter, stream_xpath_filter) = match filter {
             either::Either::Left(value) => (Some(value), None),
@@ -838,7 +838,7 @@ impl Target {
     ///
     /// Simplifies instantiating the target without having to specify the
     /// stream-specific fields.
-    pub fn new_datastore(datastore: String, filter: either::Either<Value, String>) -> Self {
+    pub fn new_datastore(datastore: Box<str>, filter: either::Either<Value, Box<str>>) -> Self {
         let (datastore_subtree_filter, datastore_xpath_filter) = match filter {
             either::Either::Left(value) => (Some(value), None),
             either::Either::Right(xpath_filter) => (None, Some(xpath_filter)),
@@ -1007,9 +1007,9 @@ mod tests {
                 stream_subtree_filter: None,
                 stream_xpath_filter: None,
                 replay_start_time: None,
-                datastore: Some("example-datastore".to_string()),
+                datastore: Some("example-datastore".into()),
                 datastore_subtree_filter: None,
-                datastore_xpath_filter: Some("/example/datastore/xpath/filter".to_string()),
+                datastore_xpath_filter: Some("/example/datastore/xpath/filter".into()),
             },
             encoding: Some(Encoding::Json),
             transport: Some(Transport::UDPNotif),
@@ -1022,7 +1022,7 @@ mod tests {
             update_trigger: Some(UpdateTrigger::OnChange {
                 dampening_period: Some(CentiSeconds::new(100)),
                 sync_on_start: Some(true),
-                excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
+                excluded_change: Some(Box::new([ChangeType::Create, ChangeType::Replace])),
             }),
             module_version: Some(vec![YangPushModuleVersion {
                 name: "example-module".into(),
@@ -1084,9 +1084,9 @@ mod tests {
             stream_subtree_filter: None,
             stream_xpath_filter: None,
             replay_start_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
-            datastore: Some("example-datastore".to_string()),
+            datastore: Some("example-datastore".into()),
             datastore_subtree_filter: Some(serde_json::json!({"example-map": "example-value"})),
-            datastore_xpath_filter: Some("/example/datastore/xpath/filter".to_string()),
+            datastore_xpath_filter: Some("/example/datastore/xpath/filter".into()),
         };
 
         // Target getters
@@ -1122,7 +1122,7 @@ mod tests {
             update_trigger: Some(UpdateTrigger::OnChange {
                 dampening_period: Some(CentiSeconds::new(100)),
                 sync_on_start: Some(true),
-                excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
+                excluded_change: Some(Box::new([ChangeType::Create, ChangeType::Replace])),
             }),
             module_version: Some(vec![YangPushModuleVersion {
                 name: "example-module".into(),
@@ -1456,9 +1456,9 @@ mod tests {
     #[test]
     fn test_target_is_datastore() {
         let stream_target = Target::new(
-            Some("example-stream".to_string()),
+            Some("example-stream".into()),
             None,
-            Some("/example/xpath/filter".to_string()),
+            Some("/example/xpath/filter".into()),
             None,
             None,
             None,
@@ -1466,8 +1466,8 @@ mod tests {
         );
 
         let datastore_target = Target::new_datastore(
-            "ds:operational".to_string(),
-            either::Either::Right("/example/xpath/filter".to_string()),
+            "ds:operational".into(),
+            either::Either::Right("/example/xpath/filter".into()),
         );
 
         assert!(!stream_target.is_datastore_only());
@@ -1525,8 +1525,8 @@ mod tests {
             });
 
         let datastore_xpath_expected = Target::new_datastore(
-            "ietf-datastores:operational".to_string(),
-            either::Either::Right("/openconfig-platform:components/component/state".to_string()),
+            "ietf-datastores:operational".into(),
+            either::Either::Right("/openconfig-platform:components/component/state".into()),
         );
 
         let datastore_subtree_input =
@@ -1602,8 +1602,8 @@ mod tests {
         let expected = SubscriptionStartedModified {
             id: 3,
             target: Target::new_datastore(
-                "ietf-datastores:operational".to_string(),
-                either::Either::Right("openconfig-platform:components/component/state".to_string()),
+                "ietf-datastores:operational".into(),
+                either::Either::Right("openconfig-platform:components/component/state".into()),
             ),
             stop_time: None,
             dscp: Some(0),

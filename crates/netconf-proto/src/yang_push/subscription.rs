@@ -205,7 +205,7 @@ pub enum UpdateTrigger {
         sync_on_start: Option<bool>,
 
         #[serde(skip_serializing_if = "Option::is_none")]
-        excluded_change: Option<Vec<ChangeType>>,
+        excluded_change: Option<Box<[ChangeType]>>,
     },
 }
 
@@ -508,7 +508,7 @@ impl<'a> XmlDeserialize<'a, UpdateTrigger> for UpdateTrigger {
             Ok(Self::OnChange {
                 dampening_period,
                 sync_on_start,
-                excluded_change,
+                excluded_change: excluded_change.map(|x| x.into_boxed_slice()),
             })
         } else {
             Err(ParsingError::WrongToken {

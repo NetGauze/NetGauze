@@ -694,8 +694,8 @@ mod tests {
             peer,
             id,
             Target::new_datastore(
-                DatastoreName::Operational.to_string(),
-                either::Right("openconfig-interfaces:interfaces".to_string()),
+                DatastoreName::Operational.to_string().into_boxed_str(),
+                either::Right("openconfig-interfaces:interfaces".into()),
             ),
             None,
             Some(Transport::UDPNotif),

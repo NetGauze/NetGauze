@@ -854,7 +854,7 @@ impl SubscriptionInfo {
             interface,
             peer,
             id,
-            target: Target::new_datastore("EMPTY".to_string(), either::Right("EMPTY".to_string())),
+            target: Target::new_datastore("EMPTY".into(), either::Right("EMPTY".into())),
             stop_time: None,
             transport: None,
             encoding: None,
@@ -1248,8 +1248,8 @@ mod tests {
             SocketAddr::from(([192, 168, 1, 101], 830)),
             1,
             Target::new_datastore(
-                "ds:operational".to_string(),
-                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+                "ds:operational".into(),
+                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".into()),
             ),
             None,
             Some(Transport::UDPNotif),
@@ -1455,10 +1455,10 @@ mod tests {
     fn test_subscription_info_new() {
         let collector = SocketAddr::from(([192, 168, 1, 100], 10000));
         let peer = SocketAddr::from(([192, 168, 1, 101], 12345));
-        let content_id = ContentId::from("content-123".to_string());
+        let content_id = ContentId::from("content-123");
         let target = Target::new_datastore(
-            "ds:operational".to_string(),
-            either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+            "ds:operational".into(),
+            either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".into()),
         );
 
         let models = Box::new([
@@ -1471,8 +1471,8 @@ mod tests {
             peer,
             1,
             Target::new_datastore(
-                "ds:operational".to_string(),
-                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+                "ds:operational".into(),
+                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".into()),
             ),
             None,
             Some(Transport::UDPNotif),
@@ -1730,8 +1730,8 @@ mod tests {
             SocketAddr::from(([192, 168, 1, 102], 830)),
             2,
             Target::new_datastore(
-                "ds:operational".to_string(),
-                either::Right("/ietf-routing:routing/routing-protocols".to_string()),
+                "ds:operational".into(),
+                either::Right("/ietf-routing:routing/routing-protocols".into()),
             ),
             None,
             Some(Transport::UDPNotif),
@@ -1755,8 +1755,8 @@ mod tests {
             SocketAddr::from(([192, 168, 1, 103], 830)),
             2,
             Target::new_datastore(
-                "ds:operational".to_string(),
-                either::Right("/ietf-routing:routing/routing-protocols".to_string()),
+                "ds:operational".into(),
+                either::Right("/ietf-routing:routing/routing-protocols".into()),
             ),
             None,
             Some(Transport::UDPNotif),
@@ -1838,8 +1838,8 @@ mod tests {
             SocketAddr::from(([192, 168, 1, 102], 830)),
             2,
             Target::new_datastore(
-                "ds:operational".to_string(),
-                either::Right("/ietf-routing:routing/routing-protocols".to_string()),
+                "ds:operational".into(),
+                either::Right("/ietf-routing:routing/routing-protocols".into()),
             ),
             None,
             Some(Transport::UDPNotif),
@@ -1895,8 +1895,8 @@ mod tests {
             SocketAddr::from(([192, 168, 1, 101], 830)),
             1,
             Target::new_datastore(
-                "ds:operational".to_string(),
-                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+                "ds:operational".into(),
+                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".into()),
             ),
             None,
             Some(Transport::UDPNotif),
@@ -1948,8 +1948,8 @@ mod tests {
             SocketAddr::from(([192, 168, 1, 102], 830)),
             2,
             Target::new_datastore(
-                "ds:operational".to_string(),
-                either::Right("/ietf-routing:routing/routing-protocols".to_string()),
+                "ds:operational".into(),
+                either::Right("/ietf-routing:routing/routing-protocols".into()),
             ),
             None,
             Some(Transport::UDPNotif),

@@ -155,8 +155,8 @@ mod tests {
             SocketAddr::new(ip, 8080),
             1,
             netgauze_udp_notif_pkt::notification::Target::new_datastore(
-                "ietf-datastores:operational".to_string(),
-                either::Right("/test-path".to_string()),
+                "ietf-datastores:operational".into(),
+                either::Right("/test-path".into()),
             ),
             None,
             Some(Transport::UDPNotif),
