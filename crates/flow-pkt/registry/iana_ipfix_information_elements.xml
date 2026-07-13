@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="ipfix">
 <title>IP Flow Information Export (IPFIX) Entities</title>
 <created>2007-05-10</created>
-<updated>2026-04-24</updated>
+<updated>2026-07-08</updated>
 
 <note><xref type="rfc" data="rfc7012"/> has obsoleted <xref type="rfc" data="rfc5102"/>. However, references to <xref type="rfc" data="rfc5102"/>
 remain as part of the historical record.</note>
@@ -14333,7 +14333,7 @@ hashSelectedRangeMax, hashOutputRangeMin, hashOutputRangeMax</parameters>
 <value>2</value>
 <description>Path Computation Element</description>
 <xref type="rfc" data="rfc9487"/>
-<xref type="draft" data="RFC-ietf-pce-segment-routing-ipv6-25"/>
+<xref type="rfc" data="rfc9603"/>
 </record>
 
 <record date="2023-06-08" updated="2024-04-09">
