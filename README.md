@@ -1,11 +1,11 @@
-# NetGauze: Weaving network protocols into one toolkit
+# NetGauze®: Weaving network protocols into one toolkit
 
 [<img alt="github" src="https://img.shields.io/badge/github-netgauze/netgauze-8da0cb??style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/NetGauze/NetGauze)
 [<img alt="build status" src="https://img.shields.io/github/actions/workflow/status/NetGauze/NetGauze/ci.yml?branch=main&style=for-the-badge" height="20">](https://github.com/NetGauze/NetGauze/actions?query=branch%3Amain)
 [![codecov](https://codecov.io/gh/NetGauze/NetGauze/graph/badge.svg?token=QYU92L6YZJ)](https://codecov.io/gh/NetGauze/NetGauze)
 
-NetGauze is a set of Rust libraries and programs for network monitoring, telemetry collection, and protocol analysis. It
-provides high-performance, type-safe packet parsing and serialization for key network protocols, along with a
+NetGauze® is a set of Rust libraries and programs for network monitoring, telemetry collection, and protocol analysis.
+It provides high-performance, type-safe packet parsing and serialization for key network protocols, along with a
 network telemetry collector daemon that can be used to collect and process telemetry data from multiple sources.
 
 NetGauze leverages Rust's type system to ensure protocol correctness at compile time when possible — packets are
@@ -191,12 +191,20 @@ cargo generate-rpm -p crates/collector
 ## License
 
 Copyright (C) 2022-present The NetGauze Authors. All rights reserved.
+Registered Trademark (R) of NetGauze is owned by Ahmed Elhassany.
 
 NetGauze is licensed under the Apache License, Version 2.0
 ([LICENSE](LICENSE) or <http://www.apache.org/licenses/LICENSE-2.0>).
 Attribution notices are in [NOTICE](NOTICE).
 The author list is in [AUTHORS](AUTHORS).
 
+## Trademark
+
+NetGauze® is a registered trademark of **Ahmed Elhassany**. The
+Apache 2.0 license covers the code only, not the "NetGauze" name or logo
+(see section 6). You may use the name to refer to the project accurately, but
+not to imply endorsement or affiliation, or as the name of a fork or derived
+product. Questions: open an issue.
 
 ## Authors
 
@@ -205,7 +213,6 @@ originally started in 2019 as a BGP library. It has since evolved into a full-fl
 network telemetry toolkit with contributions from many individuals. The current author
 list is maintained in [AUTHORS](AUTHORS); see also the full
 [contributor graph](https://github.com/NetGauze/NetGauze/graphs/contributors).
-
 
 ## Contribution
 
