@@ -2961,9 +2961,11 @@ dependencies = [
 name = "netgauze-parse-utils"
 version = "0.12.1"
 dependencies = [
+ "ipnet",
  "netgauze-locate",
  "nom 7.1.3",
  "serde",
+ "thiserror",
 ]
 
 [[package]]
