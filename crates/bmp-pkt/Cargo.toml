@@ -18,13 +18,11 @@ categories = ["network-programming", "parsing"]
 [dependencies]
 netgauze-iana = { workspace = true }
 netgauze-bgp-pkt = { workspace = true }
-netgauze-locate = { workspace = true, optional = true }
 netgauze-parse-utils = { workspace = true, optional = true }
 netgauze-serde-macros = { workspace = true, optional = true }
 strum_macros = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 ipnet = { workspace = true, features = ["serde"] }
-nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
 criterion = { workspace = true, optional = true }                        # Dev dep for bench
 serde = { workspace = true, features = ["derive"] }
@@ -35,13 +33,12 @@ bytes = { workspace = true, optional = true }
 either = { workspace = true }
 bitflags = { workspace = true, features = ["serde"] }
 schemars = { workspace = true, features = ["derive", "chrono04"], optional = true }
+thiserror = { workspace = true }
 
 [features]
 default = ["serde"]
 serde = [
-    "nom",
     "byteorder",
-    "netgauze-locate",
     "netgauze-parse-utils",
     "netgauze-serde-macros",
 ]

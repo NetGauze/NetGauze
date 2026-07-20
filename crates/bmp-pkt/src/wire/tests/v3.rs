@@ -30,7 +30,7 @@ use netgauze_bgp_pkt::capabilities::{
 use netgauze_bgp_pkt::community::{
     Community, ExtendedCommunity, TransitiveTwoOctetExtendedCommunity,
 };
-use netgauze_bgp_pkt::iana::{BgpMessageType, UndefinedBgpMessageType};
+use netgauze_bgp_pkt::iana::BgpMessageType;
 use netgauze_bgp_pkt::nlri::{
     Ipv4NlriMplsLabelsAddress, Ipv4Unicast, Ipv4UnicastAddress, MplsLabel, RouteDistinguisher,
 };
@@ -44,12 +44,12 @@ use netgauze_bgp_pkt::update::BgpUpdateMessage;
 use netgauze_bgp_pkt::wire::deserializer::nlri::RouteDistinguisherParsingError;
 use netgauze_bgp_pkt::wire::deserializer::{BgpMessageParsingError, BgpParsingContext};
 use netgauze_iana::address_family::{AddressFamily, AddressType};
-use netgauze_parse_utils::Span;
+use netgauze_parse_utils::error::ParseError;
 use netgauze_parse_utils::test_helpers::{
-    test_parse_error, test_parse_error_with_one_input, test_parsed_completely,
-    test_parsed_completely_with_one_input, test_write,
+    test_parse_error_bytes_reader, test_parse_error_with_one_input_bytes_reader,
+    test_parsed_completely_bytes_reader, test_parsed_completely_with_one_input_bytes_reader,
+    test_write,
 };
-use nom::error::ErrorKind;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
 
@@ -127,33 +127,43 @@ fn test_peer_type() -> Result<(), PeerHeaderWritingError> {
     let good_experimental_253 = BmpPeerType::Experimental253 { flags: 0xff };
     let good_experimental_254 = BmpPeerType::Experimental254 { flags: 0xff };
 
-    let bad_eof = LocatedBmpPeerTypeParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_eof_wire[1..]) },
-        BmpPeerTypeParsingError::NomError(ErrorKind::Eof),
-    );
-    let bad_reserved = LocatedBmpPeerTypeParsingError::new(
-        Span::new(&bad_reserved_wire),
-        BmpPeerTypeParsingError::UndefinedBmpPeerTypeCode(UndefinedBmpPeerTypeCode(0xff)),
-    );
+    let bad_eof = BmpPeerTypeParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 1,
+        needed: 1,
+        available: 0,
+    });
+    let bad_reserved = BmpPeerTypeParsingError::UndefinedBmpPeerTypeCode {
+        offset: 0,
+        code: 0xff,
+    };
 
-    test_parsed_completely(&good_global_instance_ipv4_wire, &good_global_instance_ipv4);
-    test_parsed_completely(&good_global_instance_ipv6_wire, &good_global_instance_ipv6);
-    test_parsed_completely(&good_global_instance_post_wire, &good_global_instance_post);
-    test_parsed_completely(&good_global_asn2_wire, &good_global_asn2);
-    test_parsed_completely(&good_global_adj_out_wire, &good_global_adj_out);
-    test_parsed_completely(&good_rd_instance_all_wire, &good_rd_instance_all);
-    test_parsed_completely(&good_loc_rib_instance_wire, &good_loc_rib_instance);
-    test_parsed_completely(&good_local_instance_all_wire, &good_local_instance_all);
-    test_parsed_completely(
+    test_parsed_completely_bytes_reader(
+        &good_global_instance_ipv4_wire,
+        &good_global_instance_ipv4,
+    );
+    test_parsed_completely_bytes_reader(
+        &good_global_instance_ipv6_wire,
+        &good_global_instance_ipv6,
+    );
+    test_parsed_completely_bytes_reader(
+        &good_global_instance_post_wire,
+        &good_global_instance_post,
+    );
+    test_parsed_completely_bytes_reader(&good_global_asn2_wire, &good_global_asn2);
+    test_parsed_completely_bytes_reader(&good_global_adj_out_wire, &good_global_adj_out);
+    test_parsed_completely_bytes_reader(&good_rd_instance_all_wire, &good_rd_instance_all);
+    test_parsed_completely_bytes_reader(&good_loc_rib_instance_wire, &good_loc_rib_instance);
+    test_parsed_completely_bytes_reader(&good_local_instance_all_wire, &good_local_instance_all);
+    test_parsed_completely_bytes_reader(
         &good_loc_rib_instance_filtered_wire,
         &good_loc_rib_instance_filtered,
     );
-    test_parsed_completely(&good_experimental_251_wire, &good_experimental_251);
-    test_parsed_completely(&good_experimental_252_wire, &good_experimental_252);
-    test_parsed_completely(&good_experimental_253_wire, &good_experimental_253);
-    test_parsed_completely(&good_experimental_254_wire, &good_experimental_254);
-    test_parse_error::<BmpPeerType, LocatedBmpPeerTypeParsingError<'_>>(&bad_eof_wire, &bad_eof);
-    test_parse_error::<BmpPeerType, LocatedBmpPeerTypeParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_experimental_251_wire, &good_experimental_251);
+    test_parsed_completely_bytes_reader(&good_experimental_252_wire, &good_experimental_252);
+    test_parsed_completely_bytes_reader(&good_experimental_253_wire, &good_experimental_253);
+    test_parsed_completely_bytes_reader(&good_experimental_254_wire, &good_experimental_254);
+    test_parse_error_bytes_reader::<BmpPeerType, BmpPeerTypeParsingError>(&bad_eof_wire, &bad_eof);
+    test_parse_error_bytes_reader::<BmpPeerType, BmpPeerTypeParsingError>(
         &bad_reserved_wire,
         &bad_reserved,
     );
@@ -289,18 +299,19 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
         Ipv4Addr::new(172, 16, 0, 20),
         None,
     );
-    let bad_eof = LocatedPeerHeaderParsingError::new(
-        unsafe { Span::new_from_raw_offset(10, &bad_eof_wire[10..]) },
-        PeerHeaderParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_eof = PeerHeaderParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 10,
+        needed: 16,
+        available: 0,
+    });
 
-    test_parsed_completely(&good_ipv4_wire, &good_ipv4);
-    test_parsed_completely(&good_ipv6_wire, &good_ipv6);
-    test_parsed_completely(&good_post_policy_wire, &good_post_policy);
-    test_parsed_completely(&good_adj_rip_out_wire, &good_adj_rip_out);
-    test_parsed_completely(&good_asn2_wire, &good_asn2);
-    test_parsed_completely(&good_filtered_wire, &good_filtered);
-    test_parse_error::<PeerHeader, LocatedPeerHeaderParsingError<'_>>(&bad_eof_wire, &bad_eof);
+    test_parsed_completely_bytes_reader(&good_ipv4_wire, &good_ipv4);
+    test_parsed_completely_bytes_reader(&good_ipv6_wire, &good_ipv6);
+    test_parsed_completely_bytes_reader(&good_post_policy_wire, &good_post_policy);
+    test_parsed_completely_bytes_reader(&good_adj_rip_out_wire, &good_adj_rip_out);
+    test_parsed_completely_bytes_reader(&good_asn2_wire, &good_asn2);
+    test_parsed_completely_bytes_reader(&good_filtered_wire, &good_filtered);
+    test_parse_error_bytes_reader::<PeerHeader, PeerHeaderParsingError>(&bad_eof_wire, &bad_eof);
 
     test_write(&good_ipv4, &good_ipv4_wire)?;
     test_write(&good_ipv6, &good_ipv6_wire)?;
@@ -335,33 +346,32 @@ fn test_initiation_information() -> Result<(), InitiationInformationWritingError
     let good_experimental_65533 = InitiationInformation::Experimental65533(vec![0x01, 0x02]);
     let good_experimental_65534 = InitiationInformation::Experimental65534(vec![0x01, 0x02]);
 
-    let bad_eof = LocatedInitiationInformationParsingError::new(
-        Span::new(&bad_eof_wire),
-        InitiationInformationParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_eof = InitiationInformationParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 2,
+        available: 0,
+    });
 
-    let bad_undefined_type = LocatedInitiationInformationParsingError::new(
-        Span::new(&bad_undefined_type_wire),
-        InitiationInformationParsingError::UndefinedType(UndefinedInitiationInformationTlvType(
-            0xffff,
-        )),
-    );
+    let bad_undefined_type = InitiationInformationParsingError::UndefinedType {
+        offset: 0,
+        code: 0xffff,
+    };
 
-    test_parsed_completely(&good_string_wire, &good_string);
-    test_parsed_completely(&good_sys_descr_wire, &good_sys_descr);
-    test_parsed_completely(&good_sys_name_wire, &good_sys_name);
-    test_parsed_completely(&good_vrf_table_wire, &good_vrf_table);
-    test_parsed_completely(&good_admin_label_wire, &good_admin_label);
-    test_parsed_completely(&good_experimental_65531_wire, &good_experimental_65531);
-    test_parsed_completely(&good_experimental_65532_wire, &good_experimental_65532);
-    test_parsed_completely(&good_experimental_65533_wire, &good_experimental_65533);
-    test_parsed_completely(&good_experimental_65534_wire, &good_experimental_65534);
+    test_parsed_completely_bytes_reader(&good_string_wire, &good_string);
+    test_parsed_completely_bytes_reader(&good_sys_descr_wire, &good_sys_descr);
+    test_parsed_completely_bytes_reader(&good_sys_name_wire, &good_sys_name);
+    test_parsed_completely_bytes_reader(&good_vrf_table_wire, &good_vrf_table);
+    test_parsed_completely_bytes_reader(&good_admin_label_wire, &good_admin_label);
+    test_parsed_completely_bytes_reader(&good_experimental_65531_wire, &good_experimental_65531);
+    test_parsed_completely_bytes_reader(&good_experimental_65532_wire, &good_experimental_65532);
+    test_parsed_completely_bytes_reader(&good_experimental_65533_wire, &good_experimental_65533);
+    test_parsed_completely_bytes_reader(&good_experimental_65534_wire, &good_experimental_65534);
 
-    test_parse_error::<InitiationInformation, LocatedInitiationInformationParsingError<'_>>(
+    test_parse_error_bytes_reader::<InitiationInformation, InitiationInformationParsingError>(
         &bad_eof_wire,
         &bad_eof,
     );
-    test_parse_error::<InitiationInformation, LocatedInitiationInformationParsingError<'_>>(
+    test_parse_error_bytes_reader::<InitiationInformation, InitiationInformationParsingError>(
         &bad_undefined_type_wire,
         &bad_undefined_type,
     );
@@ -390,18 +400,16 @@ fn test_initiation_message() -> Result<(), InitiationMessageWritingError> {
         InitiationInformation::SystemName("CD".to_string()),
     ]);
 
-    let bad_info = LocatedInitiationMessageParsingError::new(
-        Span::new(&bad_info_wire),
-        InitiationMessageParsingError::InitiationInformationError(
-            InitiationInformationParsingError::UndefinedType(
-                UndefinedInitiationInformationTlvType(0xffff),
-            ),
-        ),
+    let bad_info = InitiationMessageParsingError::InitiationInformationError(
+        InitiationInformationParsingError::UndefinedType {
+            offset: 0,
+            code: 0xffff,
+        },
     );
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
 
-    test_parse_error::<InitiationMessage, LocatedInitiationMessageParsingError<'_>>(
+    test_parse_error_bytes_reader::<InitiationMessage, InitiationMessageParsingError>(
         &bad_info_wire,
         &bad_info,
     );
@@ -425,21 +433,19 @@ fn test_bmp_value_initiation_message() -> Result<(), BmpMessageValueWritingError
         InitiationInformation::SystemDescription("test11".to_string()),
         InitiationInformation::SystemName("PE2".to_string()),
     ]));
-    let bad_information = LocatedBmpMessageValueParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_information_wire[1..]) },
-        BmpMessageValueParsingError::InitiationMessageError(
-            InitiationMessageParsingError::InitiationInformationError(
-                InitiationInformationParsingError::UndefinedType(
-                    UndefinedInitiationInformationTlvType(0xffff),
-                ),
-            ),
+    let bad_information = BmpMessageValueParsingError::InitiationMessageError(
+        InitiationMessageParsingError::InitiationInformationError(
+            InitiationInformationParsingError::UndefinedType {
+                offset: 1,
+                code: 0xffff,
+            },
         ),
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
-    test_parse_error_with_one_input::<
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
+    test_parse_error_with_one_input_bytes_reader::<
         BmpMessageValue,
         &mut BmpParsingContext,
-        LocatedBmpMessageValueParsingError<'_>,
+        BmpMessageValueParsingError,
     >(
         &bad_information_wire,
         &mut Default::default(),
@@ -526,46 +532,45 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
         )),
     )
     .unwrap();
-    let bad_peer_header = LocatedRouteMonitoringMessageParsingError::new(
-        Span::new(&bad_peer_header_wire),
-        RouteMonitoringMessageParsingError::PeerHeaderError(
-            PeerHeaderParsingError::BmpPeerTypeError(BmpPeerTypeParsingError::NomError(
-                ErrorKind::Eof,
-            )),
-        ),
+    let bad_peer_header = RouteMonitoringMessageParsingError::PeerHeaderError(
+        PeerHeaderParsingError::BmpPeerTypeError(BmpPeerTypeParsingError::Parse(
+            ParseError::UnexpectedEof {
+                offset: 0,
+                needed: 1,
+                available: 0,
+            },
+        )),
     );
-    let bad_bgp = LocatedRouteMonitoringMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(58, &bad_bgp_wire[58..]) },
-        RouteMonitoringMessageParsingError::BgpMessageError(
-            BgpMessageParsingError::BadMessageLength(61166),
-        ),
+    let bad_bgp = RouteMonitoringMessageParsingError::BgpMessageError(
+        BgpMessageParsingError::BadMessageLength {
+            offset: 58,
+            length: 61166,
+        },
     );
-    let bad_bgp_type = LocatedRouteMonitoringMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(42, &bad_bgp_type_wire[42..]) },
-        RouteMonitoringMessageParsingError::RouteMonitoringMessageError(
-            RouteMonitoringMessageError::UnexpectedMessageType(BgpMessageType::Notification),
-        ),
-    );
+    let bad_bgp_type = RouteMonitoringMessageParsingError::RouteMonitoringMessageError {
+        offset: 42,
+        error: RouteMonitoringMessageError::UnexpectedMessageType(BgpMessageType::Notification),
+    };
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
-    test_parse_error_with_one_input::<
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
+    test_parse_error_with_one_input_bytes_reader::<
         RouteMonitoringMessage,
         &mut BmpParsingContext,
-        LocatedRouteMonitoringMessageParsingError<'_>,
+        RouteMonitoringMessageParsingError,
     >(
         &bad_peer_header_wire,
         &mut Default::default(),
         &bad_peer_header,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         RouteMonitoringMessage,
         &mut BmpParsingContext,
-        LocatedRouteMonitoringMessageParsingError<'_>,
+        RouteMonitoringMessageParsingError,
     >(&bad_bgp_wire, &mut Default::default(), &bad_bgp);
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         RouteMonitoringMessage,
         &mut BmpParsingContext,
-        LocatedRouteMonitoringMessageParsingError<'_>,
+        RouteMonitoringMessageParsingError,
     >(&bad_bgp_type_wire, &mut Default::default(), &bad_bgp_type);
 
     test_write(&good, &good_wire)?;
@@ -644,19 +649,20 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
         .unwrap(),
     );
 
-    let bad = LocatedBmpMessageValueParsingError::new(
-        unsafe { Span::new_from_raw_offset(43, &bad_wire[43..]) },
-        BmpMessageValueParsingError::RouteMonitoringMessageError(
-            RouteMonitoringMessageParsingError::BgpMessageError(BgpMessageParsingError::NomError(
-                ErrorKind::Eof,
-            )),
-        ),
+    let bad = BmpMessageValueParsingError::RouteMonitoringMessageError(
+        RouteMonitoringMessageParsingError::BgpMessageError(BgpMessageParsingError::Parse(
+            ParseError::UnexpectedEof {
+                offset: 43,
+                needed: 16,
+                available: 1,
+            },
+        )),
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
-    test_parse_error_with_one_input::<
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
+    test_parse_error_with_one_input_bytes_reader::<
         BmpMessageValue,
         &mut BmpParsingContext,
-        LocatedBmpMessageValueParsingError<'_>,
+        BmpMessageValueParsingError,
     >(&bad_wire, &mut Default::default(), &bad);
     test_write(&good, &good_wire)?;
 
@@ -778,21 +784,22 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
         .unwrap(),
     );
 
-    let bad = LocatedBmpMessageValueParsingError::new(
-        unsafe { Span::new_from_raw_offset(3, &bad_wire[3..]) },
-        BmpMessageValueParsingError::PeerUpNotificationMessageError(
-            PeerUpNotificationMessageParsingError::PeerHeaderError(
-                PeerHeaderParsingError::RouteDistinguisherError(
-                    RouteDistinguisherParsingError::NomError(ErrorKind::Eof),
-                ),
-            ),
+    let bad = BmpMessageValueParsingError::PeerUpNotificationMessageError(
+        PeerUpNotificationMessageParsingError::PeerHeaderError(
+            PeerHeaderParsingError::RouteDistinguisherError(RouteDistinguisherParsingError::Parse(
+                ParseError::UnexpectedEof {
+                    offset: 3,
+                    needed: 2,
+                    available: 0,
+                },
+            )),
         ),
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
-    test_parse_error_with_one_input::<
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
+    test_parse_error_with_one_input_bytes_reader::<
         BmpMessageValue,
         &mut BmpParsingContext,
-        LocatedBmpMessageValueParsingError<'_>,
+        BmpMessageValueParsingError,
     >(&bad_wire, &mut Default::default(), &bad);
 
     test_write(&good, &good_wire)?;
@@ -858,7 +865,7 @@ fn test_bmp_peer_up_loc_rib_notification() -> Result<(), BmpMessageWritingError>
         .unwrap(),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -907,109 +914,108 @@ fn test_peer_down_reason() -> Result<(), PeerDownNotificationReasonWritingError>
     let good_experimental_253 = PeerDownNotificationReason::Experimental253(vec![1, 3]);
     let good_experimental_254 = PeerDownNotificationReason::Experimental254(vec![1, 3]);
 
-    let bad_local_pdu_bgp = LocatedPeerDownNotificationReasonParsingError::new(
-        unsafe { Span::new_from_raw_offset(19, &bad_local_pdu_bgp_wire[19..]) },
-        PeerDownNotificationReasonParsingError::BgpMessageError(
-            BgpMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(255)),
-        ),
+    let bad_local_pdu_bgp = PeerDownNotificationReasonParsingError::BgpMessageError(
+        BgpMessageParsingError::UndefinedBgpMessageType {
+            offset: 19,
+            code: 0xff,
+        },
     );
-    let bad_local_system_closed = LocatedPeerDownNotificationReasonParsingError::new(
-        unsafe { Span::new_from_raw_offset(1, &bad_local_system_closed_wire[1..]) },
+    let bad_local_system_closed =
         PeerDownNotificationReasonParsingError::InitiationInformationError(
-            InitiationInformationParsingError::UndefinedType(
-                UndefinedInitiationInformationTlvType(255),
-            ),
-        ),
-    );
-    let bad_eof = LocatedPeerDownNotificationReasonParsingError::new(
-        Span::new(&bad_eof_wire),
-        PeerDownNotificationReasonParsingError::NomError(ErrorKind::Eof),
-    );
-    let bad_undefined_reason_code = LocatedPeerDownNotificationReasonParsingError::new(
-        Span::new(&bad_undefined_reason_code_wire),
-        PeerDownNotificationReasonParsingError::UndefinedPeerDownReasonCode(
-            UndefinedPeerDownReasonCode(255),
-        ),
-    );
+            InitiationInformationParsingError::UndefinedType {
+                offset: 1,
+                code: 0xff,
+            },
+        );
+    let bad_eof = PeerDownNotificationReasonParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
+    let bad_undefined_reason_code =
+        PeerDownNotificationReasonParsingError::UndefinedPeerDownReasonCode {
+            offset: 0,
+            code: 0xff,
+        };
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_local_fsm_wire,
         &mut BgpParsingContext::default(),
         &good_local_fsm,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_local_pdu_wire,
         &mut BgpParsingContext::default(),
         &good_local_pdu,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &bad_remote_pdu_bgp_wire,
         &mut BgpParsingContext::default(),
         &good_remote_pdu,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_remote_no_data_wire,
         &mut BgpParsingContext::default(),
         &good_remote_no_data,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_peer_de_configured_wire,
         &mut BgpParsingContext::default(),
         &good_peer_de_configured,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_local_system_closed_wire,
         &mut BgpParsingContext::default(),
         &good_local_system_closed,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_experimental_251_wire,
         &mut BgpParsingContext::default(),
         &good_experimental_251,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_experimental_252_wire,
         &mut BgpParsingContext::default(),
         &good_experimental_252,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_experimental_253_wire,
         &mut BgpParsingContext::default(),
         &good_experimental_253,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_experimental_254_wire,
         &mut BgpParsingContext::default(),
         &good_experimental_254,
     );
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PeerDownNotificationReason,
         &mut BgpParsingContext,
-        LocatedPeerDownNotificationReasonParsingError<'_>,
+        PeerDownNotificationReasonParsingError,
     >(
         &bad_local_pdu_bgp_wire,
         &mut BgpParsingContext::default(),
         &bad_local_pdu_bgp,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PeerDownNotificationReason,
         &mut BgpParsingContext,
-        LocatedPeerDownNotificationReasonParsingError<'_>,
+        PeerDownNotificationReasonParsingError,
     >(
         &bad_local_system_closed_wire,
         &mut BgpParsingContext::default(),
         &bad_local_system_closed,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PeerDownNotificationReason,
         &mut BgpParsingContext,
-        LocatedPeerDownNotificationReasonParsingError<'_>,
+        PeerDownNotificationReasonParsingError,
     >(&bad_eof_wire, &mut BgpParsingContext::default(), &bad_eof);
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PeerDownNotificationReason,
         &mut BgpParsingContext,
-        LocatedPeerDownNotificationReasonParsingError<'_>,
+        PeerDownNotificationReasonParsingError,
     >(
         &bad_undefined_reason_code_wire,
         &mut BgpParsingContext::default(),
@@ -1065,54 +1071,51 @@ fn test_peer_down_notification() -> Result<(), PeerDownNotificationMessageWritin
     )
     .unwrap();
 
-    let bad_information = LocatedPeerDownNotificationMessageParsingError::new(
-        Span::new(&bad_information_wire),
-        PeerDownNotificationMessageParsingError::PeerDownMessageError(
-            PeerDownNotificationMessageError::UnexpectedInitiationInformationTlvType(
-                InitiationInformationTlvType::String,
-            ),
+    let bad_information = PeerDownNotificationMessageParsingError::PeerDownMessageError {
+        offset: 0,
+        error: PeerDownNotificationMessageError::UnexpectedInitiationInformationTlvType(
+            InitiationInformationTlvType::String,
         ),
+    };
+    let bad_peer_header = PeerDownNotificationMessageParsingError::PeerHeaderError(
+        PeerHeaderParsingError::BmpPeerTypeError(BmpPeerTypeParsingError::Parse(
+            ParseError::UnexpectedEof {
+                offset: 0,
+                needed: 1,
+                available: 0,
+            },
+        )),
     );
-    let bad_peer_header = LocatedPeerDownNotificationMessageParsingError::new(
-        Span::new(&bad_peer_header_wire),
-        PeerDownNotificationMessageParsingError::PeerHeaderError(
-            PeerHeaderParsingError::BmpPeerTypeError(BmpPeerTypeParsingError::NomError(
-                ErrorKind::Eof,
-            )),
-        ),
+    let bad_peer_reason = PeerDownNotificationMessageParsingError::PeerDownNotificationReasonError(
+        PeerDownNotificationReasonParsingError::UndefinedPeerDownReasonCode {
+            offset: 42,
+            code: 0xff,
+        },
     );
-    let bad_peer_reason = LocatedPeerDownNotificationMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(42, &bad_peer_reason_wire[42..]) },
-        PeerDownNotificationMessageParsingError::PeerDownNotificationReasonError(
-            PeerDownNotificationReasonParsingError::UndefinedPeerDownReasonCode(
-                UndefinedPeerDownReasonCode(255),
-            ),
-        ),
-    );
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PeerDownNotificationMessage,
         &mut BmpParsingContext,
-        LocatedPeerDownNotificationMessageParsingError<'_>,
+        PeerDownNotificationMessageParsingError,
     >(
         &bad_information_wire,
         &mut Default::default(),
         &bad_information,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PeerDownNotificationMessage,
         &mut BmpParsingContext,
-        LocatedPeerDownNotificationMessageParsingError<'_>,
+        PeerDownNotificationMessageParsingError,
     >(
         &bad_peer_header_wire,
         &mut Default::default(),
         &bad_peer_header,
     );
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         PeerDownNotificationMessage,
         &mut BmpParsingContext,
-        LocatedPeerDownNotificationMessageParsingError<'_>,
+        PeerDownNotificationMessageParsingError,
     >(
         &bad_peer_reason_wire,
         &mut Default::default(),
@@ -1153,17 +1156,18 @@ fn test_bmp_peer_down_notification() -> Result<(), BmpMessageWritingError> {
         .unwrap(),
     ));
 
-    let bad_eof = LocatedBmpMessageValueParsingError::new(
-        Span::new(&bad_eof_wire),
-        BmpMessageValueParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_eof = BmpMessageValueParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BmpMessageValue,
         &mut BmpParsingContext,
-        LocatedBmpMessageValueParsingError<'_>,
+        BmpMessageValueParsingError,
     >(&bad_eof_wire, &mut Default::default(), &bad_eof);
 
     test_write(&good, &good_wire)?;
@@ -1191,32 +1195,32 @@ fn test_router_mirroring_value() -> Result<(), RouteMirroringValueWritingError> 
     let good_experimental_65533 = RouteMirroringValue::Experimental65533(vec![1, 2]);
     let good_experimental_65534 = RouteMirroringValue::Experimental65534(vec![1, 2]);
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_bgp_wire,
         &mut BgpParsingContext::default(),
         &good_bgp,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_information_wire,
         &mut BgpParsingContext::default(),
         &good_information,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_experimental_65531_wire,
         &mut BgpParsingContext::default(),
         &good_experimental_65531,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_experimental_65532_wire,
         &mut BgpParsingContext::default(),
         &good_experimental_65532,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_experimental_65533_wire,
         &mut BgpParsingContext::default(),
         &good_experimental_65533,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_experimental_65534_wire,
         &mut BgpParsingContext::default(),
         &good_experimental_65534,
@@ -1259,7 +1263,7 @@ fn test_bmp_router_mirroring() -> Result<(), BmpMessageWritingError> {
             BgpMessage::KeepAlive,
         ))],
     )));
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -1285,12 +1289,12 @@ fn test_termination_information() -> Result<(), TerminationInformationWritingErr
     let good_experimental_65534 =
         TerminationInformation::Experimental65534(vec![116, 101, 115, 116]);
 
-    test_parsed_completely(&good_string_wire, &good_string);
-    test_parsed_completely(&good_reason_wire, &good_reason);
-    test_parsed_completely(&good_experimental_65531_wire, &good_experimental_65531);
-    test_parsed_completely(&good_experimental_65532_wire, &good_experimental_65532);
-    test_parsed_completely(&good_experimental_65533_wire, &good_experimental_65533);
-    test_parsed_completely(&good_experimental_65534_wire, &good_experimental_65534);
+    test_parsed_completely_bytes_reader(&good_string_wire, &good_string);
+    test_parsed_completely_bytes_reader(&good_reason_wire, &good_reason);
+    test_parsed_completely_bytes_reader(&good_experimental_65531_wire, &good_experimental_65531);
+    test_parsed_completely_bytes_reader(&good_experimental_65532_wire, &good_experimental_65532);
+    test_parsed_completely_bytes_reader(&good_experimental_65533_wire, &good_experimental_65533);
+    test_parsed_completely_bytes_reader(&good_experimental_65534_wire, &good_experimental_65534);
 
     test_write(&good_string, &good_string_wire)?;
     test_write(&good_reason, &good_reason_wire)?;
@@ -1306,7 +1310,7 @@ fn test_termination_message() -> Result<(), TerminationMessageWritingError> {
     let good_wire = [0, 0, 0, 4, 116, 101, 115, 116];
     let good = TerminationMessage::new(vec![TerminationInformation::String("test".to_string())]);
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1319,7 +1323,7 @@ fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
         TerminationInformation::String("test".to_string()),
     ])));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1336,7 +1340,7 @@ fn test_bmp_termination_with_reason() -> Result<(), BmpMessageWritingError> {
         TerminationInformation::Reason(PeerTerminationCode::AdministrativelyClosed),
     ])));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1381,7 +1385,7 @@ fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
             ],
         ),
     ));
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -1391,7 +1395,7 @@ fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
 fn test_statistics_counter() -> Result<(), StatisticsCounterMessageWritingError> {
     let good_wire = [0x00, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00];
     let good = StatisticsCounter::NumberOfDuplicatePrefixAdvertisements(CounterU32::new(0));
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1523,7 +1527,7 @@ fn test_bmp_stats() -> Result<(), BmpMessageWritingError> {
         ),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1661,7 +1665,7 @@ fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingE
         .unwrap(),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1690,10 +1694,26 @@ fn test_bmp_value_experimental_messages() -> Result<(), BmpMessageValueWritingEr
     let good_253 = BmpMessageValue::Experimental253(good_253_wire[1..].to_vec());
     let good_254 = BmpMessageValue::Experimental254(good_254_wire[1..].to_vec());
 
-    test_parsed_completely_with_one_input(&good_251_wire, &mut Default::default(), &good_251);
-    test_parsed_completely_with_one_input(&good_252_wire, &mut Default::default(), &good_252);
-    test_parsed_completely_with_one_input(&good_253_wire, &mut Default::default(), &good_253);
-    test_parsed_completely_with_one_input(&good_254_wire, &mut Default::default(), &good_254);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_251_wire,
+        &mut Default::default(),
+        &good_251,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_252_wire,
+        &mut Default::default(),
+        &good_252,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_253_wire,
+        &mut Default::default(),
+        &good_253,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_254_wire,
+        &mut Default::default(),
+        &good_254,
+    );
 
     test_write(&good_251, &good_251_wire)?;
     test_write(&good_252, &good_252_wire)?;
@@ -1728,10 +1748,26 @@ fn test_bmp_experimental() -> Result<(), BmpMessageWritingError> {
         good_254_wire[6..].to_vec(),
     ));
 
-    test_parsed_completely_with_one_input(&good_251_wire, &mut Default::default(), &good_251);
-    test_parsed_completely_with_one_input(&good_252_wire, &mut Default::default(), &good_252);
-    test_parsed_completely_with_one_input(&good_253_wire, &mut Default::default(), &good_253);
-    test_parsed_completely_with_one_input(&good_254_wire, &mut Default::default(), &good_254);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_251_wire,
+        &mut Default::default(),
+        &good_251,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_252_wire,
+        &mut Default::default(),
+        &good_252,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_253_wire,
+        &mut Default::default(),
+        &good_253,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_254_wire,
+        &mut Default::default(),
+        &good_254,
+    );
 
     test_write(&good_251, &good_251_wire)?;
     test_write(&good_252, &good_252_wire)?;

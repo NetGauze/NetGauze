@@ -15,9 +15,7 @@
 
 use crate::v4::*;
 use crate::wire::deserializer::v4::*;
-use crate::wire::deserializer::{
-    BmpMessageParsingError, BmpParsingContext, LocatedBmpMessageParsingError,
-};
+use crate::wire::deserializer::{BmpMessageParsingError, BmpParsingContext};
 use crate::wire::serializer::BmpMessageWritingError;
 use crate::wire::serializer::v4::BmpMessageValueWritingError;
 use crate::*;
@@ -33,15 +31,14 @@ use netgauze_bgp_pkt::path_attribute::{
 };
 use netgauze_bgp_pkt::update::BgpUpdateMessage;
 use netgauze_bgp_pkt::wire::deserializer::update::BgpUpdateMessageParsingError;
-use netgauze_bgp_pkt::wire::deserializer::{
-    BgpMessageParsingError, BgpParsingContext, Ipv4PrefixParsingError,
-};
+use netgauze_bgp_pkt::wire::deserializer::{BgpMessageParsingError, BgpParsingContext};
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::Span;
+use netgauze_parse_utils::common::Ipv4PrefixParsingError;
+use netgauze_parse_utils::error::ParseError;
 use netgauze_parse_utils::test_helpers::{
-    test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
+    test_parse_error_with_one_input_bytes_reader,
+    test_parsed_completely_with_one_input_bytes_reader, test_write,
 };
-use nom::error::ErrorKind;
 use std::collections::HashMap;
 use std::net::Ipv6Addr;
 use std::str::FromStr;
@@ -60,7 +57,7 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
         0x13, 0x20, 0xc6, 0x33, 0x64, 0x13,
     ];
 
-    let good = BmpMessage::V4(v4::BmpMessageValue::RouteMonitoring(
+    let good = BmpMessage::V4(BmpMessageValue::RouteMonitoring(
         RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -126,7 +123,7 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
         .unwrap(),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -147,7 +144,7 @@ fn test_bmp_v4_route_monitoring_with_groups() -> Result<(), BmpMessageWritingErr
         0x20, 0xc6, 0x33, 0x64, 0x13,
     ];
 
-    let good = BmpMessage::V4(v4::BmpMessageValue::RouteMonitoring(
+    let good = BmpMessage::V4(BmpMessageValue::RouteMonitoring(
         RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -218,7 +215,7 @@ fn test_bmp_v4_route_monitoring_with_groups() -> Result<(), BmpMessageWritingErr
         .unwrap(),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -298,7 +295,7 @@ fn test_bmp_v4_route_monitoring_with_stateless_parsing() -> Result<(), BmpMessag
         .unwrap(),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -366,15 +363,15 @@ fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMes
         .unwrap(),
     ));
 
-    let error = LocatedBmpMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(102, &good_wire[102..]) },
-        BmpMessageParsingError::BmpV4MessageValueError(
-            BmpMessageValueParsingError::RouteMonitoringMessageError(
-                RouteMonitoringMessageParsingError::BgpMessage(
-                    BgpMessageParsingError::BgpUpdateMessageParsingError(
-                        BgpUpdateMessageParsingError::Ipv4PrefixError(
-                            Ipv4PrefixParsingError::InvalidIpv4PrefixLen(69),
-                        ),
+    let error = BmpMessageParsingError::BmpV4MessageValueError(
+        BmpMessageValueParsingError::RouteMonitoringMessageError(
+            RouteMonitoringMessageParsingError::BgpMessage(
+                BgpMessageParsingError::BgpUpdateMessageParsingError(
+                    BgpUpdateMessageParsingError::Ipv4PrefixError(
+                        Ipv4PrefixParsingError::InvalidIpv4PrefixLen {
+                            offset: 102,
+                            prefix_len: 69,
+                        },
                     ),
                 ),
             ),
@@ -382,10 +379,10 @@ fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMes
     );
 
     let mut no_context = Default::default();
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BmpMessage,
         &mut BmpParsingContext,
-        LocatedBmpMessageParsingError<'_>,
+        BmpMessageParsingError,
     >(&good_wire, &mut no_context, &error);
 
     let mut good_context = BmpParsingContext::default();
@@ -407,7 +404,7 @@ fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMes
         ),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, &mut good_context, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut good_context, &good);
     Ok(())
 }
 
@@ -446,17 +443,18 @@ fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
         .unwrap(),
     ));
 
-    let bad_eof = LocatedBmpMessageValueParsingError::new(
-        Span::new(&bad_eof_wire),
-        BmpMessageValueParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_eof = BmpMessageValueParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BmpMessageValue,
         &mut BmpParsingContext,
-        LocatedBmpMessageValueParsingError<'_>,
+        BmpMessageValueParsingError,
     >(&bad_eof_wire, &mut Default::default(), &bad_eof);
 
     test_write(&good, &good_wire)?;
@@ -573,17 +571,18 @@ fn test_bmp_v4_path_marking() -> Result<(), BmpMessageWritingError> {
         .unwrap(),
     ));
 
-    let bad_eof = LocatedBmpMessageValueParsingError::new(
-        Span::new(&bad_eof_wire),
-        BmpMessageValueParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_eof = BmpMessageValueParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BmpMessageValue,
         &mut BmpParsingContext,
-        LocatedBmpMessageValueParsingError<'_>,
+        BmpMessageValueParsingError,
     >(&bad_eof_wire, &mut Default::default(), &bad_eof);
 
     test_write(&good, &good_wire)?;
@@ -700,17 +699,18 @@ fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritin
         .unwrap(),
     ));
 
-    let bad_eof = LocatedBmpMessageValueParsingError::new(
-        Span::new(&bad_eof_wire),
-        BmpMessageValueParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_eof = BmpMessageValueParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 1,
+        available: 0,
+    });
 
-    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BmpMessageValue,
         &mut BmpParsingContext,
-        LocatedBmpMessageValueParsingError<'_>,
+        BmpMessageValueParsingError,
     >(&bad_eof_wire, &mut Default::default(), &bad_eof);
 
     test_write(&good, &good_wire)?;
@@ -833,10 +833,26 @@ fn test_bmp_value_experimental_messages() -> Result<(), BmpMessageValueWritingEr
     let good_253 = BmpMessageValue::Experimental253(good_253_wire[1..].to_vec());
     let good_254 = BmpMessageValue::Experimental254(good_254_wire[1..].to_vec());
 
-    test_parsed_completely_with_one_input(&good_251_wire, &mut Default::default(), &good_251);
-    test_parsed_completely_with_one_input(&good_252_wire, &mut Default::default(), &good_252);
-    test_parsed_completely_with_one_input(&good_253_wire, &mut Default::default(), &good_253);
-    test_parsed_completely_with_one_input(&good_254_wire, &mut Default::default(), &good_254);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_251_wire,
+        &mut Default::default(),
+        &good_251,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_252_wire,
+        &mut Default::default(),
+        &good_252,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_253_wire,
+        &mut Default::default(),
+        &good_253,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_254_wire,
+        &mut Default::default(),
+        &good_254,
+    );
 
     test_write(&good_251, &good_251_wire)?;
     test_write(&good_252, &good_252_wire)?;
@@ -871,10 +887,26 @@ fn test_bmp_experimental() -> Result<(), BmpMessageWritingError> {
         good_254_wire[6..].to_vec(),
     ));
 
-    test_parsed_completely_with_one_input(&good_251_wire, &mut Default::default(), &good_251);
-    test_parsed_completely_with_one_input(&good_252_wire, &mut Default::default(), &good_252);
-    test_parsed_completely_with_one_input(&good_253_wire, &mut Default::default(), &good_253);
-    test_parsed_completely_with_one_input(&good_254_wire, &mut Default::default(), &good_254);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_251_wire,
+        &mut Default::default(),
+        &good_251,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_252_wire,
+        &mut Default::default(),
+        &good_252,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_253_wire,
+        &mut Default::default(),
+        &good_253,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_254_wire,
+        &mut Default::default(),
+        &good_254,
+    );
 
     test_write(&good_251, &good_251_wire)?;
     test_write(&good_252, &good_252_wire)?;

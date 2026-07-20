@@ -27,18 +27,25 @@ use std::collections::HashSet;
 
 use crate::wire::deserializer::BmpParsingContext;
 use netgauze_bgp_pkt::capabilities::{AddPathCapability, MultipleLabel};
-use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
-use nom::Needed;
+use netgauze_parse_utils::WritablePdu;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::{Decoder, Encoder};
 
 /// Min length for a valid BMP Message: 1-octet version + 4-octet length
 pub const BMP_MESSAGE_MIN_LENGTH: usize = 5;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, thiserror::Error, Serialize, Deserialize)]
 pub enum BmpCodecDecoderError {
+    #[error("IO error while reading BMP stream: {0}")]
     IoError(String),
+
+    #[error("incomplete BMP message, awaiting more data{}",
+            match .0 { Some(n) => format!(" ({n} more byte(s) needed)"), None => String::new() })]
     Incomplete(Option<usize>),
+
+    #[error("{0}")]
     BmpMessageParsingError(BmpMessageParsingError),
 }
 
@@ -253,44 +260,49 @@ impl Decoder for BmpCodec {
         if self.in_message || buf.len() >= BMP_MESSAGE_MIN_LENGTH {
             let version: u8 = buf[0];
             // Fail early if the version is invalid
-            if let Err(e) = BmpVersion::try_from(version) {
+            if BmpVersion::try_from(version).is_err() {
                 buf.advance(1);
                 return Err(BmpCodecDecoderError::BmpMessageParsingError(
-                    BmpMessageParsingError::UndefinedBmpVersion(e),
+                    BmpMessageParsingError::UndefinedBmpVersion {
+                        offset: 0,
+                        value: version,
+                    },
                 ));
             }
             // Read the length, starting form after the version
             let length = NetworkEndian::read_u32(&buf[1..BMP_MESSAGE_MIN_LENGTH]) as usize;
+            // BMP has no synchronization marker (RFC 7854 §4.1). If the length
+            // is too small to even cover the common header, advance past the
+            // header so we resync on the next bytes rather than getting stuck
+            // re-reading the same bad header.
+            if length < BMP_MESSAGE_MIN_LENGTH {
+                self.in_message = false;
+                buf.advance(BMP_MESSAGE_MIN_LENGTH);
+                return Err(BmpCodecDecoderError::BmpMessageParsingError(
+                    BmpMessageParsingError::InvalidBmpLength {
+                        offset: 1,
+                        length: length as u32,
+                    },
+                ));
+            }
             if buf.len() < length {
                 // We still didn't read all the bytes for the message yet
                 self.in_message = true;
                 Ok(None)
             } else {
                 self.in_message = false;
-                let msg = match BmpMessage::from_wire(Span::new(buf), &mut self.ctx) {
-                    Ok((span, msg)) => {
+                let frame = buf.split_to(length);
+                // SliceReader receives the full BMP message: version + length + payload.
+                let mut reader = SliceReader::new(&frame[..]);
+                let msg = match BmpMessage::parse(&mut reader, &mut self.ctx) {
+                    Ok(msg) => {
                         self.update_parsing_ctx(&msg);
-                        buf.advance(span.location_offset());
                         msg
                     }
                     Err(error) => {
-                        let err = match error {
-                            nom::Err::Incomplete(needed) => {
-                                let needed = match needed {
-                                    Needed::Unknown => None,
-                                    Needed::Size(size) => Some(size.get()),
-                                };
-                                BmpCodecDecoderError::Incomplete(needed)
-                            }
-                            nom::Err::Error(error) | nom::Err::Failure(error) => {
-                                BmpCodecDecoderError::BmpMessageParsingError(error.error().clone())
-                            }
-                        };
-                        // Make sure we advance the buffer far enough, so we don't get stuck on an
-                        // error value.
-                        // Unfortunately, BMP doesn't have synchronization values like in BGP
-                        // to understand we are in a new message.
-                        buf.advance(if length < 5 { 5 } else { length });
+                        // `split_to(length)` already advanced `buf` past this
+                        // frame, so we don't need an extra advance here.
+                        let err = BmpCodecDecoderError::BmpMessageParsingError(error);
                         return Err(err);
                     }
                 };
@@ -318,6 +330,137 @@ mod tests {
     use std::collections::HashMap;
     use std::net::Ipv6Addr;
     use std::str::FromStr;
+
+    /// Build a valid 14-byte BMP v3 Termination message carrying the string
+    /// "test" — used as a known-good marker for resync tests.
+    fn good_termination_wire() -> ([u8; 14], BmpMessage) {
+        let wire = [3, 0, 0, 0, 14, 5, 0, 0, 0, 4, b't', b'e', b's', b't'];
+        let msg = BmpMessage::V3(v3::BmpMessageValue::Termination(
+            v3::TerminationMessage::new(vec![TerminationInformation::String("test".to_string())]),
+        ));
+        (wire, msg)
+    }
+
+    /// Length values 0..BMP_MESSAGE_MIN_LENGTH are all invalid because they
+    /// can't even hold the common header. Each should produce
+    /// `InvalidBmpLength` and advance the buffer by BMP_MESSAGE_MIN_LENGTH so
+    /// the codec doesn't get stuck on the bad header.
+    #[test]
+    fn test_invalid_length_below_min() {
+        for bad_length in 0u32..BMP_MESSAGE_MIN_LENGTH as u32 {
+            let mut codec = BmpCodec::default();
+            let mut buf = BytesMut::new();
+            // Common header with a deliberately too-small length, plus one
+            // extra trailing byte so we can verify the advance amount.
+            buf.extend_from_slice(&[3u8]);
+            buf.extend_from_slice(&bad_length.to_be_bytes());
+            buf.extend_from_slice(&[0xAAu8]);
+            assert_eq!(buf.len(), BMP_MESSAGE_MIN_LENGTH + 1);
+
+            let result = codec.decode(&mut buf);
+            assert_eq!(
+                result,
+                Err(BmpCodecDecoderError::BmpMessageParsingError(
+                    BmpMessageParsingError::InvalidBmpLength {
+                        offset: 1,
+                        length: bad_length,
+                    },
+                )),
+                "unexpected result for length={bad_length}",
+            );
+            // We should have advanced past the whole bad header (5 bytes),
+            // leaving the single trailing sentinel byte.
+            assert_eq!(
+                &buf[..],
+                &[0xAAu8],
+                "buffer not properly advanced for length={bad_length}",
+            );
+        }
+    }
+
+    /// After hitting an invalid length, the codec must resync so a subsequent
+    /// well-formed message in the same buffer parses correctly.
+    #[test]
+    fn test_invalid_length_resync_to_next_good_message() {
+        let (good_wire, good_msg) = good_termination_wire();
+        let bad_wire = [0x03u8, 0x00, 0x00, 0x00, 0x01]; // version=3, length=1
+        let mut codec = BmpCodec::default();
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(&bad_wire);
+        buf.extend_from_slice(&good_wire);
+
+        // First decode reports the bad length and advances past the bad header.
+        assert_eq!(
+            codec.decode(&mut buf),
+            Err(BmpCodecDecoderError::BmpMessageParsingError(
+                BmpMessageParsingError::InvalidBmpLength {
+                    offset: 1,
+                    length: 1,
+                },
+            )),
+        );
+        // Second decode picks up the good message that immediately followed.
+        assert_eq!(codec.decode(&mut buf), Ok(Some(good_msg)));
+        assert!(buf.is_empty(), "buffer should be fully consumed");
+    }
+
+    /// A header with `length == BMP_MESSAGE_MIN_LENGTH` (5) has no room for
+    /// the message-type byte or any payload. The codec must hand the full
+    /// 5-byte frame to the deserializer (so its own checks can run) and not
+    /// panic.
+    #[test]
+    fn test_length_equal_to_min_is_handed_to_parser() {
+        let mut codec = BmpCodec::default();
+        let mut buf = BytesMut::from(&[0x03u8, 0x00, 0x00, 0x00, 0x05][..]);
+        let result = codec.decode(&mut buf);
+        // The codec doesn't reject length == MIN itself (it's >= the header
+        // size); the deserializer is what fails when it tries to read the
+        // message-type byte from an empty payload.
+        assert!(result.is_err(), "expected parser error, got {result:?}");
+        // The full 5-byte frame should have been split off the buffer.
+        assert!(buf.is_empty(), "frame should have been split off");
+    }
+
+    /// If `length` is valid but the buffer doesn't yet have all the bytes,
+    /// decode must return `Ok(None)` so the caller knows to read more, and
+    /// must mark itself as in-message so the next call retries even if the
+    /// buffer is shorter than BMP_MESSAGE_MIN_LENGTH at entry.
+    #[test]
+    fn test_partial_message_waits_for_more_data() {
+        let (good_wire, good_msg) = good_termination_wire();
+        let mut codec = BmpCodec::default();
+        let mut buf = BytesMut::new();
+        // Feed only the first 10 bytes of a 14-byte message.
+        buf.extend_from_slice(&good_wire[..10]);
+
+        assert_eq!(codec.decode(&mut buf), Ok(None));
+        // Buffer is preserved untouched while we wait for more data.
+        assert_eq!(&buf[..], &good_wire[..10]);
+
+        // Deliver the remaining 4 bytes; the next decode should yield the message.
+        buf.extend_from_slice(&good_wire[10..]);
+        assert_eq!(codec.decode(&mut buf), Ok(Some(good_msg)));
+        assert!(buf.is_empty());
+    }
+
+    /// A length value larger than what the BMP spec can ever produce
+    /// (e.g. `u32::MAX`) is structurally legal in the header but the codec
+    /// must not allocate or split anything until enough bytes arrive — it
+    /// just keeps waiting.
+    #[test]
+    fn test_extreme_length_does_not_split_prematurely() {
+        let mut codec = BmpCodec::default();
+        let mut buf = BytesMut::new();
+        // version=3, length=u32::MAX, plus a couple of payload bytes.
+        buf.extend_from_slice(&[0x03u8, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x01]);
+        let before_len = buf.len();
+        assert_eq!(codec.decode(&mut buf), Ok(None));
+        assert_eq!(
+            buf.len(),
+            before_len,
+            "decode must not consume bytes while waiting for the rest of the message",
+        );
+    }
 
     #[test]
     fn test_codec() -> Result<(), BmpMessageWritingError> {

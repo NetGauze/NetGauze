@@ -228,10 +228,11 @@ impl TerminationInformation {
 /// Runtime errors when constructing a [`RouteMonitoringMessage`]
 /// Peer Up BGP messages should only carry
 /// [`BgpMessage::Update`], anything else is an error
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMonitoringMessageError {
+    #[error("Unexpected BMP message type {0} in a BMP Route Monitoring message")]
     UnexpectedMessageType(BgpMessageType),
 }
 
@@ -381,11 +382,14 @@ pub struct PeerUpNotificationMessage {
 /// Runtime errors when constructing a [`PeerUpNotificationMessage`]
 /// Peer Up BGP messages should only carry
 /// [`BgpMessage::Open`], anything else is an error
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PeerUpNotificationMessageError {
+    #[error("Unexpected BGP sent message type {0} expecting BGP Open")]
     UnexpectedSentMessageType(BgpMessageType),
+
+    #[error("Unexpected BGP received message type {0} expecting BGP Open")]
     UnexpectedReceivedMessageType(BgpMessageType),
 }
 
@@ -454,11 +458,14 @@ impl PeerUpNotificationMessage {
 /// Runtime errors when constructing a [`PeerDownNotificationMessage`]
 /// Peer Up BGP messages should only carry
 /// [`BgpMessage::Notification`], anything else is an error
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PeerDownNotificationMessageError {
+    #[error("Unexpected BGP message type in peer down notifications {0}")]
     UnexpectedBgpMessageType(BgpMessageType),
+
+    #[error("Unexpected Information TLV type {0} in Peer Down notification")]
     UnexpectedInitiationInformationTlvType(InitiationInformationTlvType),
 }
 

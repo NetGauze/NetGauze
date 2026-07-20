@@ -24,7 +24,8 @@ use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
 use netgauze_bmp_pkt::wire::deserializer::BmpParsingContext;
 use netgauze_bmp_pkt::{BmpMessage, PeerKey};
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
 // We don't pass BgpParsingContext as fuzzed input since we don't want to
 // generate BgpParsingContext::parsing_errors.
@@ -43,7 +44,7 @@ fuzz_target!(|data: (
         ),
     >,
 )| {
-    let (mut buf, ctx_params) = data;
+    let (buf, ctx_params) = data;
     let ctx = ctx_params
         .iter()
         .map(
@@ -75,7 +76,8 @@ fuzz_target!(|data: (
         )
         .collect();
     let mut ctx = BmpParsingContext::new(ctx);
-    while let Ok((retbuf, _msg)) = BmpMessage::from_wire(Span::new(buf), &mut ctx) {
-        buf = retbuf.fragment();
-    }
+    let mut cur = SliceReader::new(buf);
+    while !cur.is_empty()
+        && let Ok(_msg) = BmpMessage::parse(&mut cur, &mut ctx)
+    {}
 });
