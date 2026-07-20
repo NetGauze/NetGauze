@@ -16,53 +16,74 @@
 //! Deserializer for BGP Route Refresh message
 
 use crate::BgpRouteRefreshMessage;
-use crate::iana::{RouteRefreshSubcode, UndefinedRouteRefreshSubcode};
-use netgauze_iana::address_family::{
-    AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
-    UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
-};
-use netgauze_parse_utils::{ReadablePdu, Span};
-use nom::IResult;
-use nom::error::ErrorKind;
-use nom::number::complete::{be_u8, be_u16};
+use crate::iana::RouteRefreshSubcode;
+use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
+use netgauze_parse_utils::error::ParseError;
 use serde::{Deserialize, Serialize};
 
-use netgauze_serde_macros::LocatedError;
-
 use crate::notification::RouteRefreshError;
-use netgauze_parse_utils::ErrorKindSerdeDeref;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFrom;
 
 /// BGP Route Refresh Message Parsing errors
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpRouteRefreshMessageParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedOperation(#[from_external] UndefinedRouteRefreshSubcode),
-    UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
-    UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
-    InvalidAddressType(InvalidAddressType),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("unknown route refresh operation {code} at byte offset {offset}")]
+    UndefinedOperation { offset: usize, code: u8 },
+
+    #[error("unknown address family {afi} at byte offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error("unknown subsequent address family {safi} at byte offset {offset}")]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error("unsupported address family pair (afi {afi}, safi {safi}) at byte offset {offset}")]
+    AddressTypeError { offset: usize, afi: u16, safi: u8 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpRouteRefreshMessageParsingError<'a>> for BgpRouteRefreshMessage {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBgpRouteRefreshMessageParsingError<'a>> {
-        let input = buf;
-        let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
-        let (buf, op) = nom::combinator::map_res(be_u8, RouteRefreshSubcode::try_from)(buf)?;
-        let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
+impl<'a> ParseFrom<'a> for BgpRouteRefreshMessage {
+    type Error = BgpRouteRefreshMessageParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let code = cur.peek_u16_be()?;
+        let afi = AddressFamily::try_from(code).map_err(|err| {
+            BgpRouteRefreshMessageParsingError::UndefinedAddressFamily {
+                offset: cur.offset(),
+                afi: err.0,
+            }
+        })?;
+        let _code = cur.read_u16_be()?;
+        let op = cur.peek_u8()?;
+        let op = RouteRefreshSubcode::try_from(op).map_err(|err| {
+            BgpRouteRefreshMessageParsingError::UndefinedOperation {
+                offset: cur.offset(),
+                code: err.0,
+            }
+        })?;
+        let _op = cur.read_u8()?;
+        let safi_code = cur.peek_u8()?;
+        let safi = SubsequentAddressFamily::try_from(safi_code).map_err(|err| {
+            BgpRouteRefreshMessageParsingError::UndefinedSubsequentAddressFamily {
+                offset: cur.offset(),
+                safi: err.0,
+            }
+        })?;
+        let _safi_code = cur.read_u8()?;
+
         let address_type = match AddressType::from_afi_safi(afi, safi) {
-            Ok(val) => val,
+            Ok(address_type) => address_type,
             Err(err) => {
-                return Err(nom::Err::Error(
-                    LocatedBgpRouteRefreshMessageParsingError::new(
-                        input,
-                        BgpRouteRefreshMessageParsingError::InvalidAddressType(err),
-                    ),
-                ));
+                return Err(BgpRouteRefreshMessageParsingError::AddressTypeError {
+                    // AFI (2 bytes), reserved (1 byte), and SAFI (1 byte) are the last 4 read
+                    offset: cur.offset() - 4,
+                    afi: err.address_family().into(),
+                    safi: err.subsequent_address_family().into(),
+                });
             }
         };
-        Ok((buf, BgpRouteRefreshMessage::new(address_type, op)))
+        Ok(BgpRouteRefreshMessage::new(address_type, op))
     }
 }
 
@@ -74,7 +95,7 @@ impl From<BgpRouteRefreshMessageParsingError> for RouteRefreshError {
         // Subtype 1 and 2 is not 4, then the BGP speaker MUST send a NOTIFICATION
         // message with the Error Code of "ROUTE-REFRESH Message Error" and the subcode
         // of "Invalid Message Length". The Data field of the NOTIFICATION message MUST
-        // ontain the complete ROUTE-REFRESH message.
+        // obtain the complete ROUTE-REFRESH message.
         RouteRefreshError::InvalidMessageLength { value: vec![] }
     }
 }

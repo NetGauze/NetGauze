@@ -50,7 +50,7 @@ impl MplsLabel {
     }
 }
 
-/// Route Distinguisher (RD) is a 8-byte value and encoded as follows:
+/// Route Distinguisher (RD) is an 8-byte value and encoded as follows:
 ///     - Type Field: 2 bytes
 ///     - Value Field: 6 bytes
 #[derive(Hash, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -1196,12 +1196,15 @@ impl NlriAddressType for RouteTargetMembershipAddress {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, thiserror::Error, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum InvalidIpv4NlriMplsLabelsAddress {
     /// Total length should not exceed 255, each MPLS Label is 24 bit and
     /// account for up to 32 bit IPv4 prefix length
+    #[error(
+        "too many MPLS labels for IPv4 NLRI: {0} labels plus the prefix exceed the 255-bit length field"
+    )]
     InvalidLabelsLength(usize),
 }
 
@@ -1293,12 +1296,15 @@ impl NlriAddressType for Ipv4NlriMplsLabelsAddress {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, thiserror::Error, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum InvalidIpv6NlriMplsLabelsAddress {
     /// Total length should not exceed 255, each MPLS Label is 24 bit and
     /// account for up to 128 bit IPv6 prefix length
+    #[error(
+        "too many MPLS labels for IPv6 NLRI: {0} labels plus the prefix exceed the 255-bit length field"
+    )]
     InvalidLabelsLength(usize),
 }
 

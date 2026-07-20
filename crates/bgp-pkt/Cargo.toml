@@ -17,13 +17,11 @@ categories = ["network-programming", "parsing"]
 
 [dependencies]
 netgauze-iana = { workspace = true }
-netgauze-locate = { workspace = true, optional = true }
 netgauze-parse-utils = { workspace = true, optional = true }
 netgauze-serde-macros = { workspace = true, optional = true }
 ipnet = { workspace = true, features = ["serde"] }
 strum_macros = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
 criterion = { workspace = true, optional = true } # Dev dep for bench
 arbitrary = { workspace = true, optional = true }
@@ -32,13 +30,12 @@ tracing = { workspace = true, optional = true }
 tokio-util = { workspace = true, default-features = false, features = ["codec"], optional = true }
 bytes = { workspace = true, optional = true }
 schemars = { workspace = true, features = ["derive"], optional = true }
+thiserror = { workspace = true }
 
 [features]
 default = ["serde"]
 serde = [
-    "nom",
     "byteorder",
-    "netgauze-locate",
     "netgauze-parse-utils",
     "netgauze-serde-macros",
 ]

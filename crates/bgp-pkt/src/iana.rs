@@ -1462,6 +1462,12 @@ pub enum BgpLsProtocolId {
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct BgpLsProtocolIdError(pub IanaValueError<u8>);
 
+impl std::fmt::Display for BgpLsProtocolIdError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BgpLsProtocolIdError({})", self.0)
+    }
+}
+
 impl From<BgpLsProtocolId> for u8 {
     fn from(value: BgpLsProtocolId) -> Self {
         value as u8
@@ -1494,6 +1500,12 @@ pub enum BgpLsNodeDescriptorType {
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct BgpLsNodeDescriptorTypeError(pub IanaValueError<u16>);
+
+impl std::fmt::Display for BgpLsNodeDescriptorTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BgpLsNodeDescriptorTypeError({})", self.0)
+    }
+}
 
 impl From<BgpLsNodeDescriptorType> for u16 {
     fn from(value: BgpLsNodeDescriptorType) -> Self {
@@ -1536,6 +1548,12 @@ pub enum BgpLsNodeDescriptorSubType {
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct NodeDescriptorSubTypeError(pub IanaValueError<u16>);
 
+impl std::fmt::Display for NodeDescriptorSubTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NodeDescriptorSubTypeError({})", self.0)
+    }
+}
+
 impl From<BgpLsNodeDescriptorSubType> for u16 {
     fn from(value: BgpLsNodeDescriptorSubType) -> Self {
         value as u16
@@ -1570,6 +1588,12 @@ pub enum BgpLsPrefixDescriptorType {
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct PrefixDescriptorTypeError(pub IanaValueError<u16>);
+
+impl std::fmt::Display for PrefixDescriptorTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PrefixDescriptorTypeError({})", self.0)
+    }
+}
 
 impl From<BgpLsPrefixDescriptorType> for u16 {
     fn from(value: BgpLsPrefixDescriptorType) -> Self {
@@ -1608,6 +1632,12 @@ pub enum BgpLsLinkDescriptorType {
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct LinkDescriptorTypeError(pub IanaValueError<u16>);
+
+impl std::fmt::Display for LinkDescriptorTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LinkDescriptorTypeError({})", self.0)
+    }
+}
 
 impl From<BgpLsLinkDescriptorType> for u16 {
     fn from(value: BgpLsLinkDescriptorType) -> Self {
@@ -1723,6 +1753,12 @@ pub enum IanaValueError<T> {
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct BgpLsAttributeTypeError(pub IanaValueError<u16>);
+
+impl std::fmt::Display for BgpLsAttributeTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BgpLsAttributeTypeError({})", self.0)
+    }
+}
 
 impl From<BgpLsAttributeType> for u16 {
     fn from(afi: BgpLsAttributeType) -> Self {
@@ -1884,6 +1920,12 @@ pub enum BgpSidAttributeType {
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct BgpSidAttributeTypeError(pub IanaValueError<u8>);
 
+impl std::fmt::Display for BgpSidAttributeTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BgpSidAttributeTypeError({})", self.0)
+    }
+}
+
 impl From<BgpSidAttributeType> for u8 {
     fn from(value: BgpSidAttributeType) -> Self {
         value as u8
@@ -1921,6 +1963,12 @@ pub enum BgpSrv6ServiceSubTlvType {
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct BgpSrv6ServiceSubTlvTypeError(pub IanaValueError<u8>);
 
+impl std::fmt::Display for BgpSrv6ServiceSubTlvTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BgpSrv6ServiceSubTlvTypeError({})", self.0)
+    }
+}
+
 impl From<BgpSrv6ServiceSubTlvType> for u8 {
     fn from(value: BgpSrv6ServiceSubTlvType) -> Self {
         value as u8
@@ -1955,6 +2003,12 @@ pub enum BgpSrv6ServiceSubSubTlvType {
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct BgpSrv6ServiceSubSubTlvTypeError(pub IanaValueError<u8>);
+
+impl std::fmt::Display for BgpSrv6ServiceSubSubTlvTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BgpSrv6ServiceSubSubTlvTypeError({})", self.0)
+    }
+}
 
 impl From<BgpSrv6ServiceSubSubTlvType> for u8 {
     fn from(value: BgpSrv6ServiceSubSubTlvType) -> Self {

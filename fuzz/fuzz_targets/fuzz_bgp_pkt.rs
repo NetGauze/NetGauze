@@ -22,7 +22,8 @@ use std::collections::HashMap;
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
 // We don't pass BgpParsingContext as fuzzed input since we don't want to
 // generate BgpParsingContext::parsing_errors.
@@ -37,7 +38,7 @@ fuzz_target!(|data: (
     bool
 )| {
     let (
-        mut buf,
+        buf,
         asn4,
         multiple_labels,
         add_path,
@@ -55,8 +56,10 @@ fuzz_target!(|data: (
         fail_on_capability_error,
         fail_on_malformed_path_attr,
     );
-    while let Ok((retbuf, _msg)) = BgpMessage::from_wire(Span::new(buf), &mut ctx) {
-        buf = retbuf.fragment();
+    let mut cur = SliceReader::new(buf);
+    while !cur.is_empty()
+        && let Ok(_msg) = BgpMessage::parse(&mut cur, &mut ctx)
+    {
         ctx.reset_parsing_errors();
     }
 });
