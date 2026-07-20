@@ -399,7 +399,7 @@ impl TryFrom<u8> for SubsequentAddressFamily {
 /// Since not all [`AddressFamily`] and [`SubsequentAddressFamily`] are valid
 /// combinations, this enum defines a set of valid combination to ensure only
 /// valid AFI/SAFI are used at compile time.
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, Display, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum AddressType {
