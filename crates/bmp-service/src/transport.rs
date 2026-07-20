@@ -141,7 +141,6 @@ mod tests {
     use super::*;
     use futures_util::StreamExt;
     use netgauze_bmp_pkt::codec::{BmpCodec, BmpCodecDecoderError};
-    use netgauze_bmp_pkt::iana::UndefinedBmpVersion;
     use netgauze_bmp_pkt::v3::*;
     use netgauze_bmp_pkt::wire::deserializer::BmpMessageParsingError;
     use netgauze_bmp_pkt::*;
@@ -178,7 +177,10 @@ mod tests {
             Some(Err(TaggedData::new(
                 tag,
                 BmpCodecDecoderError::BmpMessageParsingError(
-                    BmpMessageParsingError::InvalidBmpLength(1)
+                    BmpMessageParsingError::InvalidBmpLength {
+                        offset: 1,
+                        length: 1
+                    }
                 )
             )))
         );
@@ -188,7 +190,10 @@ mod tests {
             Some(Err(TaggedData::new(
                 tag,
                 BmpCodecDecoderError::BmpMessageParsingError(
-                    BmpMessageParsingError::UndefinedBmpVersion(UndefinedBmpVersion(0xff))
+                    BmpMessageParsingError::UndefinedBmpVersion {
+                        offset: 0,
+                        value: 0xff
+                    }
                 )
             )))
         );
