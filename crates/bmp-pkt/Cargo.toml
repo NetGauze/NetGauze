@@ -44,7 +44,7 @@ serde = [
 ]
 codec = ["tokio-util", "bytes"]
 bench = ["criterion", "codec"]
-fuzz = ["arbitrary", "arbitrary_ext", "bitflags/arbitrary"]
+fuzz = ["arbitrary", "arbitrary_ext", "bitflags/arbitrary", "netgauze-iana/fuzz", "netgauze-bgp-pkt/fuzz"]
 json-schema = ["schemars", "netgauze-bgp-pkt/json-schema", "netgauze-iana/json-schema", "ipnet/schemars1"]
 
 [dev-dependencies]
