@@ -39,15 +39,19 @@
 //! TCP-reassembly + [`BmpCodec`] decode path, matching the workload of a
 //! BMP collector.
 
+// `BytesMut` only on the streaming side because `BmpCodec::decode` mutates
+// the buffer via `buf.advance(...)`.
 use bytes::BytesMut;
-use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use netgauze_bgp_pkt::path_attribute::PathAttributeValue;
 use netgauze_bmp_pkt::codec::BmpCodec;
 use netgauze_bmp_pkt::iana::BmpMessageType;
 use netgauze_bmp_pkt::wire::deserializer::BmpParsingContext;
 use netgauze_bmp_pkt::{BmpMessage, v3, v4};
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePdu};
+use netgauze_parse_utils::WritablePdu;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
 use pcap_parser::LegacyPcapReader;
 use std::collections::HashMap;
@@ -302,11 +306,12 @@ where
         let wire = &flow[pos..pos + length];
         let ctx_before = ctx.clone();
         let mut working = ctx.clone();
+        let mut reader = SliceReader::new(wire);
         // Skip past unparseable messages instead of stopping: real BMP
         // pcaps sometimes contain vendor quirks or capability-gated routes
         // we can't decode with default context, but the BMP length field
         // still lets us advance to the next frame.
-        if let Ok((_, msg)) = BmpMessage::from_wire(Span::new(wire), &mut working) {
+        if let Ok(msg) = BmpMessage::parse(&mut reader, &mut working) {
             if let Some(name) = picker(&msg, idx) {
                 out.push(Exemplar {
                     name,
@@ -399,8 +404,8 @@ fn v4_route_monitoring_has_add_path(msg: &BmpMessage) -> bool {
 
 #[inline(always)]
 fn decode_with_ctx(buf: &[u8], ctx: &mut BmpParsingContext) -> BmpMessage {
-    let (_, msg) = BmpMessage::from_wire(Span::new(buf), ctx).unwrap();
-    msg
+    let mut reader = SliceReader::new(buf);
+    BmpMessage::parse(&mut reader, ctx).unwrap()
 }
 
 /// Register a decode + encode bench pair for a synthetic fixture (decode
@@ -459,21 +464,23 @@ fn bench_exemplar(c: &mut Criterion, ex: &Exemplar) {
 // Streaming benchmark — full pcap through BmpCodec
 // -------------------------------------------------------------------------
 
-/// Number of BMP messages successfully decoded by feeding every TCP flow
-/// in `pcap_bytes` through a fresh [`BmpCodec`]. Used both to set the
-/// throughput element count and to sanity-check the run.
-fn drive_stream(flows: &[Vec<u8>]) -> usize {
+/// Drive each pre-built per-flow buffer through a fresh [`BmpCodec`] and
+/// return the total number of successfully decoded messages.
+///
+/// Takes `&mut [BytesMut]` so the caller owns the buffers and we don't
+/// pay for the allocation + memcpy that previously happened on every
+/// invocation. With `iter_batched_ref` the buffers are rebuilt OUTSIDE
+/// the timed section so this routine only times codec work.
+fn drive_stream(bufs: &mut [BytesMut]) -> usize {
     let mut total = 0usize;
-    for flow in flows {
+    for buf in bufs.iter_mut() {
         let mut codec = BmpCodec::default();
-        let mut buf = BytesMut::with_capacity(flow.len());
-        buf.extend_from_slice(flow);
         // Keep going past a decode error: `BmpCodec::decode` already
         // advances the buffer past the failed frame, so subsequent frames
         // can still be processed (closer to a real collector's behavior
         // than bailing on the first vendor quirk).
         while !buf.is_empty() {
-            match codec.decode(&mut buf) {
+            match codec.decode(buf) {
                 Ok(Some(msg)) => {
                     total += 1;
                     black_box(msg);
@@ -486,10 +493,24 @@ fn drive_stream(flows: &[Vec<u8>]) -> usize {
     total
 }
 
+/// Allocate a fresh `BytesMut` per flow holding a copy of the flow bytes.
+/// Called from `iter_batched_ref` setup so the alloc + memcpy is excluded
+/// from the timed measurement.
+fn build_stream_buffers(flows: &[Vec<u8>]) -> Vec<BytesMut> {
+    flows
+        .iter()
+        .map(|f| {
+            let mut buf = BytesMut::with_capacity(f.len());
+            buf.extend_from_slice(f);
+            buf
+        })
+        .collect()
+}
+
 fn bench_pcap_stream(c: &mut Criterion, name: &str, pcap_bytes: &'static [u8]) {
     let flows = pcap_tcp_flows(pcap_bytes);
     let total_bytes: u64 = flows.iter().map(|f| f.len() as u64).sum();
-    let total_msgs = drive_stream(&flows);
+    let total_msgs = drive_stream(&mut build_stream_buffers(&flows));
     assert!(
         total_msgs > 0,
         "stream bench '{name}' decoded 0 messages — wrong pcap or bad TCP port filter?",
@@ -505,20 +526,30 @@ fn bench_pcap_stream(c: &mut Criterion, name: &str, pcap_bytes: &'static [u8]) {
     );
 
     let mut group = c.benchmark_group("stream");
-    // Report both bytes/s (decode throughput) and elements/s (msgs/s).
+    // `LargeInput` keeps the per-batch memory footprint reasonable: the
+    // 208-* pcaps are >1 MB each and `SmallInput` would let criterion
+    // pre-allocate hundreds of copies before each measurement window.
     group.throughput(Throughput::Bytes(total_bytes));
     group.bench_function(format!("{name} bytes"), |b| {
-        b.iter(|| {
-            let n = drive_stream(black_box(&flows));
-            black_box(n);
-        })
+        b.iter_batched_ref(
+            || build_stream_buffers(&flows),
+            |bufs| {
+                let n = drive_stream(bufs);
+                black_box(n);
+            },
+            BatchSize::LargeInput,
+        )
     });
     group.throughput(Throughput::Elements(total_msgs as u64));
     group.bench_function(format!("{name} msgs"), |b| {
-        b.iter(|| {
-            let n = drive_stream(black_box(&flows));
-            black_box(n);
-        })
+        b.iter_batched_ref(
+            || build_stream_buffers(&flows),
+            |bufs| {
+                let n = drive_stream(bufs);
+                black_box(n);
+            },
+            BatchSize::LargeInput,
+        )
     });
     group.finish();
 }

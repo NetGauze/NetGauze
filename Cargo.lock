@@ -2719,17 +2719,16 @@ dependencies = [
  "ipnet",
  "netgauze-bgp-pkt",
  "netgauze-iana",
- "netgauze-locate",
  "netgauze-parse-utils",
  "netgauze-pcap-reader",
  "netgauze-serde-macros",
- "nom 7.1.3",
  "pcap-parser",
  "rstest",
  "schemars 1.2.1",
  "serde",
  "serde_json",
  "strum_macros 0.28.0",
+ "thiserror",
  "tokio-util",
 ]
 

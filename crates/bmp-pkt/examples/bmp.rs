@@ -13,7 +13,9 @@ use netgauze_bmp_pkt::v3::{
     BmpMessageValue, MirroredBgpMessage, RouteMirroringMessage, RouteMirroringValue,
 };
 use netgauze_bmp_pkt::{BmpMessage, BmpPeerType, PeerHeader};
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePdu};
+use netgauze_parse_utils::WritablePdu;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
 fn main() {
     let bmp_msg = BmpMessage::V3(BmpMessageValue::RouteMirroring(RouteMirroringMessage::new(
@@ -51,7 +53,10 @@ fn main() {
     );
 
     // Deserialize the message from binary format
-    let (_, bmp_msg_back) =
-        BmpMessage::from_wire(Span::new(&buf), &mut Default::default()).unwrap();
+    let bmp_msg_back = BmpMessage::parse(
+        &mut SliceReader::new(buf.as_slice()),
+        &mut Default::default(),
+    )
+    .unwrap();
     assert_eq!(bmp_msg, bmp_msg_back);
 }

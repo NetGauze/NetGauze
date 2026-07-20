@@ -20,268 +20,301 @@ use netgauze_bgp_pkt::iana::BgpMessageType;
 use netgauze_bgp_pkt::nlri::RouteDistinguisher;
 use netgauze_bgp_pkt::wire::deserializer::nlri::RouteDistinguisherParsingError;
 use netgauze_bgp_pkt::wire::deserializer::{BgpMessageParsingError, BgpParsingContext};
-use netgauze_iana::address_family::{
-    AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
-    UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
-};
-use netgauze_parse_utils::{
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
-    parse_into_located_one_input, parse_till_empty_into_located,
-};
-use netgauze_serde_macros::LocatedError;
-use nom::IResult;
-use nom::error::{ErrorKind, FromExternalError};
-use nom::number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128};
-use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::string::FromUtf8Error;
+use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
 
 use crate::iana::*;
 use crate::wire::deserializer::BmpParsingContext;
 use crate::{BmpPeerType, CounterU32, GaugeU64, PeerHeader, PeerKey, v3};
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
+use serde::{Deserialize, Serialize};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BmpMessageValueParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedBmpMessageType(#[from_external] UndefinedBmpMessageType),
-    RouteMonitoringMessageError(
-        #[from_located(module = "self")] RouteMonitoringMessageParsingError,
-    ),
-    InitiationMessageError(#[from_located(module = "self")] InitiationMessageParsingError),
-    PeerUpNotificationMessageError(
-        #[from_located(module = "self")] PeerUpNotificationMessageParsingError,
-    ),
-    PeerDownNotificationMessageError(
-        #[from_located(module = "self")] PeerDownNotificationMessageParsingError,
-    ),
-    RouteMirroringMessageError(#[from_located(module = "self")] RouteMirroringMessageParsingError),
-    TerminationMessageError(#[from_located(module = "self")] TerminationMessageParsingError),
-    StatisticsReportMessageError(
-        #[from_located(module = "self")] StatisticsReportMessageParsingError,
-    ),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("unknown BMP message type {code} at byte offset {offset}")]
+    UndefinedBmpMessageType { offset: usize, code: u8 },
+
+    #[error("in route monitoring message: {0}")]
+    RouteMonitoringMessageError(#[from] RouteMonitoringMessageParsingError),
+
+    #[error("in initiation message: {0}")]
+    InitiationMessageError(#[from] InitiationMessageParsingError),
+
+    #[error("in peer-up notification message: {0}")]
+    PeerUpNotificationMessageError(#[from] PeerUpNotificationMessageParsingError),
+
+    #[error("in peer-down notification message: {0}")]
+    PeerDownNotificationMessageError(#[from] PeerDownNotificationMessageParsingError),
+
+    #[error("in route mirroring message: {0}")]
+    RouteMirroringMessageError(#[from] RouteMirroringMessageParsingError),
+
+    #[error("in termination message: {0}")]
+    TerminationMessageError(#[from] TerminationMessageParsingError),
+
+    #[error("in statistics report message: {0}")]
+    StatisticsReportMessageError(#[from] StatisticsReportMessageParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessageValueParsingError<'a>>
-    for v3::BmpMessageValue
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BmpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedBmpMessageValueParsingError<'a>> {
-        let (buf, msg_type) = nom::combinator::map_res(be_u8, BmpMessageType::try_from)(buf)?;
-        let (buf, msg) = match msg_type {
-            BmpMessageType::RouteMonitoring => {
-                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, v3::BmpMessageValue::RouteMonitoring(value))
-            }
-            BmpMessageType::StatisticsReport => {
-                let (buf, value) = parse_into_located(buf)?;
-                (buf, v3::BmpMessageValue::StatisticsReport(value))
-            }
-            BmpMessageType::PeerDownNotification => {
-                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, v3::BmpMessageValue::PeerDownNotification(value))
-            }
-            BmpMessageType::PeerUpNotification => {
-                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, v3::BmpMessageValue::PeerUpNotification(value))
-            }
-            BmpMessageType::Initiation => {
-                let (buf, init) = parse_into_located(buf)?;
-                (buf, v3::BmpMessageValue::Initiation(init))
-            }
-            BmpMessageType::Termination => {
-                let (buf, init) = parse_into_located(buf)?;
-                (buf, v3::BmpMessageValue::Termination(init))
-            }
-            BmpMessageType::RouteMirroring => {
-                let (buf, init) = parse_into_located_one_input(buf, ctx)?;
-                (buf, v3::BmpMessageValue::RouteMirroring(init))
-            }
-            BmpMessageType::Experimental251 => {
-                let (span, buf) = nom::bytes::complete::take(buf.len())(buf)?;
-                (span, v3::BmpMessageValue::Experimental251(buf.to_vec()))
-            }
-            BmpMessageType::Experimental252 => {
-                let (span, buf) = nom::bytes::complete::take(buf.len())(buf)?;
-                (span, v3::BmpMessageValue::Experimental252(buf.to_vec()))
-            }
-            BmpMessageType::Experimental253 => {
-                let (span, buf) = nom::bytes::complete::take(buf.len())(buf)?;
-                (span, v3::BmpMessageValue::Experimental253(buf.to_vec()))
-            }
-            BmpMessageType::Experimental254 => {
-                let (span, buf) = nom::bytes::complete::take(buf.len())(buf)?;
-                (span, v3::BmpMessageValue::Experimental254(buf.to_vec()))
+impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v3::BmpMessageValue {
+    type Error = BmpMessageValueParsingError;
+
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BmpParsingContext) -> Result<Self, Self::Error> {
+        let msg_type = cur.read_u8()?;
+        let msg_type = match BmpMessageType::from_repr(msg_type) {
+            Some(msg_type) => msg_type,
+            None => {
+                return Err(BmpMessageValueParsingError::UndefinedBmpMessageType {
+                    offset: cur.offset() - 1,
+                    code: msg_type,
+                });
             }
         };
-        Ok((buf, msg))
+        let msg = match msg_type {
+            BmpMessageType::RouteMonitoring => {
+                let value = v3::RouteMonitoringMessage::parse(cur, ctx)?;
+                v3::BmpMessageValue::RouteMonitoring(value)
+            }
+            BmpMessageType::StatisticsReport => {
+                let value = v3::StatisticsReportMessage::parse(cur)?;
+                v3::BmpMessageValue::StatisticsReport(value)
+            }
+            BmpMessageType::PeerDownNotification => {
+                let value = v3::PeerDownNotificationMessage::parse(cur, ctx)?;
+                v3::BmpMessageValue::PeerDownNotification(value)
+            }
+            BmpMessageType::PeerUpNotification => {
+                let value = v3::PeerUpNotificationMessage::parse(cur, ctx)?;
+                v3::BmpMessageValue::PeerUpNotification(value)
+            }
+            BmpMessageType::Initiation => {
+                let init = v3::InitiationMessage::parse(cur)?;
+                v3::BmpMessageValue::Initiation(init)
+            }
+            BmpMessageType::Termination => {
+                let terminate = v3::TerminationMessage::parse(cur)?;
+                v3::BmpMessageValue::Termination(terminate)
+            }
+            BmpMessageType::RouteMirroring => {
+                let value = v3::RouteMirroringMessage::parse(cur, ctx)?;
+                v3::BmpMessageValue::RouteMirroring(value)
+            }
+            BmpMessageType::Experimental251 => {
+                let value = cur.read_bytes(cur.remaining())?;
+                v3::BmpMessageValue::Experimental251(value.to_vec())
+            }
+            BmpMessageType::Experimental252 => {
+                let value = cur.read_bytes(cur.remaining())?;
+                v3::BmpMessageValue::Experimental252(value.to_vec())
+            }
+            BmpMessageType::Experimental253 => {
+                let value = cur.read_bytes(cur.remaining())?;
+                v3::BmpMessageValue::Experimental253(value.to_vec())
+            }
+            BmpMessageType::Experimental254 => {
+                let value = cur.read_bytes(cur.remaining())?;
+                v3::BmpMessageValue::Experimental254(value.to_vec())
+            }
+        };
+        Ok(msg)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum InitiationMessageParsingError {
-    InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
+    #[error("in initiation information: {0}")]
+    InitiationInformationError(#[from] InitiationInformationParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedInitiationMessageParsingError<'a>> for v3::InitiationMessage {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedInitiationMessageParsingError<'a>> {
-        let (buf, information) = parse_till_empty_into_located(buf)?;
-        Ok((buf, v3::InitiationMessage::new(information)))
+impl<'a> ParseFrom<'a> for v3::InitiationMessage {
+    type Error = InitiationMessageParsingError;
+
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let mut information = Vec::new();
+        while !cur.is_empty() {
+            let info = v3::InitiationInformation::parse(cur)?;
+            information.push(info);
+        }
+        Ok(v3::InitiationMessage::new(information))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum InitiationInformationParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedType(#[from_external] UndefinedInitiationInformationTlvType),
-    FromUtf8Error(String),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("unknown initiation information TLV type {code} at byte offset {offset}")]
+    UndefinedType { offset: usize, code: u16 },
+
+    #[error("invalid UTF-8 in initiation information TLV at byte offset {offset}: {error}")]
+    FromUtf8Error { offset: usize, error: String },
 }
 
-impl<'a> FromExternalError<Span<'a>, FromUtf8Error>
-    for LocatedInitiationInformationParsingError<'a>
-{
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: FromUtf8Error) -> Self {
-        LocatedInitiationInformationParsingError::new(
-            input,
-            InitiationInformationParsingError::FromUtf8Error(error.to_string()),
-        )
-    }
-}
+impl<'a> ParseFrom<'a> for v3::InitiationInformation {
+    type Error = InitiationInformationParsingError;
 
-impl<'a> ReadablePdu<'a, LocatedInitiationInformationParsingError<'a>>
-    for v3::InitiationInformation
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedInitiationInformationParsingError<'a>> {
-        let (buf, tlv_type) =
-            nom::combinator::map_res(be_u16, InitiationInformationTlvType::try_from)(buf)?;
-        let (buf, length) = be_u16(buf)?;
-        let (remainder, buf) = nom::bytes::complete::take(length)(buf)?;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let code = cur.read_u16_be()?;
+        let tlv_type = match InitiationInformationTlvType::try_from(code) {
+            Ok(tlv_type) => tlv_type,
+            Err(_) => {
+                return Err(InitiationInformationParsingError::UndefinedType {
+                    offset: cur.offset() - 2,
+                    code,
+                });
+            }
+        };
+        let length = cur.read_u16_be()?;
+        let mut buf = cur.take_slice(length as usize)?;
+
         match tlv_type {
             InitiationInformationTlvType::String => {
-                let (_, str) =
-                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
-                        String::from_utf8(x.to_vec())
-                    })(buf)?;
-                Ok((remainder, v3::InitiationInformation::String(str)))
+                let offset = buf.offset();
+                match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
+                    Ok(s) => Ok(v3::InitiationInformation::String(s)),
+                    Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
+                        offset,
+                        error: error.to_string(),
+                    }),
+                }
             }
             InitiationInformationTlvType::SystemDescription => {
-                let (_, str) =
-                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
-                        String::from_utf8(x.to_vec())
-                    })(buf)?;
-                Ok((remainder, v3::InitiationInformation::SystemDescription(str)))
+                let offset = buf.offset();
+                match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
+                    Ok(s) => Ok(v3::InitiationInformation::SystemDescription(s)),
+                    Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
+                        offset,
+                        error: error.to_string(),
+                    }),
+                }
             }
             InitiationInformationTlvType::SystemName => {
-                let (_, str) =
-                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
-                        String::from_utf8(x.to_vec())
-                    })(buf)?;
-                Ok((remainder, v3::InitiationInformation::SystemName(str)))
+                let offset = buf.offset();
+                match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
+                    Ok(s) => Ok(v3::InitiationInformation::SystemName(s)),
+                    Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
+                        offset,
+                        error: error.to_string(),
+                    }),
+                }
             }
             InitiationInformationTlvType::VrfTableName => {
-                let (_, str) =
-                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
-                        String::from_utf8(x.to_vec())
-                    })(buf)?;
-                Ok((remainder, v3::InitiationInformation::VrfTableName(str)))
+                let offset = buf.offset();
+                match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
+                    Ok(s) => Ok(v3::InitiationInformation::VrfTableName(s)),
+                    Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
+                        offset,
+                        error: error.to_string(),
+                    }),
+                }
             }
             InitiationInformationTlvType::AdminLabel => {
-                let (_, str) =
-                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
-                        String::from_utf8(x.to_vec())
-                    })(buf)?;
-                Ok((remainder, v3::InitiationInformation::AdminLabel(str)))
+                let offset = buf.offset();
+                match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
+                    Ok(s) => Ok(v3::InitiationInformation::AdminLabel(s)),
+                    Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
+                        offset,
+                        error: error.to_string(),
+                    }),
+                }
             }
-            InitiationInformationTlvType::Experimental65531 => Ok((
-                remainder,
-                v3::InitiationInformation::Experimental65531(buf.to_vec()),
-            )),
-            InitiationInformationTlvType::Experimental65532 => Ok((
-                remainder,
-                v3::InitiationInformation::Experimental65532(buf.to_vec()),
-            )),
-            InitiationInformationTlvType::Experimental65533 => Ok((
-                remainder,
-                v3::InitiationInformation::Experimental65533(buf.to_vec()),
-            )),
-            InitiationInformationTlvType::Experimental65534 => Ok((
-                remainder,
-                v3::InitiationInformation::Experimental65534(buf.to_vec()),
-            )),
+            InitiationInformationTlvType::Experimental65531 => {
+                Ok(v3::InitiationInformation::Experimental65531(
+                    buf.read_bytes(buf.remaining())?.to_vec(),
+                ))
+            }
+            InitiationInformationTlvType::Experimental65532 => {
+                Ok(v3::InitiationInformation::Experimental65532(
+                    buf.read_bytes(buf.remaining())?.to_vec(),
+                ))
+            }
+            InitiationInformationTlvType::Experimental65533 => {
+                Ok(v3::InitiationInformation::Experimental65533(
+                    buf.read_bytes(buf.remaining())?.to_vec(),
+                ))
+            }
+            InitiationInformationTlvType::Experimental65534 => {
+                Ok(v3::InitiationInformation::Experimental65534(
+                    buf.read_bytes(buf.remaining())?.to_vec(),
+                ))
+            }
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum RouteMonitoringMessageParsingError {
-    RouteMonitoringMessageError(v3::RouteMonitoringMessageError),
-    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
-    BgpMessageError(
-        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
-    ),
+    #[error("malformed route monitoring message at byte offset {offset}: {error}")]
+    RouteMonitoringMessageError {
+        offset: usize,
+        error: v3::RouteMonitoringMessageError,
+    },
+
+    #[error("in peer header: {0}")]
+    PeerHeaderError(#[from] PeerHeaderParsingError),
+
+    #[error("in BGP message: {0}")]
+    BgpMessageError(#[from] BgpMessageParsingError),
 }
 
-impl<'a>
-    ReadablePduWithOneInput<
-        'a,
-        &mut BmpParsingContext,
-        LocatedRouteMonitoringMessageParsingError<'a>,
-    > for v3::RouteMonitoringMessage
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BmpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedRouteMonitoringMessageParsingError<'a>> {
-        let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v3::RouteMonitoringMessage {
+    type Error = RouteMonitoringMessageParsingError;
+
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BmpParsingContext) -> Result<Self, Self::Error> {
+        let peer_header = PeerHeader::parse(cur)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
         let bgp_ctx = ctx.entry(peer_key).or_default();
         bgp_ctx.set_asn4(peer_header.is_asn4());
-        let input = buf;
-        let (buf, update_message): (Span<'_>, BgpMessage) =
-            parse_into_located_one_input(buf, bgp_ctx)?;
+        let offset = cur.offset();
+        let update_message = BgpMessage::parse(cur, bgp_ctx)?;
         if update_message.get_type() != BgpMessageType::Update {
-            return Err(nom::Err::Error(
-                LocatedRouteMonitoringMessageParsingError::new(
-                    input,
-                    RouteMonitoringMessageParsingError::RouteMonitoringMessageError(
-                        v3::RouteMonitoringMessageError::UnexpectedMessageType(
-                            update_message.get_type(),
-                        ),
+            return Err(
+                RouteMonitoringMessageParsingError::RouteMonitoringMessageError {
+                    offset,
+                    error: v3::RouteMonitoringMessageError::UnexpectedMessageType(
+                        update_message.get_type(),
                     ),
-                ),
-            ));
+                },
+            );
         }
         match v3::RouteMonitoringMessage::build(peer_header, update_message) {
-            Ok(msg) => Ok((buf, msg)),
-            Err(err) => Err(nom::Err::Error(
-                LocatedRouteMonitoringMessageParsingError::new(
-                    input,
-                    RouteMonitoringMessageParsingError::RouteMonitoringMessageError(err),
-                ),
-            )),
+            Ok(msg) => Ok(msg),
+            Err(error) => Err(
+                RouteMonitoringMessageParsingError::RouteMonitoringMessageError { offset, error },
+            ),
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BmpPeerTypeParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedBmpPeerTypeCode(#[from_external] UndefinedBmpPeerTypeCode),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("unknown BMP peer type {code} at byte offset {offset}")]
+    UndefinedBmpPeerTypeCode { offset: usize, code: u8 },
 }
 
-impl<'a> ReadablePdu<'a, LocatedBmpPeerTypeParsingError<'a>> for BmpPeerType {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBmpPeerTypeParsingError<'a>> {
-        let (buf, peer_type_code) =
-            nom::combinator::map_res(be_u8, BmpPeerTypeCode::try_from)(buf)?;
-        let (buf, flags) = be_u8(buf)?;
+impl<'a> ParseFrom<'a> for BmpPeerType {
+    type Error = BmpPeerTypeParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let code = cur.read_u8()?;
+        let peer_type_code = match BmpPeerTypeCode::try_from(code) {
+            Ok(peer_type_code) => peer_type_code,
+            Err(_) => {
+                return Err(BmpPeerTypeParsingError::UndefinedBmpPeerTypeCode {
+                    offset: cur.offset() - 1,
+                    code,
+                });
+            }
+        };
+        let flags = cur.read_u8()?;
         let ipv6 = flags & PEER_FLAGS_IS_IPV6 == PEER_FLAGS_IS_IPV6;
         let post_policy = flags & PEER_FLAGS_IS_POST_POLICY == PEER_FLAGS_IS_POST_POLICY;
         let asn2 = flags & PEER_FLAGS_IS_ASN2 == PEER_FLAGS_IS_ASN2;
@@ -312,29 +345,39 @@ impl<'a> ReadablePdu<'a, LocatedBmpPeerTypeParsingError<'a>> for BmpPeerType {
             BmpPeerTypeCode::Experimental253 => BmpPeerType::Experimental253 { flags },
             BmpPeerTypeCode::Experimental254 => BmpPeerType::Experimental254 { flags },
         };
-        Ok((buf, peer_type))
+        Ok(peer_type)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum PeerHeaderParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    BmpPeerTypeError(#[from_located(module = "self")] BmpPeerTypeParsingError),
-    RouteDistinguisherError(
-        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer::nlri")]
-        RouteDistinguisherParsingError,
-    ),
-    InvalidTime(u32, u32),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("in BMP peer type: {0}")]
+    BmpPeerTypeError(#[from] BmpPeerTypeParsingError),
+
+    #[error("in route distinguisher: {0}")]
+    RouteDistinguisherError(#[from] RouteDistinguisherParsingError),
+
+    #[error(
+        "invalid peer header timestamp at byte offset {offset} (seconds={timestamp_secs}, microseconds={timestamp_micro})"
+    )]
+    InvalidTime {
+        offset: usize,
+        timestamp_secs: u32,
+        timestamp_micro: u32,
+    },
 }
 
-impl<'a> ReadablePdu<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedPeerHeaderParsingError<'a>> {
-        let (buf, peer_type) = parse_into_located(buf)?;
-        let (buf, rd) = parse_into_located(buf)?;
+impl<'a> ParseFrom<'a> for PeerHeader {
+    type Error = PeerHeaderParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let peer_type = BmpPeerType::parse(cur)?;
+        let rd = RouteDistinguisher::parse(cur)?;
         let zero = RouteDistinguisher::As2Administrator { asn2: 0, number: 0 };
         let rd = if rd == zero { None } else { Some(rd) };
-        let (buf, peer_address) = be_u128(buf)?;
+        let peer_address = cur.read_u128_be()?;
         let address = if peer_address == 0u128 {
             None
         } else if check_is_ipv6(&peer_type).unwrap_or(true) {
@@ -342,43 +385,57 @@ impl<'a> ReadablePdu<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
         } else {
             Some(IpAddr::V4(Ipv4Addr::from(peer_address as u32)))
         };
-        let (buf, peer_as) = be_u32(buf)?;
-        let (buf, bgp_id) = be_u32(buf)?;
+        let peer_as = cur.read_u32_be()?;
+        let bgp_id = cur.read_u32_be()?;
         let bgp_id = Ipv4Addr::from(bgp_id);
-        let input = buf;
-        let (buf, timestamp_secs) = be_u32(buf)?;
-        let (buf, timestamp_micro) = be_u32(buf)?;
+        let timestamp_secs = cur.read_u32_be()?;
+        let timestamp_micro = cur.read_u32_be()?;
         let time = if timestamp_secs != 0 || timestamp_micro != 0 {
             let time_opt =
                 Utc.timestamp_opt(timestamp_secs.into(), timestamp_micro.saturating_mul(1_000));
             let time = if let LocalResult::Single(time) = time_opt {
                 time
             } else {
-                return Err(nom::Err::Error(LocatedPeerHeaderParsingError::new(
-                    Span::new(&input),
-                    PeerHeaderParsingError::InvalidTime(timestamp_secs, timestamp_micro),
-                )));
+                return Err(PeerHeaderParsingError::InvalidTime {
+                    offset: cur.offset() - 8,
+                    timestamp_secs,
+                    timestamp_micro,
+                });
             };
             Some(time)
         } else {
             None
         };
         let peer_header = PeerHeader::new(peer_type, rd, address, peer_as, bgp_id, time);
-        Ok((buf, peer_header))
+        Ok(peer_header)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum PeerUpNotificationMessageParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    PeerUpMessageError(v3::PeerUpNotificationMessageError),
-    UnexpectedPeerType(BmpPeerTypeCode),
-    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
-    BgpMessageError(
-        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
-    ),
-    InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("malformed peer-up notification at byte offset {offset}: {error}")]
+    PeerUpMessageError {
+        offset: usize,
+        error: v3::PeerUpNotificationMessageError,
+    },
+
+    #[error("unexpected peer type {peer_type} in peer-up notification at byte offset {offset}")]
+    UnexpectedPeerType {
+        offset: usize,
+        peer_type: BmpPeerTypeCode,
+    },
+
+    #[error("in peer header: {0}")]
+    PeerHeaderError(#[from] PeerHeaderParsingError),
+
+    #[error("in BGP message: {0}")]
+    BgpMessageError(#[from] BgpMessageParsingError),
+
+    #[error("in initiation information: {0}")]
+    InitiationInformationError(#[from] InitiationInformationParsingError),
 }
 
 /// Check if the V flag is enabled in the peer header. Or return error of the
@@ -402,32 +459,23 @@ const fn check_is_ipv6(peer_type: &BmpPeerType) -> Result<bool, BmpPeerTypeCode>
     }
 }
 
-impl<'a>
-    ReadablePduWithOneInput<
-        'a,
-        &mut BmpParsingContext,
-        LocatedPeerUpNotificationMessageParsingError<'a>,
-    > for v3::PeerUpNotificationMessage
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BmpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedPeerUpNotificationMessageParsingError<'a>> {
-        let input = buf;
-        let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v3::PeerUpNotificationMessage {
+    type Error = PeerUpNotificationMessageParsingError;
+
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BmpParsingContext) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let peer_header = PeerHeader::parse(cur)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
         let ipv6 = match check_is_ipv6(&peer_header.peer_type) {
             Ok(ipv6) => ipv6,
-            Err(code) => {
-                return Err(nom::Err::Error(
-                    LocatedPeerUpNotificationMessageParsingError::new(
-                        input,
-                        PeerUpNotificationMessageParsingError::UnexpectedPeerType(code),
-                    ),
-                ));
+            Err(peer_type) => {
+                return Err(PeerUpNotificationMessageParsingError::UnexpectedPeerType {
+                    offset,
+                    peer_type,
+                });
             }
         };
-        let (buf, address) = be_u128(buf)?;
+        let address = cur.read_u128_be()?;
         let local_address = if address == 0u128 {
             None
         } else if ipv6 {
@@ -436,13 +484,13 @@ impl<'a>
             // the upper bits should be zero and can be ignored
             Some(IpAddr::V4(Ipv4Addr::from(address as u32)))
         };
-        let (buf, local_port) = be_u16(buf)?;
+        let local_port = cur.read_u16_be()?;
         let local_port = if local_port == 0 {
             None
         } else {
             Some(local_port)
         };
-        let (buf, remote_port) = be_u16(buf)?;
+        let remote_port = cur.read_u16_be()?;
         let remote_port = if remote_port == 0 {
             None
         } else {
@@ -450,11 +498,15 @@ impl<'a>
         };
         let bgp_ctx = ctx.entry(peer_key).or_default();
         bgp_ctx.set_asn4(peer_header.is_asn4());
-        let (buf, sent_message) = parse_into_located_one_input(buf, bgp_ctx)?;
+        let sent_message = BgpMessage::parse(cur, bgp_ctx)?;
         let bgp_ctx = ctx.entry(peer_key).or_default();
         bgp_ctx.set_asn4(peer_header.is_asn4());
-        let (buf, received_message) = parse_into_located_one_input(buf, bgp_ctx)?;
-        let (buf, information) = parse_till_empty_into_located(buf)?;
+        let received_message = BgpMessage::parse(cur, bgp_ctx)?;
+        let mut information = Vec::new();
+        while !cur.is_empty() {
+            let info = v3::InitiationInformation::parse(cur)?;
+            information.push(info);
+        }
         let peer_up_msg = v3::PeerUpNotificationMessage::build(
             peer_header,
             local_address,
@@ -465,813 +517,685 @@ impl<'a>
             information,
         );
         match peer_up_msg {
-            Ok(msg) => Ok((buf, msg)),
-            Err(err) => Err(nom::Err::Error(
-                LocatedPeerUpNotificationMessageParsingError::new(
-                    input,
-                    PeerUpNotificationMessageParsingError::PeerUpMessageError(err),
-                ),
-            )),
+            Ok(msg) => Ok(msg),
+            Err(error) => {
+                Err(PeerUpNotificationMessageParsingError::PeerUpMessageError { offset, error })
+            }
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum PeerDownNotificationMessageParsingError {
-    PeerDownMessageError(v3::PeerDownNotificationMessageError),
-    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
-    PeerDownNotificationReasonError(
-        #[from_located(module = "self")] PeerDownNotificationReasonParsingError,
-    ),
+    #[error("malformed peer-down notification at byte offset {offset}: {error}")]
+    PeerDownMessageError {
+        offset: usize,
+        error: v3::PeerDownNotificationMessageError,
+    },
+
+    #[error("in peer header: {0}")]
+    PeerHeaderError(#[from] PeerHeaderParsingError),
+
+    #[error("in peer-down notification reason: {0}")]
+    PeerDownNotificationReasonError(#[from] PeerDownNotificationReasonParsingError),
 }
 
-impl<'a>
-    ReadablePduWithOneInput<
-        'a,
-        &mut BmpParsingContext,
-        LocatedPeerDownNotificationMessageParsingError<'a>,
-    > for v3::PeerDownNotificationMessage
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BmpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedPeerDownNotificationMessageParsingError<'a>> {
-        let input = buf;
-        let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v3::PeerDownNotificationMessage {
+    type Error = PeerDownNotificationMessageParsingError;
+
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BmpParsingContext) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let peer_header = PeerHeader::parse(cur)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
         let bgp_ctx = ctx.entry(peer_key).or_default();
         bgp_ctx.set_asn4(peer_header.is_asn4());
-        let (buf, reason) = parse_into_located_one_input(buf, bgp_ctx)?;
+        let reason = v3::PeerDownNotificationReason::parse(cur, bgp_ctx)?;
         let msg = v3::PeerDownNotificationMessage::build(peer_header, reason);
         match msg {
-            Ok(msg) => Ok((buf, msg)),
-            Err(err) => Err(nom::Err::Error(
-                LocatedPeerDownNotificationMessageParsingError::new(
-                    input,
-                    PeerDownNotificationMessageParsingError::PeerDownMessageError(err),
-                ),
-            )),
+            Ok(msg) => Ok(msg),
+            Err(error) => {
+                Err(PeerDownNotificationMessageParsingError::PeerDownMessageError { offset, error })
+            }
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum PeerDownNotificationReasonParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedPeerDownReasonCode(#[from_external] UndefinedPeerDownReasonCode),
-    BgpMessageError(
-        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
-    ),
-    InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("unknown peer-down reason code {code} at byte offset {offset}")]
+    UndefinedPeerDownReasonCode { offset: usize, code: u8 },
+
+    #[error("in BGP message: {0}")]
+    BgpMessageError(#[from] BgpMessageParsingError),
+
+    #[error("in initiation information: {0}")]
+    InitiationInformationError(#[from] InitiationInformationParsingError),
 }
 
-impl<'a>
-    ReadablePduWithOneInput<
-        'a,
-        &mut BgpParsingContext,
-        LocatedPeerDownNotificationReasonParsingError<'a>,
-    > for v3::PeerDownNotificationReason
-{
-    fn from_wire(
-        buf: Span<'a>,
+impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for v3::PeerDownNotificationReason {
+    type Error = PeerDownNotificationReasonParsingError;
+    fn parse(
+        cur: &mut SliceReader<'a>,
         bgp_ctx: &mut BgpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedPeerDownNotificationReasonParsingError<'a>> {
-        let (buf, reason_code) =
-            nom::combinator::map_res(be_u8, PeerDownReasonCode::try_from)(buf)?;
+    ) -> Result<Self, Self::Error> {
+        let code = cur.read_u8()?;
+        let reason_code = match PeerDownReasonCode::try_from(code) {
+            Ok(reason_code) => reason_code,
+            Err(_) => {
+                return Err(
+                    PeerDownNotificationReasonParsingError::UndefinedPeerDownReasonCode {
+                        offset: cur.offset() - 1,
+                        code,
+                    },
+                );
+            }
+        };
         match reason_code {
             PeerDownReasonCode::LocalSystemClosedNotificationPduFollows => {
-                let (buf, msg) = parse_into_located_one_input(buf, bgp_ctx)?;
-                Ok((
-                    buf,
-                    v3::PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(msg),
-                ))
+                let msg = BgpMessage::parse(cur, bgp_ctx)?;
+                Ok(v3::PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(msg))
             }
             PeerDownReasonCode::LocalSystemClosedFsmEventFollows => {
-                let (buf, value) = be_u16(buf)?;
-                Ok((
-                    buf,
-                    v3::PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(value),
-                ))
+                let value = cur.read_u16_be()?;
+                Ok(v3::PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(value))
             }
             PeerDownReasonCode::RemoteSystemClosedNotificationPduFollows => {
-                let (buf, msg) = parse_into_located_one_input(buf, bgp_ctx)?;
-                Ok((
-                    buf,
-                    v3::PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(msg),
-                ))
+                let msg = BgpMessage::parse(cur, bgp_ctx)?;
+                Ok(v3::PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(msg))
             }
-            PeerDownReasonCode::RemoteSystemClosedNoData => Ok((
-                buf,
-                v3::PeerDownNotificationReason::RemoteSystemClosedNoData,
-            )),
+            PeerDownReasonCode::RemoteSystemClosedNoData => {
+                Ok(v3::PeerDownNotificationReason::RemoteSystemClosedNoData)
+            }
             PeerDownReasonCode::PeerDeConfigured => {
-                Ok((buf, v3::PeerDownNotificationReason::PeerDeConfigured))
+                Ok(v3::PeerDownNotificationReason::PeerDeConfigured)
             }
             PeerDownReasonCode::LocalSystemClosedTlvDataFollows => {
-                let (buf, information) = parse_into_located(buf)?;
-                Ok((
-                    buf,
-                    v3::PeerDownNotificationReason::LocalSystemClosedTlvDataFollows(information),
-                ))
+                let information = v3::InitiationInformation::parse(cur)?;
+                Ok(v3::PeerDownNotificationReason::LocalSystemClosedTlvDataFollows(information))
             }
             PeerDownReasonCode::Experimental251 => {
-                let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
-                Ok((
-                    buf,
-                    v3::PeerDownNotificationReason::Experimental251(data.to_vec()),
+                Ok(v3::PeerDownNotificationReason::Experimental251(
+                    cur.take_slice(cur.remaining())?.as_slice().to_vec(),
                 ))
             }
             PeerDownReasonCode::Experimental252 => {
-                let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
-                Ok((
-                    buf,
-                    v3::PeerDownNotificationReason::Experimental252(data.to_vec()),
+                Ok(v3::PeerDownNotificationReason::Experimental252(
+                    cur.take_slice(cur.remaining())?.as_slice().to_vec(),
                 ))
             }
             PeerDownReasonCode::Experimental253 => {
-                let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
-                Ok((
-                    buf,
-                    v3::PeerDownNotificationReason::Experimental253(data.to_vec()),
+                Ok(v3::PeerDownNotificationReason::Experimental253(
+                    cur.take_slice(cur.remaining())?.as_slice().to_vec(),
                 ))
             }
             PeerDownReasonCode::Experimental254 => {
-                let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
-                Ok((
-                    buf,
-                    v3::PeerDownNotificationReason::Experimental254(data.to_vec()),
+                Ok(v3::PeerDownNotificationReason::Experimental254(
+                    cur.take_slice(cur.remaining())?.as_slice().to_vec(),
                 ))
             }
         }
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum RouteMirroringMessageParsingError {
-    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
-    RouteMirroringValueError(#[from_located(module = "self")] RouteMirroringValueParsingError),
+    #[error("in peer header: {0}")]
+    PeerHeaderError(#[from] PeerHeaderParsingError),
+
+    #[error("in route mirroring value: {0}")]
+    RouteMirroringValueError(#[from] RouteMirroringValueParsingError),
 }
 
-impl<'a>
-    ReadablePduWithOneInput<
-        'a,
-        &mut BmpParsingContext,
-        LocatedRouteMirroringMessageParsingError<'a>,
-    > for v3::RouteMirroringMessage
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BmpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedRouteMirroringMessageParsingError<'a>> {
-        let (mut buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v3::RouteMirroringMessage {
+    type Error = RouteMirroringMessageParsingError;
+
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BmpParsingContext) -> Result<Self, Self::Error> {
+        let peer_header = PeerHeader::parse(cur)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
         let bgp_ctx = ctx.entry(peer_key).or_default();
         bgp_ctx.set_asn4(peer_header.is_asn4());
         let mut mirrored = Vec::new();
-        while !buf.is_empty() {
-            let (tmp, element) = parse_into_located_one_input(buf, &mut *bgp_ctx)?;
+        while !cur.is_empty() {
+            let element = v3::RouteMirroringValue::parse(cur, bgp_ctx)?;
             mirrored.push(element);
-            buf = tmp;
         }
-        Ok((buf, v3::RouteMirroringMessage::new(peer_header, mirrored)))
+        Ok(v3::RouteMirroringMessage::new(peer_header, mirrored))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum RouteMirroringValueParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedRouteMirroringTlvType(#[from_external] UndefinedRouteMirroringTlvType),
-    UndefinedRouteMirroringInformation(#[from_external] UndefinedRouteMirroringInformation),
-    BgpMessageError(
-        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
-    ),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("unknown route mirroring TLV type {code} at byte offset {offset}")]
+    UndefinedRouteMirroringTlvType { offset: usize, code: u16 },
+
+    #[error("unknown route mirroring information code {code} at byte offset {offset}")]
+    UndefinedRouteMirroringInformation { offset: usize, code: u16 },
+
+    #[error(
+        "{unparsed_bytes} trailing byte(s) left unparsed at byte offset {offset} in a route mirroring value declaring length {length}"
+    )]
+    UnparseableBytes {
+        offset: usize,
+        length: u16,
+        unparsed_bytes: usize,
+    },
+
+    #[error("in BGP message: {0}")]
+    BgpMessageError(#[from] BgpMessageParsingError),
 }
 
-impl<'a>
-    ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedRouteMirroringValueParsingError<'a>>
-    for v3::RouteMirroringValue
-{
-    fn from_wire(
-        buf: Span<'a>,
+impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for v3::RouteMirroringValue {
+    type Error = RouteMirroringValueParsingError;
+    fn parse(
+        cur: &mut SliceReader<'a>,
         bgp_ctx: &mut BgpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedRouteMirroringValueParsingError<'a>> {
-        let (buf, code) = nom::combinator::map_res(be_u16, RouteMirroringTlvType::try_from)(buf)?;
-        let (_, length): (_, u16) = nom::combinator::peek(be_u16)(buf)?;
-        let (remainder, buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (buf, value) = match code {
+    ) -> Result<Self, Self::Error> {
+        let code = cur.read_u16_be()?;
+        let code = match RouteMirroringTlvType::try_from(code) {
+            Ok(code) => code,
+            Err(_) => {
+                return Err(
+                    RouteMirroringValueParsingError::UndefinedRouteMirroringTlvType {
+                        offset: cur.offset() - 2,
+                        code,
+                    },
+                );
+            }
+        };
+        let length = cur.read_u16_be()?;
+        let mut buf = cur.take_slice(length as usize)?;
+        let value = match code {
             RouteMirroringTlvType::BgpMessage => {
-                let (buf, msg) = parse_into_located_one_input(buf, bgp_ctx)?;
-                (
-                    buf,
-                    v3::RouteMirroringValue::BgpMessage(v3::MirroredBgpMessage::Parsed(msg)),
-                )
+                let msg = BgpMessage::parse(&mut buf, bgp_ctx)?;
+                v3::RouteMirroringValue::BgpMessage(v3::MirroredBgpMessage::Parsed(msg))
             }
             RouteMirroringTlvType::Information => {
-                let (buf, information) =
-                    nom::combinator::map_res(be_u16, RouteMirroringInformation::try_from)(buf)?;
-                (buf, v3::RouteMirroringValue::Information(information))
+                let code = buf.read_u16_be()?;
+                let information =
+                    match RouteMirroringInformation::try_from(code) {
+                        Ok(information) => information,
+                        Err(_) => return Err(
+                            RouteMirroringValueParsingError::UndefinedRouteMirroringInformation {
+                                offset: buf.offset() - 2,
+                                code,
+                            },
+                        ),
+                    };
+                v3::RouteMirroringValue::Information(information)
             }
             RouteMirroringTlvType::Experimental65531 => {
-                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                let value = v3::RouteMirroringValue::Experimental65531(data.to_vec());
-                (buf, value)
+                let data = buf.take_slice(length as usize)?;
+                v3::RouteMirroringValue::Experimental65531(data.as_slice().to_vec())
             }
             RouteMirroringTlvType::Experimental65532 => {
-                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                let value = v3::RouteMirroringValue::Experimental65532(data.to_vec());
-                (buf, value)
+                let data = buf.take_slice(length as usize)?;
+                v3::RouteMirroringValue::Experimental65532(data.as_slice().to_vec())
             }
             RouteMirroringTlvType::Experimental65533 => {
-                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                let value = v3::RouteMirroringValue::Experimental65533(data.to_vec());
-                (buf, value)
+                let data = buf.take_slice(length as usize)?;
+                v3::RouteMirroringValue::Experimental65533(data.as_slice().to_vec())
             }
             RouteMirroringTlvType::Experimental65534 => {
-                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                let value = v3::RouteMirroringValue::Experimental65534(data.to_vec());
-                (buf, value)
+                let data = buf.take_slice(length as usize)?;
+                v3::RouteMirroringValue::Experimental65534(data.as_slice().to_vec())
             }
         };
         if !buf.is_empty() {
-            return Err(nom::Err::Error(
-                LocatedRouteMirroringValueParsingError::new(
-                    buf,
-                    RouteMirroringValueParsingError::NomError(ErrorKind::NonEmpty),
-                ),
-            ));
+            return Err(RouteMirroringValueParsingError::UnparseableBytes {
+                offset: buf.offset(),
+                length,
+                unparsed_bytes: buf.remaining(),
+            });
         }
-        Ok((remainder, value))
+        Ok(value)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum TerminationMessageParsingError {
-    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
-    TerminationInformationError(
-        #[from_located(module = "self")] TerminationInformationParsingError,
-    ),
+    #[error("in peer header: {0}")]
+    PeerHeaderError(#[from] PeerHeaderParsingError),
+
+    #[error("in termination information: {0}")]
+    TerminationInformationError(#[from] TerminationInformationParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedTerminationMessageParsingError<'a>> for v3::TerminationMessage {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedTerminationMessageParsingError<'a>> {
-        let (buf, information) = parse_till_empty_into_located(buf)?;
-        Ok((buf, v3::TerminationMessage::new(information)))
+impl<'a> ParseFrom<'a> for v3::TerminationMessage {
+    type Error = TerminationMessageParsingError;
+
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let mut information = Vec::new();
+        while !cur.is_empty() {
+            let info = v3::TerminationInformation::parse(cur)?;
+            information.push(info);
+        }
+        Ok(v3::TerminationMessage::new(information))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum TerminationInformationParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedTerminationInformationTlvType(#[from_external] UndefinedTerminationInformationTlvType),
-    UndefinedPeerTerminationCode(#[from_external] UndefinedPeerTerminationCode),
-    FromUtf8Error(String),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("unknown termination information TLV type {code} at byte offset {offset}")]
+    UndefinedTerminationInformationTlvType { offset: usize, code: u16 },
+
+    #[error("unknown termination reason code {code} at byte offset {offset}")]
+    UndefinedPeerTerminationCode { offset: usize, code: u16 },
+
+    #[error("invalid UTF-8 in termination information TLV at byte offset {offset}: {error}")]
+    FromUtf8Error { offset: usize, error: String },
+
+    #[error(
+        "{unparsed_bytes} trailing byte(s) left unparsed at byte offset {offset} in termination information declaring length {length}"
+    )]
+    UnparseableBytes {
+        offset: usize,
+        length: u16,
+        unparsed_bytes: usize,
+    },
 }
 
-impl<'a> FromExternalError<Span<'a>, FromUtf8Error>
-    for LocatedTerminationInformationParsingError<'a>
-{
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: FromUtf8Error) -> Self {
-        LocatedTerminationInformationParsingError::new(
-            input,
-            TerminationInformationParsingError::FromUtf8Error(error.to_string()),
-        )
-    }
-}
-
-impl<'a> ReadablePdu<'a, LocatedTerminationInformationParsingError<'a>>
-    for v3::TerminationInformation
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedTerminationInformationParsingError<'a>> {
-        let (buf, code) =
-            nom::combinator::map_res(be_u16, TerminationInformationTlvType::try_from)(buf)?;
-        let (_, length): (_, u16) = nom::combinator::peek(be_u16)(buf)?;
-        let (remainder, buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (buf, value) = match code {
+impl<'a> ParseFrom<'a> for v3::TerminationInformation {
+    type Error = TerminationInformationParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let code = cur.read_u16_be()?;
+        let code =
+            match TerminationInformationTlvType::try_from(code) {
+                Ok(code) => code,
+                Err(_) => return Err(
+                    TerminationInformationParsingError::UndefinedTerminationInformationTlvType {
+                        offset: cur.offset() - 2,
+                        code,
+                    },
+                ),
+            };
+        let length = cur.read_u16_be()?;
+        let mut buf = cur.take_slice(length as usize)?;
+        let value = match code {
             TerminationInformationTlvType::String => {
-                let (buf, str) =
-                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
-                        String::from_utf8(x.to_vec())
-                    })(buf)?;
-                (buf, v3::TerminationInformation::String(str))
+                let offset = buf.offset();
+                match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
+                    Ok(s) => v3::TerminationInformation::String(s),
+                    Err(error) => {
+                        return Err(TerminationInformationParsingError::FromUtf8Error {
+                            offset,
+                            error: error.to_string(),
+                        });
+                    }
+                }
             }
             TerminationInformationTlvType::Reason => {
-                let (buf, reason) =
-                    nom::combinator::map_res(be_u16, PeerTerminationCode::try_from)(buf)?;
-                (buf, v3::TerminationInformation::Reason(reason))
+                let code = buf.read_u16_be()?;
+                let reason = match PeerTerminationCode::try_from(code) {
+                    Ok(reason) => reason,
+                    Err(_) => {
+                        return Err(
+                            TerminationInformationParsingError::UndefinedPeerTerminationCode {
+                                offset: buf.offset() - 2,
+                                code,
+                            },
+                        );
+                    }
+                };
+                v3::TerminationInformation::Reason(reason)
             }
             TerminationInformationTlvType::Experimental65531 => {
-                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                let value = v3::TerminationInformation::Experimental65531(data.to_vec());
-                (buf, value)
+                v3::TerminationInformation::Experimental65531(
+                    buf.read_bytes(buf.remaining())?.to_vec(),
+                )
             }
             TerminationInformationTlvType::Experimental65532 => {
-                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                let value = v3::TerminationInformation::Experimental65532(data.to_vec());
-                (buf, value)
+                v3::TerminationInformation::Experimental65532(
+                    buf.read_bytes(buf.remaining())?.to_vec(),
+                )
             }
             TerminationInformationTlvType::Experimental65533 => {
-                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                let value = v3::TerminationInformation::Experimental65533(data.to_vec());
-                (buf, value)
+                v3::TerminationInformation::Experimental65533(
+                    buf.read_bytes(buf.remaining())?.to_vec(),
+                )
             }
             TerminationInformationTlvType::Experimental65534 => {
-                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                let value = v3::TerminationInformation::Experimental65534(data.to_vec());
-                (buf, value)
+                v3::TerminationInformation::Experimental65534(
+                    buf.read_bytes(buf.remaining())?.to_vec(),
+                )
             }
         };
         if !buf.is_empty() {
-            return Err(nom::Err::Error(
-                LocatedTerminationInformationParsingError::new(
-                    buf,
-                    TerminationInformationParsingError::NomError(ErrorKind::NonEmpty),
-                ),
-            ));
+            return Err(TerminationInformationParsingError::UnparseableBytes {
+                offset: buf.offset(),
+                length,
+                unparsed_bytes: buf.remaining(),
+            });
         }
-        Ok((remainder, value))
+        Ok(value)
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum StatisticsReportMessageParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
-    StatisticsCounterError(#[from_located(module = "self")] StatisticsCounterParsingError),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("in peer header: {0}")]
+    PeerHeaderError(#[from] PeerHeaderParsingError),
+
+    #[error("in statistics counter: {0}")]
+    StatisticsCounterError(#[from] StatisticsCounterParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedStatisticsReportMessageParsingError<'a>>
-    for v3::StatisticsReportMessage
-{
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedStatisticsReportMessageParsingError<'a>> {
-        let (buf, peer_header) = parse_into_located(buf)?;
-        let (mut buf, stats_count) = be_u32(buf)?;
-        let mut counters = vec![];
+impl<'a> ParseFrom<'a> for v3::StatisticsReportMessage {
+    type Error = StatisticsReportMessageParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let peer_header = PeerHeader::parse(cur)?;
+        let stats_count = cur.read_u32_be()?;
+        let mut counters = Vec::new();
         for _ in 0..stats_count {
-            let (t, counter) = parse_into_located(buf)?;
-            buf = t;
+            let counter = v3::StatisticsCounter::parse(cur)?;
             counters.push(counter);
         }
-        Ok((buf, v3::StatisticsReportMessage::new(peer_header, counters)))
+        Ok(v3::StatisticsReportMessage::new(peer_header, counters))
     }
 }
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum StatisticsCounterParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
-    UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
-    InvalidAddressType(InvalidAddressType),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("unknown address family {afi} in statistics counter at byte offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error(
+        "unknown subsequent address family {safi} in statistics counter at byte offset {offset}"
+    )]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error(
+        "unsupported address family pair (afi {afi}, safi {safi}) in statistics counter at byte offset {offset}"
+    )]
+    AddressTypeError { offset: usize, afi: u16, safi: u8 },
+
+    #[error(
+        "{unparsed_bytes} trailing byte(s) left unparsed at byte offset {offset} in a statistics counter declaring length {length}"
+    )]
+    UnparseableBytes {
+        offset: usize,
+        length: u16,
+        unparsed_bytes: usize,
+    },
 }
 
 #[inline]
 fn parse_address_type(
-    buf: Span<'_>,
-) -> IResult<Span<'_>, AddressType, LocatedStatisticsCounterParsingError<'_>> {
-    let input = buf;
-    let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
-    let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
+    cur: &mut SliceReader<'_>,
+) -> Result<AddressType, StatisticsCounterParsingError> {
+    let afi = AddressFamily::try_from(cur.read_u16_be()?).map_err(|err| {
+        StatisticsCounterParsingError::UndefinedAddressFamily {
+            offset: cur.offset() - 2,
+            afi: err.0,
+        }
+    })?;
+    let safi = SubsequentAddressFamily::try_from(cur.read_u8()?).map_err(|err| {
+        StatisticsCounterParsingError::UndefinedSubsequentAddressFamily {
+            offset: cur.offset() - 1,
+            safi: err.0,
+        }
+    })?;
     let address_type = match AddressType::from_afi_safi(afi, safi) {
         Ok(address_type) => address_type,
         Err(err) => {
-            return Err(nom::Err::Error(LocatedStatisticsCounterParsingError::new(
-                input,
-                StatisticsCounterParsingError::InvalidAddressType(err),
-            )));
+            return Err(StatisticsCounterParsingError::AddressTypeError {
+                offset: cur.offset() - 3,
+                afi: err.address_family().into(),
+                safi: err.subsequent_address_family().into(),
+            });
         }
     };
-    Ok((buf, address_type))
+    Ok(address_type)
 }
 
-impl<'a> ReadablePdu<'a, LocatedStatisticsCounterParsingError<'a>> for v3::StatisticsCounter {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedStatisticsCounterParsingError<'a>> {
-        let (buf, code) = be_u16(buf)?;
-        let (buf, length) = nom::combinator::peek(be_u16)(buf)?;
-        let (remainder, buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (buf, counter) = match BmpStatisticsType::try_from(code) {
+impl<'a> ParseFrom<'a> for v3::StatisticsCounter {
+    type Error = StatisticsCounterParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let code = cur.read_u16_be()?;
+        let length = cur.read_u16_be()?;
+        let mut buf = cur.take_slice(length as usize)?;
+        let  counter = match BmpStatisticsType::try_from(code) {
             Ok(code) => match code {
                 BmpStatisticsType::NumberOfPrefixesRejectedByInboundPolicy => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfPrefixesRejectedByInboundPolicy(CounterU32(
-                            value,
-                        )),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfPrefixesRejectedByInboundPolicy(CounterU32(
+                        value,
+                    ))
                 }
                 BmpStatisticsType::NumberOfDuplicatePrefixAdvertisements => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfDuplicatePrefixAdvertisements(CounterU32(
-                            value,
-                        )),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfDuplicatePrefixAdvertisements(CounterU32(
+                        value,
+                    ))
                 }
                 BmpStatisticsType::NumberOfDuplicateWithdraws => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfDuplicateWithdraws(CounterU32(value)),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfDuplicateWithdraws(CounterU32(
+                        value,
+                    ))
                 }
                 BmpStatisticsType::NumberOfUpdatesInvalidatedDueToClusterListLoop => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfUpdatesInvalidatedDueToClusterListLoop(
-                            CounterU32(value),
-                        ),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfUpdatesInvalidatedDueToClusterListLoop(CounterU32(
+                        value,
+                    ))
                 }
                 BmpStatisticsType::NumberOfUpdatesInvalidatedDueToAsPathLoop => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfUpdatesInvalidatedDueToAsPathLoop(
-                            CounterU32(value),
-                        ),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfUpdatesInvalidatedDueToAsPathLoop(CounterU32(value))
                 }
                 BmpStatisticsType::NumberOfUpdatesInvalidatedDueToOriginatorId => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfUpdatesInvalidatedDueToOriginatorId(
-                            CounterU32(value),
-                        ),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfUpdatesInvalidatedDueToOriginatorId(CounterU32(
+                        value,
+                    ))
                 }
                 BmpStatisticsType::NumberOfUpdatesInvalidatedDueToAsConfederationLoop => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(
-                            CounterU32(value),
-                        ),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(CounterU32(
+                        value,
+                    ))
                 }
                 BmpStatisticsType::NumberOfRoutesInAdjRibIn => {
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInAdjRibIn(GaugeU64(value)),
-                    )
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInAdjRibIn(GaugeU64(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInLocRib => {
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInLocRib(GaugeU64(value)),
-                    )
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInLocRib(GaugeU64(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiAdjRibIn => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiAdjRibIn(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiAdjRibIn(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiLocRib => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiLocRib(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiLocRib(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfUpdatesSubjectedToTreatAsWithdraw => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfUpdatesSubjectedToTreatAsWithdraw(
-                            CounterU32(value),
-                        ),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfUpdatesSubjectedToTreatAsWithdraw(CounterU32(value))
                 }
                 BmpStatisticsType::NumberOfPrefixesSubjectedToTreatAsWithdraw => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfPrefixesSubjectedToTreatAsWithdraw(
-                            CounterU32(value),
-                        ),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfPrefixesSubjectedToTreatAsWithdraw(CounterU32(value))
                 }
                 BmpStatisticsType::NumberOfDuplicateUpdateMessagesReceived => {
-                    let (buf, value) = be_u32(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfDuplicateUpdateMessagesReceived(CounterU32(
-                            value,
-                        )),
-                    )
+                    let value = buf.read_u32_be()?;
+                    v3::StatisticsCounter::NumberOfDuplicateUpdateMessagesReceived(CounterU32(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibOut => {
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibOut(GaugeU64(value)),
-                    )
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibOut(GaugeU64(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibOut => {
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibOut(GaugeU64(value)),
-                    )
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibOut(GaugeU64(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibIn => {
-                    let (buf, value) = be_u64(buf)?;
-                    (buf, v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibIn(GaugeU64(value)))
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibIn(GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibIn => {
-                    let (buf, value) = be_u64(buf)?;
-                    (buf, v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibIn(GaugeU64(value)))
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibIn(GaugeU64(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiSuppressedByDamping => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiSuppressedByDamping(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiSuppressedByDamping(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiMarkedStaleByGr => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiMarkedStaleByGr(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiMarkedStaleByGr(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold => {
-                    let (buf, value) = be_u64(buf)?;
-                    (buf, v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold(GaugeU64(value)))
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold(GaugeU64(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold => {
-                    let (buf, value) = be_u64(buf)?;
-                    (buf, v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(GaugeU64(value)))
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(GaugeU64(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength => {
-                    let (buf, value) = be_u64(buf)?;
-                    (buf, v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength(GaugeU64(value)))
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength(GaugeU64(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength => {
-                    let (buf, value) = be_u64(buf)?;
-                    (buf, v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength(GaugeU64(value)))
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength(GaugeU64(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound => {
-                    let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u64(buf)?;
-                    (
-                        buf,
-                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(
-                            address_type,
-                            GaugeU64::new(value),
-                        ),
-                    )
+                    let address_type = parse_address_type(&mut buf)?;
+                    let value = buf.read_u64_be()?;
+                    v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::Experimental65531 => {
-                    let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                    (buf, v3::StatisticsCounter::Experimental65531(data.to_vec()))
+                    v3::StatisticsCounter::Experimental65531(buf.take_slice(buf.remaining())?.as_slice().to_vec())
                 }
                 BmpStatisticsType::Experimental65532 => {
-                    let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                    (buf, v3::StatisticsCounter::Experimental65532(data.to_vec()))
+                    v3::StatisticsCounter::Experimental65532(buf.take_slice(buf.remaining())?.as_slice().to_vec())
                 }
                 BmpStatisticsType::Experimental65533 => {
-                    let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                    (buf, v3::StatisticsCounter::Experimental65533(data.to_vec()))
+                    v3::StatisticsCounter::Experimental65533(buf.take_slice(buf.remaining())?.as_slice().to_vec())
                 }
                 BmpStatisticsType::Experimental65534 => {
-                    let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                    (buf, v3::StatisticsCounter::Experimental65534(data.to_vec()))
+                    v3::StatisticsCounter::Experimental65534(buf.take_slice(buf.remaining())?.as_slice().to_vec())
                 }
             },
             Err(code) => {
-                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
-                (buf, v3::StatisticsCounter::Unknown(code.0, data.to_vec()))
+                v3::StatisticsCounter::Unknown(code.0, buf.take_slice(buf.remaining())?.as_slice().to_vec())
             }
         };
         if !buf.is_empty() {
-            return Err(nom::Err::Error(LocatedStatisticsCounterParsingError::new(
-                buf,
-                StatisticsCounterParsingError::NomError(ErrorKind::NonEmpty),
-            )));
+            return Err(StatisticsCounterParsingError::UnparseableBytes {
+                offset: buf.offset(),
+                length,
+                unparsed_bytes: buf.remaining(),
+            });
         }
-        Ok((remainder, counter))
+        Ok(counter)
     }
 }

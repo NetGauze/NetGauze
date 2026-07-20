@@ -18,28 +18,43 @@
 pub mod v3;
 pub mod v4;
 
-use crate::iana::{BmpVersion, UndefinedBmpVersion};
+use crate::iana::BmpVersion;
 use crate::{BmpMessage, PeerKey};
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
-use netgauze_parse_utils::{
-    ErrorKindSerdeDeref, ReadablePduWithOneInput, Span, parse_into_located_one_input,
-};
-use netgauze_serde_macros::LocatedError;
-use nom::IResult;
-use nom::error::ErrorKind;
-use nom::number::complete::{be_u8, be_u32};
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BmpMessageParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UndefinedBmpVersion(#[from_external] UndefinedBmpVersion),
-    InvalidBmpLength(u32),
-    BmpV3MessageValueError(#[from_located(module = "self")] v3::BmpMessageValueParsingError),
-    BmpV4MessageValueError(#[from_located(module = "self")] v4::BmpMessageValueParsingError),
+    #[error("while parsing BMP message: {0}")]
+    Parse(#[from] ParseError),
+
+    #[error("unsupported BMP version {value} at byte offset {offset} (expected 3 or 4)")]
+    UndefinedBmpVersion { offset: usize, value: u8 },
+
+    #[error(
+        "invalid BMP message length {length} at byte offset {offset} (must be at least 5, the size of the common header)"
+    )]
+    InvalidBmpLength { offset: usize, length: u32 },
+
+    #[error(
+        "{unparsed_bytes} trailing byte(s) left unparsed at byte offset {offset} in a BMP message declaring length {length}"
+    )]
+    UnparseableBytes {
+        offset: usize,
+        length: u32,
+        unparsed_bytes: usize,
+    },
+
+    #[error("in BMP v3 message: {0}")]
+    BmpV3MessageValueError(#[from] v3::BmpMessageValueParsingError),
+
+    #[error("in BMP v4 message: {0}")]
+    BmpV4MessageValueError(#[from] v4::BmpMessageValueParsingError),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -85,42 +100,48 @@ impl DerefMut for BmpParsingContext {
     }
 }
 
-impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessageParsingError<'a>>
-    for BmpMessage
-{
-    fn from_wire(
-        buf: Span<'a>,
-        ctx: &mut BmpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedBmpMessageParsingError<'a>> {
-        let (buf, version) = nom::combinator::map_res(be_u8, BmpVersion::try_from)(buf)?;
-        let input = buf;
-        let (buf, length) = be_u32(buf)?;
+impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for BmpMessage {
+    type Error = BmpMessageParsingError;
+
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BmpParsingContext) -> Result<Self, Self::Error> {
+        let version = cur.read_u8()?;
+        let version = match BmpVersion::try_from(version) {
+            Ok(version) => version,
+            Err(err) => {
+                return Err(BmpMessageParsingError::UndefinedBmpVersion {
+                    offset: cur.offset() - 1,
+                    value: err.0,
+                });
+            }
+        };
+        let length = cur.read_u32_be()?;
         let base_length = 5;
         if length < base_length {
-            return Err(nom::Err::Error(LocatedBmpMessageParsingError::new(
-                input,
-                BmpMessageParsingError::InvalidBmpLength(length),
-            )));
+            return Err(BmpMessageParsingError::InvalidBmpLength {
+                offset: cur.offset() - 4,
+                length,
+            });
         }
-        let (remainder, buf) = nom::bytes::complete::take(length - 5)(buf)?;
+        let mut buf = cur.take_slice(length as usize - 5)?;
 
-        let (buf, msg) = match version {
+        let msg = match version {
             BmpVersion::Version3 => {
-                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpMessage::V3(value))
+                let v3_msg = crate::v3::BmpMessageValue::parse(&mut buf, ctx)?;
+                BmpMessage::V3(v3_msg)
             }
             BmpVersion::Version4 => {
-                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpMessage::V4(value))
+                let v4_msg = crate::v4::BmpMessageValue::parse(&mut buf, ctx)?;
+                BmpMessage::V4(v4_msg)
             }
         };
         // Make sure bmp message is fully parsed according to it's length
         if !buf.is_empty() {
-            return Err(nom::Err::Error(LocatedBmpMessageParsingError::new(
-                buf,
-                BmpMessageParsingError::NomError(ErrorKind::NonEmpty),
-            )));
+            return Err(BmpMessageParsingError::UnparseableBytes {
+                offset: buf.offset(),
+                length,
+                unparsed_bytes: buf.remaining(),
+            });
         }
-        Ok((remainder, msg))
+        Ok(msg)
     }
 }

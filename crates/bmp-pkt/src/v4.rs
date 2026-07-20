@@ -83,12 +83,17 @@ pub struct RouteMonitoringTlv {
     value: RouteMonitoringTlvValue,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, thiserror::Error)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMonitoringTlvError {
+    #[error("Route monitoring TLV with bad Group TLV index {0}")]
     BadGroupTlvIndex(u16),
+
+    #[error("Route monitoring message with unexpected BGP message type {0}")]
     BadBgpMessageType(BgpMessageType),
+
+    #[error("Route monitoring message with VRF Table Name String is too long at length={0}")]
     VrfTableNameStringIsTooLong(usize),
 }
 
@@ -342,9 +347,7 @@ impl From<WellKnownPathMarkingReasonCode> for PathMarkingReason {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr, strum_macros::Display,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr, Display)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[repr(u16)]
@@ -373,10 +376,11 @@ pub enum WellKnownPathMarkingReasonCode {
     NotPreferredAigp = 0x000B,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, thiserror::Error)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMonitoringError {
+    #[error("Route monitoring message with TLV error: {0}")]
     TlvError(RouteMonitoringTlvError),
 }
 
