@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use netgauze_parse_utils::Span;
 use netgauze_parse_utils::test_helpers::{
-    combine, test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
+    combine, test_parse_error_with_one_input_bytes_reader,
+    test_parsed_completely_with_one_input_bytes_reader, test_write,
 };
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
@@ -25,9 +25,7 @@ use crate::capabilities::BgpCapability;
 use crate::open::{BGP_VERSION, BgpOpenMessageParameter};
 use crate::wire::deserializer::BgpParsingContext;
 use crate::wire::deserializer::capabilities::BgpCapabilityParsingError;
-use crate::wire::deserializer::open::{
-    BgpOpenMessageParsingError, BgpParameterParsingError, LocatedBgpOpenMessageParsingError,
-};
+use crate::wire::deserializer::open::{BgpOpenMessageParsingError, BgpParameterParsingError};
 use crate::wire::serializer::open::BgpOpenMessageWritingError;
 use crate::wire::tests::{BGP_ID, HOLD_TIME, MY_AS};
 
@@ -41,14 +39,14 @@ fn test_parse_bgp_open_with_wrong_bpg_version() {
         BGP_ID,
         &[0x00u8],
     ]);
-    let bad = LocatedBgpOpenMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(0, &bad_wire) },
-        BgpOpenMessageParsingError::UnsupportedVersionNumber(unsupported_version),
-    );
-    test_parse_error_with_one_input::<
+    let bad = BgpOpenMessageParsingError::UnsupportedVersionNumber {
+        offset: 0,
+        version: unsupported_version,
+    };
+    test_parse_error_with_one_input_bytes_reader::<
         BgpOpenMessage,
         &mut BgpParsingContext,
-        LocatedBgpOpenMessageParsingError<'_>,
+        BgpOpenMessageParsingError,
     >(&bad_wire, &mut BgpParsingContext::default(), &bad);
 }
 
@@ -56,7 +54,7 @@ fn test_parse_bgp_open_with_wrong_bpg_version() {
 fn test_bgp_open_no_params() -> Result<(), BgpOpenMessageWritingError> {
     let good_no_params_wire = combine(vec![&[BGP_VERSION], MY_AS, HOLD_TIME, BGP_ID, &[0x00u8]]);
     let good_no_params_msg = BgpOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), vec![]);
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_no_params_wire,
         &mut BgpParsingContext::default(),
         &good_no_params_msg,
@@ -79,7 +77,11 @@ fn test_open_one_params() -> Result<(), BgpOpenMessageWritingError> {
             BgpCapability::RouteRefresh,
         ])],
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire,
+        &mut BgpParsingContext::default(),
+        &good,
+    );
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -95,24 +97,25 @@ fn test_open_bad_capability_params() -> Result<(), BgpOpenMessageWritingError> {
     let cap_ignored =
         BgpOpenMessage::new(65033, 180, Ipv4Addr::new(0xc0, 0xa8, 0x00, 0x0f), vec![]);
 
-    let bad = LocatedBgpOpenMessageParsingError::new(
-        unsafe { Span::new_from_raw_offset(13, &bad_wire[13..]) },
+    let bad =
         BgpOpenMessageParsingError::ParameterError(BgpParameterParsingError::CapabilityError(
-            BgpCapabilityParsingError::InvalidRouteRefreshLength(bad_wire[13]),
-        )),
-    );
+            BgpCapabilityParsingError::InvalidRouteRefreshLength {
+                offset: 13,
+                length: bad_wire[13],
+            },
+        ));
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         BgpOpenMessage,
         &mut BgpParsingContext,
-        LocatedBgpOpenMessageParsingError<'_>,
+        BgpOpenMessageParsingError,
     >(
         &bad_wire,
         &mut BgpParsingContext::new(true, HashMap::new(), HashMap::new(), true, true, true, true),
         &bad,
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &cap_ignored_wire,
         &mut BgpParsingContext::new(
             true,

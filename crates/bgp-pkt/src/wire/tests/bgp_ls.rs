@@ -24,8 +24,8 @@ use crate::path_attribute::{
     PathAttributeValue,
 };
 use netgauze_parse_utils::test_helpers::{
-    test_parsed_completely_with_one_input, test_parsed_completely_with_three_inputs, test_write,
-    test_write_with_one_input,
+    test_parsed_completely_with_one_input_bytes_reader,
+    test_parsed_completely_with_three_inputs_bytes_reader, test_write, test_write_with_one_input,
 };
 use std::collections::HashMap;
 
@@ -100,7 +100,7 @@ fn test_wire() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
         &mut BgpParsingContext::new(
             true,
@@ -128,7 +128,7 @@ pub fn test_bgp_ls_attr_parse() -> Result<(), BgpLsAttributeWritingError> {
         attributes: vec![BgpLsAttributeValue::LinkName("My Super Link".to_string())],
     };
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
     test_write_with_one_input(&good, false, &good_wire)?;
 
     Ok(())
@@ -157,7 +157,7 @@ pub fn test_bgp_ls_nlri_parse() -> Result<(), BgpLsNlriWritingError> {
         }),
     };
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -191,7 +191,7 @@ pub fn test_bgp_ls_nlri_ipv4_parse() -> Result<(), BgpLsNlriWritingError> {
         }),
     };
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -226,7 +226,7 @@ pub fn test_bgp_ls_nlri_ipv6_parse() -> Result<(), BgpLsNlriWritingError> {
         }),
     };
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -270,7 +270,7 @@ pub fn test_bgp_ls_mp_reach() -> Result<(), MpReachWritingError> {
         nlri: vec![ls_nlri.clone(), ls_nlri.clone(), ls_nlri],
     };
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &good_wire,
         false,
         &HashMap::new(),
@@ -328,7 +328,7 @@ pub fn test_bgp_ls_vpn_mp_reach() -> Result<(), MpReachWritingError> {
         nlri: vec![ls_nlri.clone(), ls_nlri.clone(), ls_nlri],
     };
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &good_wire,
         false,
         &HashMap::new(),
@@ -385,7 +385,7 @@ pub fn test_bgp_ls_vpn_mp_unreach() -> Result<(), MpUnreachWritingError> {
     let mut add_path_map = HashMap::new();
     add_path_map.insert(AddressType::BgpLsVpn, true);
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_three_inputs_bytes_reader(
         &good_wire,
         false,
         &HashMap::new(),
@@ -423,7 +423,7 @@ pub fn test_bgp_ls_sid() -> Result<(), BgpLsAttributeWritingError> {
             )),
         ],
     };
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
     test_write_with_one_input(&good, false, &good_wire)?;
 
     Ok(())

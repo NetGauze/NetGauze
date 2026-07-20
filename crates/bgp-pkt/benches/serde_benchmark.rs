@@ -36,8 +36,11 @@
 //! Synthetic bench names are unchanged; new ones use a `"(pcap)"` suffix
 //! and the streaming ones live under the `stream/` group.
 
-use bytes::BytesMut;
-use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+// `Bytes` for the per-exemplar wire (cheap reference-counted slice clone);
+// `BytesMut` only on the streaming side because `BgpCodec::decode` mutates
+// the buffer via `buf.advance(...)`.
+use bytes::{Bytes, BytesMut};
+use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::capabilities::BgpCapability;
 use netgauze_bgp_pkt::codec::BgpCodec;
@@ -45,7 +48,9 @@ use netgauze_bgp_pkt::iana::BgpMessageType;
 use netgauze_bgp_pkt::path_attribute::PathAttributeValue;
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePdu};
+use netgauze_parse_utils::WritablePdu;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
 use pcap_parser::LegacyPcapReader;
 use std::collections::HashMap;
@@ -215,7 +220,7 @@ const BGP_PORT: u16 = 179;
 /// decoding (asn4, add-path, multi-label MPLS) is exercised faithfully.
 struct Exemplar {
     name: String,
-    wire: Vec<u8>,
+    wire: Bytes,
     ctx_before: BgpParsingContext,
 }
 
@@ -281,18 +286,18 @@ where
         if length < 19 || pos + length > flow.len() {
             break;
         }
-        let wire = &flow[pos..pos + length];
+        let mut wire = SliceReader::new(flow[pos..pos + length].into());
         let ctx_before = ctx.clone();
         let mut working = ctx.clone();
         // Skip past unparseable messages: real-vendor pcaps occasionally
         // carry capability-gated routes we can't decode with default
         // context. The BGP length field still lets us advance to the
         // next frame.
-        if let Ok((_, msg)) = BgpMessage::from_wire(Span::new(wire), &mut working) {
+        if let Ok(msg) = BgpMessage::parse(&mut wire, &mut working) {
             if let Some(name) = picker(&msg, idx) {
                 out.push(Exemplar {
                     name,
-                    wire: wire.to_vec(),
+                    wire: Bytes::copy_from_slice(&flow[pos..pos + length]),
                     ctx_before,
                 });
             }
@@ -359,9 +364,8 @@ fn update_has_ipv4_unicast_nlri(msg: &BgpMessage) -> bool {
 // -------------------------------------------------------------------------
 
 #[inline(always)]
-fn decode_with_ctx(buf: &[u8], ctx: &mut BgpParsingContext) -> BgpMessage {
-    let (_, msg) = BgpMessage::from_wire(Span::new(buf), ctx).unwrap();
-    msg
+fn decode_with_ctx(cur: &mut SliceReader<'_>, ctx: &mut BgpParsingContext) -> BgpMessage {
+    BgpMessage::parse(cur, ctx).unwrap()
 }
 
 /// Register a decode + encode bench pair for a single exemplar with a
@@ -369,12 +373,12 @@ fn decode_with_ctx(buf: &[u8], ctx: &mut BgpParsingContext) -> BgpMessage {
 /// fixture fails fast instead of producing misleading throughput numbers.
 fn bench_exemplar(c: &mut Criterion, ex: &Exemplar) {
     let mut warmup_ctx = ex.ctx_before.clone();
-    let msg = decode_with_ctx(&ex.wire, &mut warmup_ctx);
+    let msg = decode_with_ctx(&mut SliceReader::new(ex.wire.as_ref()), &mut warmup_ctx);
     let mut warmup_buf = Vec::with_capacity(msg.len());
     msg.write(&mut warmup_buf).unwrap();
     assert_eq!(
         warmup_buf.as_slice(),
-        ex.wire.as_slice(),
+        ex.wire,
         "round-trip mismatch for fixture '{}'",
         ex.name,
     );
@@ -384,8 +388,14 @@ fn bench_exemplar(c: &mut Criterion, ex: &Exemplar) {
     let ctx_template = ex.ctx_before.clone();
     c.bench_function(&decode_name, |b| {
         let mut ctx = ctx_template.clone();
+        // `SliceReader<'_>` is `Copy` and zero-cost (a `&[u8]` + offset),
+        // so building a fresh one per iteration costs ~1ns — no need for
+        // `iter_batched_ref` here. Matches the measurement semantics of
+        // the historical nom-based `b.iter(|| from_wire(Span::new(...)))`
+        // shape: parse + drop of the parsed `BgpMessage` both timed.
         b.iter(|| {
-            let msg = decode_with_ctx(black_box(&wire), &mut ctx);
+            let mut reader = SliceReader::new(wire.as_ref());
+            let msg = decode_with_ctx(black_box(&mut reader), &mut ctx);
             black_box(msg);
         })
     });
@@ -405,21 +415,23 @@ fn bench_exemplar(c: &mut Criterion, ex: &Exemplar) {
 // Streaming benchmark — full pcap through BgpCodec
 // -------------------------------------------------------------------------
 
-/// Number of BGP messages successfully decoded by feeding every TCP flow
-/// in `flows` through a fresh [`BgpCodec`]. Used both to set the
-/// throughput element count and to sanity-check the run.
-fn drive_stream(flows: &[Vec<u8>]) -> usize {
+/// Drive each pre-built per-flow buffer through a fresh [`BgpCodec`] and
+/// return the total number of successfully decoded messages.
+///
+/// Takes `&mut [BytesMut]` so the caller owns the buffers and we don't
+/// pay for the allocation + memcpy that previously happened on every
+/// invocation. With `iter_batched_ref` the buffers are rebuilt OUTSIDE
+/// the timed section, so this routine only times codec work.
+fn drive_stream(bufs: &mut [BytesMut]) -> usize {
     let mut total = 0usize;
-    for flow in flows {
+    for buf in bufs.iter_mut() {
         // Mirror the BGP pcap-test setup: optimistic asn4=true to start,
         // narrowed by the codec once a real OPEN is observed.
         let mut codec = BgpCodec::new(true);
-        let mut buf = BytesMut::with_capacity(flow.len());
-        buf.extend_from_slice(flow);
         // Keep going past a decode error: BgpCodec advances past the
         // failed frame, so subsequent frames can still be processed.
         while !buf.is_empty() {
-            match codec.decode(&mut buf) {
+            match codec.decode(buf) {
                 Ok(Some(msg)) => {
                     total += 1;
                     black_box(msg);
@@ -432,10 +444,24 @@ fn drive_stream(flows: &[Vec<u8>]) -> usize {
     total
 }
 
+/// Allocate a fresh `BytesMut` per flow holding a copy of the flow bytes.
+/// Called from `iter_batched_ref` setup so the alloc + memcpy is excluded
+/// from the timed measurement.
+fn build_stream_buffers(flows: &[Vec<u8>]) -> Vec<BytesMut> {
+    flows
+        .iter()
+        .map(|f| {
+            let mut buf = BytesMut::with_capacity(f.len());
+            buf.extend_from_slice(f);
+            buf
+        })
+        .collect()
+}
+
 fn bench_pcap_stream(c: &mut Criterion, name: &str, pcap_bytes: &'static [u8]) {
     let flows = pcap_tcp_flows(pcap_bytes);
     let total_bytes: u64 = flows.iter().map(|f| f.len() as u64).sum();
-    let total_msgs = drive_stream(&flows);
+    let total_msgs = drive_stream(&mut build_stream_buffers(&flows));
     assert!(
         total_msgs > 0,
         "stream bench '{name}' decoded 0 messages — wrong pcap or bad TCP port filter?",
@@ -448,19 +474,30 @@ fn bench_pcap_stream(c: &mut Criterion, name: &str, pcap_bytes: &'static [u8]) {
     );
 
     let mut group = c.benchmark_group("stream");
+    // `LargeInput` keeps the per-batch memory footprint reasonable —
+    // some of these pcaps are >1 MB and `SmallInput` would let criterion
+    // pre-allocate hundreds of copies before each measurement window.
     group.throughput(Throughput::Bytes(total_bytes));
     group.bench_function(format!("{name} bytes"), |b| {
-        b.iter(|| {
-            let n = drive_stream(black_box(&flows));
-            black_box(n);
-        })
+        b.iter_batched_ref(
+            || build_stream_buffers(&flows),
+            |bufs| {
+                let n = drive_stream(bufs);
+                black_box(n);
+            },
+            BatchSize::LargeInput,
+        )
     });
     group.throughput(Throughput::Elements(total_msgs as u64));
     group.bench_function(format!("{name} msgs"), |b| {
-        b.iter(|| {
-            let n = drive_stream(black_box(&flows));
-            black_box(n);
-        })
+        b.iter_batched_ref(
+            || build_stream_buffers(&flows),
+            |bufs| {
+                let n = drive_stream(bufs);
+                black_box(n);
+            },
+            BatchSize::LargeInput,
+        )
     });
     group.finish();
 }
@@ -470,42 +507,49 @@ fn bench_pcap_stream(c: &mut Criterion, name: &str, pcap_bytes: &'static [u8]) {
 // -------------------------------------------------------------------------
 
 pub fn legacy_synthetic_benches(c: &mut Criterion) {
+    // `SliceReader::new(&CONST)` is free (a `&[u8]` + offset, `Copy`), so
+    // every iteration just builds a fresh reader on the stack. Same
+    // measurement semantics as the historical nom-based bench — parse and
+    // the drop of the parsed `BgpMessage` are both timed — which is what
+    // makes the numbers directly comparable to the saved `main-bgp`
+    // baseline.
     let mut ctx = BgpParsingContext::default();
-    let no_params_span = Span::new(&OPEN_COMPLEX_NO_PARAMS);
-    let complex_span = Span::new(&OPEN_COMPLEX_RAW);
     c.bench_function("open no params", |b| {
         b.iter(|| {
-            let (_, msg) = BgpMessage::from_wire(no_params_span, &mut ctx).unwrap();
+            let mut reader = SliceReader::new(&OPEN_COMPLEX_NO_PARAMS);
+            let msg = BgpMessage::parse(&mut reader, &mut ctx).unwrap();
             black_box(msg);
         })
     });
     c.bench_function("open complex", |b| {
         b.iter(|| {
-            let (_, msg) = BgpMessage::from_wire(complex_span, &mut ctx).unwrap();
+            let mut reader = SliceReader::new(&OPEN_COMPLEX_RAW);
+            let msg = BgpMessage::parse(&mut reader, &mut ctx).unwrap();
             black_box(msg);
         })
     });
 
-    // Setup the context to parse the Update BGP message with MPLS data.
+    // Prime the context with the OPEN that negotiates the caps used by
+    // the MPLS UPDATE we want to bench.
     let mut ctx = BgpParsingContext::default();
-    let open_mpls_span = Span::new(&OPEN_FOR_UPDATE_MPLS);
-    let _ = BgpMessage::from_wire(open_mpls_span, &mut ctx).unwrap();
-    let update_mpls_span = Span::new(&UPDATE_MPLS);
+    let mut open_mpls_reader = SliceReader::new(&OPEN_FOR_UPDATE_MPLS);
+    let _ = BgpMessage::parse(&mut open_mpls_reader, &mut ctx).unwrap();
     c.bench_function("Update MPLS", |b| {
         b.iter(|| {
-            let (_, msg) = BgpMessage::from_wire(update_mpls_span, &mut ctx).unwrap();
+            let mut reader = SliceReader::new(&UPDATE_MPLS);
+            let msg = BgpMessage::parse(&mut reader, &mut ctx).unwrap();
             black_box(msg);
         })
     });
 
-    // Setup the context to parse the Update BGP message with SRv6 data.
+    // Same priming dance for the SRv6 fixture.
     let mut ctx = BgpParsingContext::default();
-    let open_srv6_span = Span::new(&OPEN_FOR_UPDATE_SRV6);
-    let _ = BgpMessage::from_wire(open_srv6_span, &mut ctx).unwrap();
-    let update_srv6_span = Span::new(&UPDATE_SRV6);
+    let mut open_srv6_reader = SliceReader::new(&OPEN_FOR_UPDATE_SRV6);
+    let _ = BgpMessage::parse(&mut open_srv6_reader, &mut ctx).unwrap();
     c.bench_function("Update SRV6", |b| {
         b.iter(|| {
-            let (_, msg) = BgpMessage::from_wire(update_srv6_span, &mut ctx).unwrap();
+            let mut reader = SliceReader::new(&UPDATE_SRV6);
+            let msg = BgpMessage::parse(&mut reader, &mut ctx).unwrap();
             black_box(msg);
         })
     });

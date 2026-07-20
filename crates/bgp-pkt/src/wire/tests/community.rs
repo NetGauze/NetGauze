@@ -15,13 +15,13 @@
 
 use crate::community::*;
 use crate::nlri::MacAddress;
-use crate::wire::deserializer::community::{CommunityParsingError, LocatedCommunityParsingError};
+use crate::wire::deserializer::community::CommunityParsingError;
 use crate::wire::serializer::community::*;
-use netgauze_parse_utils::Span;
+use netgauze_parse_utils::error::ParseError;
 use netgauze_parse_utils::test_helpers::{
-    test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input, test_write,
+    test_parse_error_bytes_reader, test_parsed_completely_bytes_reader,
+    test_parsed_completely_with_one_input_bytes_reader, test_write,
 };
-use nom::error::ErrorKind;
 use std::net::Ipv4Addr;
 
 #[test]
@@ -30,13 +30,14 @@ fn test_community() -> Result<(), CommunityWritingError> {
     let bad_incomplete_wire = [0x00];
 
     let good = Community::new(0x00ef0020);
-    let bad_incomplete = LocatedCommunityParsingError::new(
-        Span::new(&bad_incomplete_wire),
-        CommunityParsingError::NomError(ErrorKind::Eof),
-    );
+    let bad_incomplete = CommunityParsingError::Parse(ParseError::UnexpectedEof {
+        offset: 0,
+        needed: 4,
+        available: 1,
+    });
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<Community, LocatedCommunityParsingError<'_>>(
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parse_error_bytes_reader::<Community, CommunityParsingError>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -54,7 +55,7 @@ fn test_transitive_four_octet_extended_community()
         local_admin: 1,
     };
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -67,7 +68,7 @@ fn test_transitive_two_extended_community()
         local_admin: 1,
     };
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -81,7 +82,7 @@ fn test_non_transitive_two_extended_community()
         local_admin: 1,
     };
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -95,7 +96,7 @@ fn test_transitive_ipv4_extended_community()
         local_admin: 45,
     };
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -128,11 +129,11 @@ fn test_evpn_extended_community() -> Result<(), EvpnExtendedCommunityWritingErro
         l2_mtu: 0,
     };
 
-    test_parsed_completely(&mac_mobility_wire, &mac_mobility);
-    test_parsed_completely(&es_label_wire, &es_label);
-    test_parsed_completely(&es_import_rt_wire, &good_es_import_rt);
-    test_parsed_completely(&good_router_mac_wire, &good_router_mac);
-    test_parsed_completely(&good_l2_attribute_wire, &good_l2_attribute);
+    test_parsed_completely_bytes_reader(&mac_mobility_wire, &mac_mobility);
+    test_parsed_completely_bytes_reader(&es_label_wire, &es_label);
+    test_parsed_completely_bytes_reader(&es_import_rt_wire, &good_es_import_rt);
+    test_parsed_completely_bytes_reader(&good_router_mac_wire, &good_router_mac);
+    test_parsed_completely_bytes_reader(&good_l2_attribute_wire, &good_l2_attribute);
     test_write(&mac_mobility, &mac_mobility_wire)?;
     test_write(&es_label, &es_label_wire)?;
     test_write(&good_es_import_rt, &es_import_rt_wire)?;
@@ -146,7 +147,7 @@ fn test_unknown_extended_community() -> Result<(), UnknownExtendedCommunityWriti
     let good_wire = [0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01];
     let good = UnknownExtendedCommunity::new(0, 2, [0, 1, 0, 0, 0, 1]);
 
-    test_parsed_completely_with_one_input(&good_wire, 0, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, 0, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
