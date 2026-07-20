@@ -857,7 +857,7 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
     let mut treatment = UpdateTreatment::Normal;
     for path_err in errors.path_attr_errors() {
         match path_err {
-            PathAttributeParsingError::NomError(_) => {
+            PathAttributeParsingError::Parse(_) => {
                 if treatment < UpdateTreatment::TreatAsWithdraw {
                     treatment = UpdateTreatment::TreatAsWithdraw
                 }
@@ -906,21 +906,21 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
             }
             PathAttributeParsingError::MpReachErrorError(err) => {
                 match err {
-                    MpReachParsingError::NomError(_) => {
+                    MpReachParsingError::Parse(_) => {
                         // No meaningful AFI/SAFI read
                         if treatment < UpdateTreatment::SessionReset {
                             treatment = UpdateTreatment::SessionReset
                         }
                     }
-                    MpReachParsingError::UndefinedAddressFamily(_)
-                    | MpReachParsingError::UndefinedSubsequentAddressFamily(_) => {
+                    MpReachParsingError::UndefinedAddressFamily { .. }
+                    | MpReachParsingError::UndefinedSubsequentAddressFamily { .. } => {
                         // AFI/SAFI is not supported, this would've been blocked from open message
                         // in the first place
                         if treatment < UpdateTreatment::SessionReset {
                             treatment = UpdateTreatment::SessionReset
                         }
                     }
-                    MpReachParsingError::IpAddrError(address_type, _) => {
+                    MpReachParsingError::IpAddrError { address_type, .. } => {
                         let tmp = UpdateTreatment::ResetAddressFamily(
                             address_type.address_family().into(),
                             address_type.subsequent_address_family().into(),
@@ -929,7 +929,7 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
                             treatment = tmp
                         }
                     }
-                    MpReachParsingError::LabeledNextHopError(address_type, _) => {
+                    MpReachParsingError::LabeledNextHopError { address_type, .. } => {
                         let tmp = UpdateTreatment::ResetAddressFamily(
                             address_type.address_family().into(),
                             address_type.subsequent_address_family().into(),
@@ -1041,14 +1041,14 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
             }
             PathAttributeParsingError::MpUnreachErrorError(err) => {
                 match err {
-                    MpUnreachParsingError::NomError(_) => {
+                    MpUnreachParsingError::Parse(_) => {
                         // No meaningful AFI/SAFI read
                         if treatment < UpdateTreatment::SessionReset {
                             treatment = UpdateTreatment::SessionReset
                         }
                     }
-                    MpUnreachParsingError::UndefinedAddressFamily(_)
-                    | MpUnreachParsingError::UndefinedSubsequentAddressFamily(_) => {
+                    MpUnreachParsingError::UndefinedAddressFamily { .. }
+                    | MpUnreachParsingError::UndefinedSubsequentAddressFamily { .. } => {
                         // AFI/SAFI is not supported, this would've been blocked from open message
                         // in the first place
                         if treatment < UpdateTreatment::SessionReset {
@@ -1169,13 +1169,15 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
             PathAttributeParsingError::UnknownAttributeError(_) => {
                 // Keep treatment as is
             }
-            PathAttributeParsingError::InvalidPathAttribute(err, _) => {
+            PathAttributeParsingError::InvalidPathAttribute {
+                invalid_attribute, ..
+            } => {
                 // RFC 7606:  If the value of either the Optional or Transitive bits in the
                 // Attribute Flags is in conflict with their specified values, then the
                 // attribute MUST be treated as malformed and the "treat-as-withdraw" approach
                 // used, unless the specification for the attribute mandates different handling
                 // for incorrect Attribute Flags.
-                match err {
+                match invalid_attribute {
                     InvalidPathAttribute::InvalidOptionalFlagValue(_)
                     | InvalidPathAttribute::InvalidTransitiveFlagValue(_) => {
                         if treatment < UpdateTreatment::TreatAsWithdraw {
