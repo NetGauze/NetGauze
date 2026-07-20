@@ -424,20 +424,25 @@ impl<A> From<BgpCodecDecoderError> for ConnectionEvent<A> {
                 })
             }
             BgpCodecDecoderError::BgpMessageParsingError(parse_err) => match parse_err {
-                BgpMessageParsingError::NomError(_) => {
+                BgpMessageParsingError::Parse(_) => {
                     ConnectionEvent::BGPHeaderErr(MessageHeaderError::Unspecific { value: vec![] })
                 }
-                BgpMessageParsingError::ConnectionNotSynchronized(header) => {
+                BgpMessageParsingError::ConnectionNotSynchronized { header, .. } => {
                     ConnectionEvent::BGPHeaderErr(MessageHeaderError::ConnectionNotSynchronized {
                         value: header.to_be_bytes().to_vec(),
                     })
                 }
-                BgpMessageParsingError::UndefinedBgpMessageType(msg_type) => {
+                BgpMessageParsingError::UndefinedBgpMessageType { code, .. } => {
                     ConnectionEvent::BGPHeaderErr(MessageHeaderError::BadMessageType {
-                        value: vec![msg_type.0],
+                        value: vec![code],
                     })
                 }
-                BgpMessageParsingError::BadMessageLength(length) => {
+                BgpMessageParsingError::BadMessageLength { length, .. } => {
+                    ConnectionEvent::BGPHeaderErr(MessageHeaderError::BadMessageLength {
+                        value: length.to_be_bytes().to_vec(),
+                    })
+                }
+                BgpMessageParsingError::UnparseableBytes { length, .. } => {
                     ConnectionEvent::BGPHeaderErr(MessageHeaderError::BadMessageLength {
                         value: length.to_be_bytes().to_vec(),
                     })
