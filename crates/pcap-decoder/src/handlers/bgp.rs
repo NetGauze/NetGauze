@@ -98,7 +98,6 @@ impl ProtocolHandler<(BgpMessage, BgpParsingIgnoredErrors), BgpCodec, BgpCodecDe
 mod tests {
     use super::*;
     use netgauze_bgp_pkt::open::BgpOpenMessage;
-    use netgauze_bgp_pkt::path_attribute::UndefinedOrigin;
     use netgauze_bgp_pkt::wire::deserializer::BgpMessageParsingError;
     use netgauze_bgp_pkt::wire::deserializer::path_attribute::{
         OriginParsingError, PathAttributeParsingError,
@@ -306,7 +305,12 @@ mod tests {
                     BgpMessageParsingError::BgpUpdateMessageParsingError(
                         BgpUpdateMessageParsingError::PathAttributeError(
                             PathAttributeParsingError::OriginError(
-                                OriginParsingError::UndefinedOrigin(UndefinedOrigin(255))
+                                // 19-byte BGP header + 2 withdrawn-routes-length
+                                // + 2 path-attributes-length + 3 attribute header
+                                OriginParsingError::UndefinedOrigin {
+                                    offset: 26,
+                                    code: 255
+                                }
                             )
                         )
                     )
@@ -347,9 +351,10 @@ mod tests {
             result,
             Some(vec![DecodeOutcome::Error(
                 BgpCodecDecoderError::BgpMessageParsingError(
-                    BgpMessageParsingError::ConnectionNotSynchronized(
-                        1329227995784915872903807060280344575
-                    )
+                    BgpMessageParsingError::ConnectionNotSynchronized {
+                        offset: 0,
+                        header: 1329227995784915872903807060280344575
+                    }
                 )
             )]),
         );
@@ -442,7 +447,11 @@ mod tests {
     fn test_bgp_handler_serialize_error() {
         let handler = BgpProtocolHandler::new(vec![179]);
         let error = BgpCodecDecoderError::BgpMessageParsingError(
-            BgpMessageParsingError::BadMessageLength(10),
+            // offset 16 is where the length field sits in a BGP message header
+            BgpMessageParsingError::BadMessageLength {
+                offset: 16,
+                length: 10,
+            },
         );
         let outcome = DecodeOutcome::Error(error);
 
@@ -451,7 +460,10 @@ mod tests {
         let json = result.unwrap();
         let expected = json!({
             "BgpMessageParsingError": {
-                "BadMessageLength": 10
+                "BadMessageLength": {
+                    "offset": 16,
+                    "length": 10
+                }
             }
         });
         assert_eq!(json, expected);

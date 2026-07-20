@@ -279,9 +279,10 @@ mod tests {
             result,
             Some(vec![DecodeOutcome::Error(
                 BmpCodecDecoderError::BmpMessageParsingError(
-                    BmpMessageParsingError::UndefinedBmpVersion(
-                        netgauze_bmp_pkt::iana::UndefinedBmpVersion(1)
-                    )
+                    BmpMessageParsingError::UndefinedBmpVersion {
+                        offset: 0,
+                        value: 1
+                    }
                 )
             )]),
         );
@@ -366,7 +367,11 @@ mod tests {
     fn test_bmp_handler_serialize_error() {
         let handler = BmpProtocolHandler::new(vec![1790]);
         let error = BmpCodecDecoderError::BmpMessageParsingError(
-            BmpMessageParsingError::InvalidBmpLength(10),
+            // offset 1 is where the length field sits in a BMP common header
+            BmpMessageParsingError::InvalidBmpLength {
+                offset: 1,
+                length: 10,
+            },
         );
         let outcome = DecodeOutcome::Error(error);
         let result = handler.serialize(outcome);
@@ -374,7 +379,10 @@ mod tests {
         let json = result.unwrap();
         let expected = json!({
             "BmpMessageParsingError": {
-                "InvalidBmpLength": 10
+                "InvalidBmpLength": {
+                    "offset": 1,
+                    "length": 10
+                }
             }
         });
         assert_eq!(json, expected);
