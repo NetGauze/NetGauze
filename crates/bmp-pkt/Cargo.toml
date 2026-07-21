@@ -19,7 +19,6 @@ categories = ["network-programming", "parsing"]
 netgauze-iana = { workspace = true }
 netgauze-bgp-pkt = { workspace = true }
 netgauze-parse-utils = { workspace = true, optional = true }
-netgauze-serde-macros = { workspace = true, optional = true }
 strum_macros = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 ipnet = { workspace = true, features = ["serde"] }
@@ -38,7 +37,6 @@ thiserror = { workspace = true }
 default = ["serde"]
 serde = [
     "netgauze-parse-utils",
-    "netgauze-serde-macros",
 ]
 codec = ["tokio-util", "bytes"]
 bench = ["criterion", "codec"]

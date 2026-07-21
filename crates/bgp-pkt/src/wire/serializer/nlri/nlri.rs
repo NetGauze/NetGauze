@@ -15,8 +15,7 @@
 
 use crate::nlri::*;
 use crate::wire::serializer::round_len;
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 use std::io::Write;
 use std::net::IpAddr;
 
@@ -32,10 +31,12 @@ pub(crate) const LABELED_IPV6_LEN: u8 = RD_LEN + IPV6_LEN;
 pub(crate) const MPLS_LABEL_LEN_BITS: u8 = 24;
 pub(crate) const MAC_ADDRESS_LEN_BITS: u8 = 48;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteDistinguisherWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route distinguisher: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(RouteDistinguisherWritingError);
 
 impl WritablePdu<RouteDistinguisherWritingError> for RouteDistinguisher {
     const BASE_LENGTH: usize = RD_LEN as usize;
@@ -50,10 +51,12 @@ impl WritablePdu<RouteDistinguisherWritingError> for RouteDistinguisher {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MplsLabelWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing MPLS label: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(MplsLabelWritingError);
 
 impl WritablePdu<MplsLabelWritingError> for MplsLabel {
     // We don't include the TTL here
@@ -69,11 +72,15 @@ impl WritablePdu<MplsLabelWritingError> for MplsLabel {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum LabeledIpv4NextHopWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing labeled IPv4 next hop: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
 }
+impl_from_io_error!(LabeledIpv4NextHopWritingError);
 
 impl WritablePdu<LabeledIpv4NextHopWritingError> for LabeledIpv4NextHop {
     const BASE_LENGTH: usize = LABELED_IPV4_LEN as usize;
@@ -89,11 +96,15 @@ impl WritablePdu<LabeledIpv4NextHopWritingError> for LabeledIpv4NextHop {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum LabeledIpv6NextHopWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing labeled IPv6 next hop: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
 }
+impl_from_io_error!(LabeledIpv6NextHopWritingError);
 
 impl WritablePdu<LabeledIpv6NextHopWritingError> for LabeledIpv6NextHop {
     const BASE_LENGTH: usize = LABELED_IPV6_LEN as usize;
@@ -109,12 +120,18 @@ impl WritablePdu<LabeledIpv6NextHopWritingError> for LabeledIpv6NextHop {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum LabeledNextHopWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing labeled next hop: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in labeled IPv4 next hop: {0}")]
     LabeledIpv4NextHopError(#[from] LabeledIpv4NextHopWritingError),
+
+    #[error("in labeled IPv6 next hop: {0}")]
     LabeledIpv6NextHopError(#[from] LabeledIpv6NextHopWritingError),
 }
+impl_from_io_error!(LabeledNextHopWritingError);
 
 impl WritablePdu<LabeledNextHopWritingError> for LabeledNextHop {
     // 1-octet for length
@@ -138,10 +155,12 @@ impl WritablePdu<LabeledNextHopWritingError> for LabeledNextHop {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6UnicastWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv6 unicast: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(Ipv6UnicastWritingError);
 
 impl WritablePdu<Ipv6UnicastWritingError> for Ipv6Unicast {
     // 1-octet for the prefix length
@@ -159,11 +178,15 @@ impl WritablePdu<Ipv6UnicastWritingError> for Ipv6Unicast {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6UnicastAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv6 unicast address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in IPv6 unicast: {0}")]
     Ipv6UnicastError(#[from] Ipv6UnicastWritingError),
 }
+impl_from_io_error!(Ipv6UnicastAddressWritingError);
 
 impl WritablePdu<Ipv6UnicastAddressWritingError> for Ipv6UnicastAddress {
     const BASE_LENGTH: usize = 0;
@@ -181,10 +204,12 @@ impl WritablePdu<Ipv6UnicastAddressWritingError> for Ipv6UnicastAddress {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6MulticastWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv6 multicast: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(Ipv6MulticastWritingError);
 
 impl WritablePdu<Ipv6MulticastWritingError> for Ipv6Multicast {
     // 1-octet for the prefix length
@@ -202,11 +227,15 @@ impl WritablePdu<Ipv6MulticastWritingError> for Ipv6Multicast {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6MulticastAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv6 multicast address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in IPv6 multicast: {0}")]
     Ipv6MulticastError(#[from] Ipv6MulticastWritingError),
 }
+impl_from_io_error!(Ipv6MulticastAddressWritingError);
 
 impl WritablePdu<Ipv6MulticastAddressWritingError> for Ipv6MulticastAddress {
     const BASE_LENGTH: usize = 0;
@@ -224,13 +253,21 @@ impl WritablePdu<Ipv6MulticastAddressWritingError> for Ipv6MulticastAddress {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6MplsVpnUnicastAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv6 MPLS VPN unicast address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelError(#[from] MplsLabelWritingError),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+
+    #[error("in IPv6 unicast: {0}")]
     Ipv6UnicastError(#[from] Ipv6UnicastAddressWritingError),
 }
+impl_from_io_error!(Ipv6MplsVpnUnicastAddressWritingError);
 
 impl WritablePdu<Ipv6MplsVpnUnicastAddressWritingError> for Ipv6MplsVpnUnicastAddress {
     const BASE_LENGTH: usize = 0;
@@ -262,10 +299,12 @@ impl WritablePdu<Ipv6MplsVpnUnicastAddressWritingError> for Ipv6MplsVpnUnicastAd
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv4UnicastWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv4 unicast: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(Ipv4UnicastWritingError);
 
 impl WritablePdu<Ipv4UnicastWritingError> for Ipv4Unicast {
     // 1-octet for the prefix length
@@ -283,11 +322,15 @@ impl WritablePdu<Ipv4UnicastWritingError> for Ipv4Unicast {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv4UnicastAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv4 unicast address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in IPv4 unicast: {0}")]
     Ipv4UnicastError(#[from] Ipv4UnicastWritingError),
 }
+impl_from_io_error!(Ipv4UnicastAddressWritingError);
 
 impl WritablePdu<Ipv4UnicastAddressWritingError> for Ipv4UnicastAddress {
     const BASE_LENGTH: usize = 0;
@@ -305,10 +348,12 @@ impl WritablePdu<Ipv4UnicastAddressWritingError> for Ipv4UnicastAddress {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv4MulticastWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv4 multicast: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(Ipv4MulticastWritingError);
 
 impl WritablePdu<Ipv4MulticastWritingError> for Ipv4Multicast {
     // 1-octet for the prefix length
@@ -326,11 +371,15 @@ impl WritablePdu<Ipv4MulticastWritingError> for Ipv4Multicast {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv4MulticastAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv4 multicast address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in IPv4 multicast: {0}")]
     Ipv4MulticastError(#[from] Ipv4MulticastWritingError),
 }
+impl_from_io_error!(Ipv4MulticastAddressWritingError);
 
 impl WritablePdu<Ipv4MulticastAddressWritingError> for Ipv4MulticastAddress {
     const BASE_LENGTH: usize = 0;
@@ -348,13 +397,21 @@ impl WritablePdu<Ipv4MulticastAddressWritingError> for Ipv4MulticastAddress {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv4MplsVpnUnicastAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv4 MPLS VPN unicast address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelError(#[from] MplsLabelWritingError),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+
+    #[error("in IPv4 unicast: {0}")]
     Ipv4UnicastError(#[from] Ipv4UnicastWritingError),
 }
+impl_from_io_error!(Ipv4MplsVpnUnicastAddressWritingError);
 
 impl WritablePdu<Ipv4MplsVpnUnicastAddressWritingError> for Ipv4MplsVpnUnicastAddress {
     const BASE_LENGTH: usize = 0;
@@ -386,10 +443,12 @@ impl WritablePdu<Ipv4MplsVpnUnicastAddressWritingError> for Ipv4MplsVpnUnicastAd
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MacAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing MAC address: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(MacAddressWritingError);
 
 impl WritablePdu<MacAddressWritingError> for MacAddress {
     const BASE_LENGTH: usize = 6;
@@ -404,10 +463,12 @@ impl WritablePdu<MacAddressWritingError> for MacAddress {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum EthernetTagWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing ethernet tag: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(EthernetTagWritingError);
 
 impl WritablePdu<EthernetTagWritingError> for EthernetTag {
     const BASE_LENGTH: usize = 4;
@@ -422,10 +483,12 @@ impl WritablePdu<EthernetTagWritingError> for EthernetTag {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum EthernetSegmentIdentifierWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing ethernet segment identifier: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(EthernetSegmentIdentifierWritingError);
 
 impl WritablePdu<EthernetSegmentIdentifierWritingError> for EthernetSegmentIdentifier {
     const BASE_LENGTH: usize = 10;
@@ -440,11 +503,18 @@ impl WritablePdu<EthernetSegmentIdentifierWritingError> for EthernetSegmentIdent
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum EthernetAutoDiscoveryWritingError {
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+
+    #[error("in ethernet segment identifier: {0}")]
     EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
+
+    #[error("in ethernet tag: {0}")]
     EthernetTagError(#[from] EthernetTagWritingError),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelError(#[from] MplsLabelWritingError),
 }
 
@@ -468,15 +538,27 @@ impl WritablePdu<EthernetAutoDiscoveryWritingError> for EthernetAutoDiscovery {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MacIpAdvertisementWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing MAC IP advertisement: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+
+    #[error("in ethernet segment identifier: {0}")]
     EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
+
+    #[error("in ethernet tag: {0}")]
     EthernetTagError(#[from] EthernetTagWritingError),
+
+    #[error("in MAC address: {0}")]
     MacAddressError(#[from] MacAddressWritingError),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelError(#[from] MplsLabelWritingError),
 }
+impl_from_io_error!(MacIpAdvertisementWritingError);
 
 impl WritablePdu<MacIpAdvertisementWritingError> for MacIpAdvertisement {
     // 1-mac address len + 1 ip address len
@@ -524,12 +606,18 @@ impl WritablePdu<MacIpAdvertisementWritingError> for MacIpAdvertisement {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum InclusiveMulticastEthernetTagRouteWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing inclusive multicast ethernet tag route: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+
+    #[error("in ethernet tag: {0}")]
     EthernetTagError(#[from] EthernetTagWritingError),
 }
+impl_from_io_error!(InclusiveMulticastEthernetTagRouteWritingError);
 
 impl WritablePdu<InclusiveMulticastEthernetTagRouteWritingError>
     for InclusiveMulticastEthernetTagRoute
@@ -568,12 +656,18 @@ impl WritablePdu<InclusiveMulticastEthernetTagRouteWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum EthernetSegmentRouteWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing ethernet segment route: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+
+    #[error("in ethernet segment identifier: {0}")]
     EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
 }
+impl_from_io_error!(EthernetSegmentRouteWritingError);
 
 impl WritablePdu<EthernetSegmentRouteWritingError> for EthernetSegmentRoute {
     // 1-octet for ip length
@@ -607,17 +701,29 @@ impl WritablePdu<EthernetSegmentRouteWritingError> for EthernetSegmentRoute {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum L2EvpnRouteWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing L2 EVPN route: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in ethernet auto-discovery: {0}")]
     EthernetAutoDiscoveryError(#[from] EthernetAutoDiscoveryWritingError),
+
+    #[error("in MAC IP advertisement: {0}")]
     MacIpAdvertisementError(#[from] MacIpAdvertisementWritingError),
+
+    #[error("in inclusive multicast ethernet tag: {0}")]
     InclusiveMulticastEthernetTagWritingError(
         #[from] InclusiveMulticastEthernetTagRouteWritingError,
     ),
+
+    #[error("in ethernet segment route: {0}")]
     EthernetSegmentRouteError(#[from] EthernetSegmentRouteWritingError),
+
+    #[error("in L2 EVPN IP prefix route: {0}")]
     L2EvpnIpPrefixRouteError(#[from] L2EvpnIpPrefixRouteWritingError),
 }
+impl_from_io_error!(L2EvpnRouteWritingError);
 
 impl WritablePdu<L2EvpnRouteWritingError> for L2EvpnRoute {
     // 1-octet type + 1-octet length
@@ -655,11 +761,15 @@ impl WritablePdu<L2EvpnRouteWritingError> for L2EvpnRoute {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum L2EvpnAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing L2 EVPN address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in L2 EVPN route: {0}")]
     L2EvpnRouteError(#[from] L2EvpnRouteWritingError),
 }
+impl_from_io_error!(L2EvpnAddressWritingError);
 
 impl WritablePdu<L2EvpnAddressWritingError> for L2EvpnAddress {
     const BASE_LENGTH: usize = 0;
@@ -677,14 +787,24 @@ impl WritablePdu<L2EvpnAddressWritingError> for L2EvpnAddress {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum L2EvpnIpv4PrefixRouteWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing L2 EVPN IPv4 prefix route: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+
+    #[error("in ethernet segment identifier: {0}")]
     EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
+
+    #[error("in ethernet tag: {0}")]
     EthernetTagError(#[from] EthernetTagWritingError),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelError(#[from] MplsLabelWritingError),
 }
+impl_from_io_error!(L2EvpnIpv4PrefixRouteWritingError);
 
 impl WritablePdu<L2EvpnIpv4PrefixRouteWritingError> for L2EvpnIpv4PrefixRoute {
     // 1-octet prefix len + 2 * 4 prefix & gateway + 3 MPLS Label
@@ -706,14 +826,24 @@ impl WritablePdu<L2EvpnIpv4PrefixRouteWritingError> for L2EvpnIpv4PrefixRoute {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum L2EvpnIpv6PrefixRouteWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing L2 EVPN IPv6 prefix route: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+
+    #[error("in ethernet segment identifier: {0}")]
     EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
+
+    #[error("in ethernet tag: {0}")]
     EthernetTagError(#[from] EthernetTagWritingError),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelError(#[from] MplsLabelWritingError),
 }
+impl_from_io_error!(L2EvpnIpv6PrefixRouteWritingError);
 
 impl WritablePdu<L2EvpnIpv6PrefixRouteWritingError> for L2EvpnIpv6PrefixRoute {
     // 1-octet prefix len + 2 * 16 prefix & gateway + 3 MPLS Label
@@ -735,9 +865,12 @@ impl WritablePdu<L2EvpnIpv6PrefixRouteWritingError> for L2EvpnIpv6PrefixRoute {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum L2EvpnIpPrefixRouteWritingError {
+    #[error("in L2 EVPN IPv4 prefix route: {0}")]
     L2EvpnIpv4PrefixRouteError(#[from] L2EvpnIpv4PrefixRouteWritingError),
+
+    #[error("in L2 EVPN IPv6 prefix route: {0}")]
     L2EvpnIpv6PrefixRouteError(#[from] L2EvpnIpv6PrefixRouteWritingError),
 }
 
@@ -761,11 +894,15 @@ impl WritablePdu<L2EvpnIpPrefixRouteWritingError> for L2EvpnIpPrefixRoute {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteTargetMembershipAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route target membership address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route target membership: {0}")]
     RouteTargetMembershipWritingError(#[from] RouteTargetMembershipWritingError),
 }
+impl_from_io_error!(RouteTargetMembershipAddressWritingError);
 
 impl WritablePdu<RouteTargetMembershipAddressWritingError> for RouteTargetMembershipAddress {
     // 1-octet prefix len
@@ -796,10 +933,12 @@ impl WritablePdu<RouteTargetMembershipAddressWritingError> for RouteTargetMember
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteTargetMembershipWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route target membership: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(RouteTargetMembershipWritingError);
 
 impl WritablePdu<RouteTargetMembershipWritingError> for RouteTargetMembership {
     // 4-octet origin AS
@@ -816,13 +955,19 @@ impl WritablePdu<RouteTargetMembershipWritingError> for RouteTargetMembership {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv4NlriMplsLabelsAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv4 NLRI MPLS labels address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelError(#[from] MplsLabelWritingError),
+
     /// prefix length is exceeding 255 limit
+    #[error("prefix length {0} bits (label stack + prefix) exceeds the 255 bit maximum")]
     InvalidPrefixLength(usize),
 }
+impl_from_io_error!(Ipv4NlriMplsLabelsAddressWritingError);
 
 impl WritablePdu<Ipv4NlriMplsLabelsAddressWritingError> for Ipv4NlriMplsLabelsAddress {
     // 1-octet len
@@ -852,13 +997,19 @@ impl WritablePdu<Ipv4NlriMplsLabelsAddressWritingError> for Ipv4NlriMplsLabelsAd
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6NlriMplsLabelsAddressWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPv6 NLRI MPLS labels address: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelError(#[from] MplsLabelWritingError),
+
     /// prefix length is exceeding 255 limit
+    #[error("prefix length {0} bits (label stack + prefix) exceeds the 255 bit maximum")]
     InvalidPrefixLength(usize),
 }
+impl_from_io_error!(Ipv6NlriMplsLabelsAddressWritingError);
 
 impl WritablePdu<Ipv6NlriMplsLabelsAddressWritingError> for Ipv6NlriMplsLabelsAddress {
     // 1 octet prefix len

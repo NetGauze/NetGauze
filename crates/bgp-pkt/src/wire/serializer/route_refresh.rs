@@ -16,13 +16,14 @@
 //! Serializer for BGP Route Refresh message
 
 use crate::BgpRouteRefreshMessage;
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpRouteRefreshMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP route refresh message: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(BgpRouteRefreshMessageWritingError);
 
 impl WritablePdu<BgpRouteRefreshMessageWritingError> for BgpRouteRefreshMessage {
     // 4 octet = 2 afi + 1 op + + 1 safi

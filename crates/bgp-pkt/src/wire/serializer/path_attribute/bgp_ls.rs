@@ -23,18 +23,30 @@ use crate::wire::serializer::path_attribute::write_length;
 use crate::wire::serializer::{
     IpAddrWritingError, MultiTopologyIdWritingError, write_tlv_header_t16_l16,
 };
-use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput, impl_from_io_error};
 use std::io::Write;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpLsAttributeWritingError {
-    StdIoError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP-LS attribute: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in IP address: {0}")]
     IpAddrWritingError(#[from] IpAddrWritingError),
+
+    #[error("in multi-topology ID: {0}")]
     MultiTopologyIdWritingError(#[from] MultiTopologyIdWritingError),
+
+    #[error("in BGP-LS peer SID: {0}")]
     BgpLsPeerSidWritingError(#[from] BgpLsPeerSidWritingError),
+
+    // NOTE: thiserror rejects mixing `{0}` with trailing positional args in a
+    // tuple variant, so NODE_NAME_TLV_MAX_LEN (255) is spelled out here.
+    #[error("BGP-LS node name is {0} bytes, exceeding the maximum of 255")]
     NodeNameTlvStringTooLong(usize),
 }
+impl_from_io_error!(BgpLsAttributeWritingError);
+
 impl WritablePduWithOneInput<bool, BgpLsAttributeWritingError> for BgpLsAttribute {
     const BASE_LENGTH: usize = 1; // 1 byte for attribute length
 
@@ -283,11 +295,15 @@ impl WritablePdu<BgpLsAttributeWritingError> for BgpLsAttributeValue {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpLsPeerSidWritingError {
-    StdIoError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP-LS peer SID: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelWritingError(#[from] MplsLabelWritingError),
 }
+impl_from_io_error!(BgpLsPeerSidWritingError);
 
 impl WritablePdu<BgpLsPeerSidWritingError> for BgpLsPeerSid {
     const BASE_LENGTH: usize = 4; // flags u8 + weight u8 + reserved u16

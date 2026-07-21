@@ -25,23 +25,40 @@ use crate::wire::serializer::v3::{
 };
 use netgauze_bgp_pkt::wire::serializer::capabilities::BGPCapabilityWritingError;
 use netgauze_bgp_pkt::wire::serializer::{BgpMessageWritingError, write_tlv_header_t16_l16};
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 use std::convert::identity;
 use std::io::Write;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageValueWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BMP message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route monitoring message: {0}")]
     RouteMonitoringMessage(#[from] RouteMonitoringMessageWritingError),
+
+    #[error("in route mirroring message: {0}")]
     RouteMirroringMessage(#[from] RouteMirroringMessageWritingError),
+
+    #[error("in initiation message: {0}")]
     InitiationMessage(#[from] InitiationMessageWritingError),
+
+    #[error("in peer up notification message: {0}")]
     PeerUpNotificationMessage(#[from] PeerUpNotificationMessageWritingError),
+
+    #[error("in peer down notification message: {0}")]
     PeerDownNotificationMessage(#[from] PeerDownNotificationMessageWritingError),
+
+    #[error("in peer down TLV message: {0}")]
     PeerDownTlvMessage(#[from] PeerDownTlvWritingError),
+
+    #[error("in termination message: {0}")]
     TerminationMessage(#[from] TerminationMessageWritingError),
+
+    #[error("in statistics report message: {0}")]
     StatisticsReportMessage(#[from] StatisticsReportMessageWritingError),
 }
+impl_from_io_error!(BmpMessageValueWritingError);
 
 impl WritablePdu<BmpMessageValueWritingError> for BmpMessageValue {
     /// 1-octet msg type,
@@ -83,14 +100,24 @@ impl WritablePdu<BmpMessageValueWritingError> for BmpMessageValue {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum PeerDownNotificationMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing peer down notification message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in peer header: {0}")]
     PeerHeaderError(#[from] PeerHeaderWritingError),
+
+    #[error("in initiation information: {0}")]
     InitiationInformationError(#[from] InitiationInformationWritingError),
+
+    #[error("in peer down notification reason: {0}")]
     PeerDownNotificationReasonError(#[from] PeerDownNotificationReasonWritingError),
+
+    #[error("in peer down TLV: {0}")]
     PeerDownTlvError(#[from] PeerDownTlvWritingError),
 }
+impl_from_io_error!(PeerDownNotificationMessageWritingError);
 
 impl WritablePdu<PeerDownNotificationMessageWritingError> for PeerDownNotificationMessage {
     const BASE_LENGTH: usize = 0;
@@ -115,10 +142,12 @@ impl WritablePdu<PeerDownNotificationMessageWritingError> for PeerDownNotificati
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum PeerDownTlvWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing peer down TLV: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(PeerDownTlvWritingError);
 
 impl WritablePdu<PeerDownTlvWritingError> for PeerDownTlv {
     const BASE_LENGTH: usize = 2 + 2; /* type + length */
@@ -144,12 +173,18 @@ impl WritablePdu<PeerDownTlvWritingError> for PeerDownTlv {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteMonitoringMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route monitoring message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in peer header: {0}")]
     PeerHeader(#[from] PeerHeaderWritingError),
+
+    #[error("in TLV v4: {0}")]
     TlvV4(#[from] RouteMonitoringTlvWritingError),
 }
+impl_from_io_error!(RouteMonitoringMessageWritingError);
 
 impl WritablePdu<RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
     const BASE_LENGTH: usize = 0;
@@ -173,11 +208,15 @@ impl WritablePdu<RouteMonitoringMessageWritingError> for RouteMonitoringMessage 
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteMonitoringTlvWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route monitoring TLV: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route monitoring TLV value: {0}")]
     RouteMonitoringTlvValueError(#[from] RouteMonitoringTlvValueWritingError),
 }
+impl_from_io_error!(RouteMonitoringTlvWritingError);
 
 impl WritablePdu<RouteMonitoringTlvWritingError> for RouteMonitoringTlv {
     const BASE_LENGTH: usize = 2 + 2 + 2; /* type + length + index */
@@ -204,12 +243,18 @@ impl WritablePdu<RouteMonitoringTlvWritingError> for RouteMonitoringTlv {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteMonitoringTlvValueWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route monitoring TLV value: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in BGP message: {0}")]
     BgpMessageWritingError(#[from] BgpMessageWritingError),
+
+    #[error("in BGP capability: {0}")]
     BgpCapability(#[from] BGPCapabilityWritingError),
 }
+impl_from_io_error!(RouteMonitoringTlvValueWritingError);
 
 impl WritablePdu<RouteMonitoringTlvValueWritingError> for RouteMonitoringTlvValue {
     const BASE_LENGTH: usize = 0;

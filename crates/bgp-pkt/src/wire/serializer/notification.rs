@@ -23,20 +23,35 @@ use crate::notification::{
     CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
     OpenMessageError, RouteRefreshError, UpdateMessageError,
 };
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpNotificationMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP notification message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in message header: {0}")]
     MessageHeaderError(#[from] MessageHeaderErrorWritingError),
+
+    #[error("in open message: {0}")]
     OpenMessageError(#[from] OpenMessageErrorWritingError),
+
+    #[error("in update message: {0}")]
     UpdateMessageError(#[from] UpdateMessageErrorWritingError),
+
+    #[error("in hold timer expired: {0}")]
     HoldTimerExpiredError(#[from] HoldTimerExpiredErrorWritingError),
+
+    #[error("in finite state machine: {0}")]
     FiniteStateMachineError(#[from] FiniteStateMachineErrorWritingError),
+
+    #[error("in cease: {0}")]
     CeaseError(#[from] CeaseErrorWritingError),
+
+    #[error("in route refresh: {0}")]
     RouteRefreshError(#[from] RouteRefreshErrorWritingError),
 }
+impl_from_io_error!(BgpNotificationMessageWritingError);
 
 impl WritablePdu<BgpNotificationMessageWritingError> for BgpNotificationMessage {
     // One octet for the code
@@ -93,10 +108,12 @@ impl WritablePdu<BgpNotificationMessageWritingError> for BgpNotificationMessage 
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MessageHeaderErrorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing message header error: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(MessageHeaderErrorWritingError);
 
 impl WritablePdu<MessageHeaderErrorWritingError> for MessageHeaderError {
     // One octet sub-code
@@ -138,10 +155,12 @@ impl WritablePdu<MessageHeaderErrorWritingError> for MessageHeaderError {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum OpenMessageErrorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing open message error: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(OpenMessageErrorWritingError);
 
 impl WritablePdu<OpenMessageErrorWritingError> for OpenMessageError {
     // One octet sub-code
@@ -201,10 +220,12 @@ impl WritablePdu<OpenMessageErrorWritingError> for OpenMessageError {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum UpdateMessageErrorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing update message error: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(UpdateMessageErrorWritingError);
 
 impl WritablePdu<UpdateMessageErrorWritingError> for UpdateMessageError {
     // One octet sub-code
@@ -283,10 +304,12 @@ impl WritablePdu<UpdateMessageErrorWritingError> for UpdateMessageError {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum HoldTimerExpiredErrorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing hold timer expired error: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(HoldTimerExpiredErrorWritingError);
 
 impl WritablePdu<HoldTimerExpiredErrorWritingError> for HoldTimerExpiredError {
     // One octet sub-code
@@ -313,10 +336,12 @@ impl WritablePdu<HoldTimerExpiredErrorWritingError> for HoldTimerExpiredError {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum FiniteStateMachineErrorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing finite state machine error: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(FiniteStateMachineErrorWritingError);
 
 impl WritablePdu<FiniteStateMachineErrorWritingError> for FiniteStateMachineError {
     // One octet sub-code
@@ -366,10 +391,12 @@ impl WritablePdu<FiniteStateMachineErrorWritingError> for FiniteStateMachineErro
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum CeaseErrorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing cease error: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(CeaseErrorWritingError);
 
 impl WritablePdu<CeaseErrorWritingError> for CeaseError {
     // One octet sub-code
@@ -438,10 +465,12 @@ impl WritablePdu<CeaseErrorWritingError> for CeaseError {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteRefreshErrorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route refresh error: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(RouteRefreshErrorWritingError);
 
 impl WritablePdu<RouteRefreshErrorWritingError> for RouteRefreshError {
     // One octet sub-code
