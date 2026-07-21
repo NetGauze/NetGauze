@@ -19,7 +19,8 @@ use crate::wire::{
     BGP_ROLE_CAPABILITY_LENGTH, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
     EXTENDED_MESSAGE_CAPABILITY_LENGTH, EXTENDED_NEXT_HOP_ENCODING_LENGTH,
     FOUR_OCTET_AS_CAPABILITY_LENGTH, GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH,
-    MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
+    LONG_LIVED_GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
+    ROUTE_REFRESH_CAPABILITY_LENGTH,
 };
 use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
 use netgauze_parse_utils::error::ParseError;
@@ -62,6 +63,9 @@ pub enum BgpCapabilityParsingError {
 
     #[error("in graceful restart capability: {0}")]
     GracefulRestartCapabilityError(#[from] GracefulRestartCapabilityParsingError),
+
+    #[error("in long-lived graceful restart capability: {0}")]
+    LongLivedGracefulRestartCapabilityError(#[from] LongLivedGracefulRestartCapabilityParsingError),
 
     #[error("in add-path capability: {0}")]
     AddPathCapabilityError(#[from] AddPathCapabilityParsingError),
@@ -210,7 +214,8 @@ impl<'a> ParseFrom<'a> for BgpCapability {
                     parse_enhanced_route_refresh_capability(cur)
                 }
                 BgpCapabilityCode::LongLivedGracefulRestartLLGRCapability => {
-                    parse_unrecognized_capability(code.into(), cur)
+                    let cap = LongLivedGracefulRestartCapability::parse(cur)?;
+                    Ok(BgpCapability::LongLivedGracefulRestart(cap))
                 }
                 BgpCapabilityCode::RoutingPolicyDistribution => {
                     parse_unrecognized_capability(code.into(), cur)
@@ -393,6 +398,108 @@ impl<'a> ParseFrom<'a> for GracefulRestartCapability {
             graceful_notification,
             time,
             address_families,
+        ))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
+pub enum LongLivedGracefulRestartCapabilityParsingError {
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error(
+        "invalid long-lived graceful restart capability length {length} at byte offset {offset} (must be a multiple of {})",
+        LONG_LIVED_GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH
+    )]
+    InvalidLength { offset: usize, length: u8 },
+
+    #[error("unknown address family {afi} at byte offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error("unknown subsequent address family {safi} at byte offset {offset}")]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error("unsupported address family pair (afi {afi}, safi {safi}) at byte offset {offset}")]
+    AddressTypeError { offset: usize, afi: u16, safi: u8 },
+}
+
+impl<'a> ParseFrom<'a> for LongLivedGracefulRestartCapability {
+    type Error = LongLivedGracefulRestartCapabilityParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let len = cur.read_u8()?;
+        // The value is a whole number of <AFI, SAFI, Flags, Stale Time> tuples;
+        // anything else means the capability is malformed rather than merely
+        // carrying a family we do not know about.
+        if len % LONG_LIVED_GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH != 0 {
+            return Err(
+                LongLivedGracefulRestartCapabilityParsingError::InvalidLength {
+                    offset,
+                    length: len,
+                },
+            );
+        }
+        let mut params_buf = cur.take_slice(len as usize)?;
+        let mut address_families = Vec::with_capacity(
+            params_buf.remaining() / LONG_LIVED_GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH as usize,
+        );
+        while !params_buf.is_empty() {
+            let v = LongLivedGracefulRestartAddressFamily::parse(&mut params_buf)?;
+            address_families.push(v);
+        }
+        Ok(LongLivedGracefulRestartCapability::new(address_families))
+    }
+}
+
+impl<'a> ParseFrom<'a> for LongLivedGracefulRestartAddressFamily {
+    type Error = LongLivedGracefulRestartCapabilityParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let mut buf = cur.take_slice(LONG_LIVED_GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH as usize)?;
+
+        let afi = AddressFamily::try_from(buf.read_u16_be()?).map_err(|err| {
+            LongLivedGracefulRestartCapabilityParsingError::UndefinedAddressFamily {
+                offset: buf.offset() - 2,
+                afi: err.0,
+            }
+        })?;
+        let safi = SubsequentAddressFamily::try_from(buf.read_u8()?).map_err(|err| {
+            LongLivedGracefulRestartCapabilityParsingError::UndefinedSubsequentAddressFamily {
+                offset: buf.offset() - 1,
+                safi: err.0,
+            }
+        })?;
+        let address_type = match AddressType::from_afi_safi(afi, safi) {
+            Ok(address_type) => address_type,
+            Err(err) => {
+                return Err(
+                    LongLivedGracefulRestartCapabilityParsingError::AddressTypeError {
+                        // AFI (2 bytes) and SAFI (1 byte) are the last 3 read
+                        offset: buf.offset() - 3,
+                        afi: err.address_family().into(),
+                        safi: err.subsequent_address_family().into(),
+                    },
+                );
+            }
+        };
+
+        let flags = buf.read_u8()?;
+        // Only the most significant `F` bit is defined; the remaining bits are
+        // reserved and MUST be ignored by the receiver (RFC 9494).
+        let forwarding_state = flags & 0x80 == 0x80;
+
+        // Long-lived Stale Time is 24 bits
+        let stale_time_bytes: [u8; 3] = buf.read_array()?;
+        let stale_time = u32::from_be_bytes([
+            0,
+            stale_time_bytes[0],
+            stale_time_bytes[1],
+            stale_time_bytes[2],
+        ]);
+
+        Ok(LongLivedGracefulRestartAddressFamily::new(
+            forwarding_state,
+            address_type,
+            stale_time,
         ))
     }
 }

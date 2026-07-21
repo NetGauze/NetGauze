@@ -387,3 +387,71 @@ fn test_experimental_capabilities() -> Result<(), BGPCapabilityWritingError> {
     }
     Ok(())
 }
+
+/// Long-Lived Graceful Restart, [RFC9494](https://datatracker.ietf.org/doc/html/rfc9494)
+///
+/// `good_wire` is taken verbatim off the wire from FRRouting 10.8: capability
+/// code 71, length 7, then the single tuple `<AFI=1, SAFI=1, F=1, LLST=0>`.
+#[test]
+fn test_long_lived_graceful_restart() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [0x47, 0x07, 0x00, 0x01, 0x01, 0x80, 0x00, 0x00, 0x00];
+    let good =
+        BgpCapability::LongLivedGracefulRestart(LongLivedGracefulRestartCapability::new(vec![
+            LongLivedGracefulRestartAddressFamily::new(true, AddressType::Ipv4Unicast, 0),
+        ]));
+
+    // An empty capability is legal: it advertises LLGR for no address family.
+    let empty_wire = [0x47, 0x00];
+    let empty =
+        BgpCapability::LongLivedGracefulRestart(LongLivedGracefulRestartCapability::new(vec![]));
+
+    // Two families, forwarding state preserved only for the second, and a
+    // stale time that exercises the full 24-bit field.
+    let multi_wire = [
+        0x47, 0x0e, 0x00, 0x01, 0x01, 0x00, 0x00, 0x0e, 0x10, 0x00, 0x02, 0x01, 0x80, 0xff, 0xff,
+        0xff,
+    ];
+    let multi =
+        BgpCapability::LongLivedGracefulRestart(LongLivedGracefulRestartCapability::new(vec![
+            LongLivedGracefulRestartAddressFamily::new(false, AddressType::Ipv4Unicast, 3600),
+            LongLivedGracefulRestartAddressFamily::new(
+                true,
+                AddressType::Ipv6Unicast,
+                LongLivedGracefulRestartAddressFamily::MAX_STALE_TIME,
+            ),
+        ]));
+
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&empty_wire, &empty);
+    test_parsed_completely_bytes_reader(&multi_wire, &multi);
+    test_write(&good, &good_wire)?;
+    test_write(&empty, &empty_wire)?;
+    test_write(&multi, &multi_wire)?;
+    Ok(())
+}
+
+/// The reserved bits of the flags octet MUST be ignored on receipt (RFC 9494
+/// Section 4), so a peer setting them must not change how we decode.
+#[test]
+fn test_long_lived_graceful_restart_ignores_reserved_flag_bits() {
+    let reserved_bits_set = [0x47, 0x07, 0x00, 0x01, 0x01, 0xff, 0x00, 0x00, 0x2a];
+    let expected =
+        BgpCapability::LongLivedGracefulRestart(LongLivedGracefulRestartCapability::new(vec![
+            LongLivedGracefulRestartAddressFamily::new(true, AddressType::Ipv4Unicast, 42),
+        ]));
+    test_parsed_completely_bytes_reader(&reserved_bits_set, &expected);
+}
+
+/// The value is a whole number of 7-octet tuples; a length that is not a
+/// multiple of 7 is malformed rather than an unknown address family.
+#[test]
+fn test_long_lived_graceful_restart_bad_length() {
+    let bad_wire = [0x47, 0x05, 0x00, 0x01, 0x01, 0x80, 0x00];
+    let bad = BgpCapabilityParsingError::LongLivedGracefulRestartCapabilityError(
+        LongLivedGracefulRestartCapabilityParsingError::InvalidLength {
+            offset: 1,
+            length: 5,
+        },
+    );
+    test_parse_error_bytes_reader::<BgpCapability, BgpCapabilityParsingError>(&bad_wire, &bad);
+}

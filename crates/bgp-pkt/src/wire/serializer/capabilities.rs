@@ -37,6 +37,9 @@ pub enum BGPCapabilityWritingError {
     #[error("in graceful restart capability: {0}")]
     GracefulRestartCapabilityError(#[from] GracefulRestartCapabilityWritingError),
 
+    #[error("in long-lived graceful restart capability: {0}")]
+    LongLivedGracefulRestartCapabilityError(#[from] LongLivedGracefulRestartCapabilityWritingError),
+
     #[error("in add path capability: {0}")]
     AddPathCapabilityError(#[from] AddPathCapabilityWritingError),
 
@@ -66,6 +69,7 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
             Self::FourOctetAs(value) => value.len(),
             // GracefulRestartCapability carries n length field, so need to account for it here
             Self::GracefulRestartCapability(value) => value.len() - 2,
+            Self::LongLivedGracefulRestart(value) => value.len(),
             Self::AddPath(value) => value.len(),
             // ExtendedNextHopEncoding carries n length field, so need to account for it here
             Self::ExtendedNextHopEncoding(value) => value.len() - 1,
@@ -114,6 +118,11 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
                 value.write(writer)?;
             }
             Self::GracefulRestartCapability(value) => {
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[len])?;
+                value.write(writer)?;
+            }
+            Self::LongLivedGracefulRestart(value) => {
                 writer.write_all(&[self.code().unwrap().into()])?;
                 writer.write_all(&[len])?;
                 value.write(writer)?;
@@ -224,6 +233,62 @@ impl WritablePdu<GracefulRestartCapabilityWritingError> for GracefulRestartCapab
         for value in self.address_families() {
             value.write(writer)?;
         }
+        Ok(())
+    }
+}
+
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
+pub enum LongLivedGracefulRestartCapabilityWritingError {
+    #[error("IO error while writing long-lived graceful restart capability: {0}")]
+    StdIOError(Box<str>),
+}
+impl_from_io_error!(LongLivedGracefulRestartCapabilityWritingError);
+
+impl WritablePdu<LongLivedGracefulRestartCapabilityWritingError>
+    for LongLivedGracefulRestartCapability
+{
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self
+                .address_families()
+                .iter()
+                .map(|x| x.len())
+                .sum::<usize>()
+    }
+
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), LongLivedGracefulRestartCapabilityWritingError> {
+        for value in self.address_families() {
+            value.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl WritablePdu<LongLivedGracefulRestartCapabilityWritingError>
+    for LongLivedGracefulRestartAddressFamily
+{
+    /// 2-octet AFI, 1-octet SAFI, 1-octet flags, and 3-octet stale time
+    const BASE_LENGTH: usize = 7;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), LongLivedGracefulRestartCapabilityWritingError> {
+        writer.write_all(&u16::from(self.address_type().address_family()).to_be_bytes())?;
+        writer.write_all(&[self.address_type().subsequent_address_family().into()])?;
+        // Only the most significant `F` bit is defined, the rest MUST be zero
+        writer.write_all(&[if self.forwarding_state() { 0x80 } else { 0x00 }])?;
+        // The stale time is carried in the low 24 bits
+        writer.write_all(&self.stale_time().to_be_bytes()[1..])?;
         Ok(())
     }
 }

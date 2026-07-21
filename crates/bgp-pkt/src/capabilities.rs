@@ -56,6 +56,9 @@ pub enum BgpCapability {
     /// and [RFC8538](https://datatracker.ietf.org/doc/html/rfc8538)
     GracefulRestartCapability(GracefulRestartCapability),
 
+    /// Defined in [RFC9494](https://datatracker.ietf.org/doc/html/rfc9494)
+    LongLivedGracefulRestart(LongLivedGracefulRestartCapability),
+
     /// Defined in [RFC7911](https://datatracker.ietf.org/doc/html/rfc7911)
     AddPath(AddPathCapability),
 
@@ -91,6 +94,9 @@ impl BgpCapability {
             Self::EnhancedRouteRefresh => Ok(BgpCapabilityCode::EnhancedRouteRefresh),
             Self::CiscoRouteRefresh => Ok(BgpCapabilityCode::CiscoRouteRefresh),
             Self::GracefulRestartCapability(_) => Ok(BgpCapabilityCode::GracefulRestartCapability),
+            Self::LongLivedGracefulRestart(_) => {
+                Ok(BgpCapabilityCode::LongLivedGracefulRestartLLGRCapability)
+            }
             Self::AddPath(_) => Ok(BgpCapabilityCode::AddPathCapability),
             Self::ExtendedMessage => Ok(BgpCapabilityCode::BgpExtendedMessage),
             Self::MultipleLabels(_) => Ok(BgpCapabilityCode::MultipleLabelsCapability),
@@ -318,6 +324,86 @@ impl GracefulRestartCapability {
 pub struct GracefulRestartAddressFamily {
     forwarding_state: bool,
     address_type: AddressType,
+}
+
+/// Long-Lived Graceful Restart (LLGR) Capability
+///
+/// ```text
+/// +--------------------------------------------------+
+/// | Address Family Identifier (16 bits)              |
+/// +--------------------------------------------------+
+/// | Subsequent Address Family Identifier (8 bits)    |
+/// +--------------------------------------------------+
+/// | Flags for Address Family (8 bits)                |
+/// +--------------------------------------------------+
+/// | Long-lived Stale Time (24 bits)                  |
+/// +--------------------------------------------------+
+/// | ...                                              |
+/// +--------------------------------------------------+
+/// ```
+///
+/// The capability value is a sequence of the tuples above, one per address
+/// family, each 7 octets wide.
+///
+/// Defined in [RFC9494](https://datatracker.ietf.org/doc/html/rfc9494)
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct LongLivedGracefulRestartCapability {
+    address_families: Vec<LongLivedGracefulRestartAddressFamily>,
+}
+
+impl LongLivedGracefulRestartCapability {
+    pub const fn new(address_families: Vec<LongLivedGracefulRestartAddressFamily>) -> Self {
+        Self { address_families }
+    }
+
+    pub const fn address_families(&self) -> &Vec<LongLivedGracefulRestartAddressFamily> {
+        &self.address_families
+    }
+}
+
+/// One `<AFI, SAFI, Flags, Long-lived Stale Time>` tuple of the
+/// [`LongLivedGracefulRestartCapability`].
+///
+/// Defined in [RFC9494](https://datatracker.ietf.org/doc/html/rfc9494)
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct LongLivedGracefulRestartAddressFamily {
+    /// The `F` bit: the forwarding state for routes of this address family was
+    /// preserved across the previous BGP restart.
+    forwarding_state: bool,
+    address_type: AddressType,
+    /// Long-lived Stale Time in seconds. Carried on the wire in 24 bits, so
+    /// values above [`Self::MAX_STALE_TIME`] cannot be represented.
+    stale_time: u32,
+}
+
+impl LongLivedGracefulRestartAddressFamily {
+    /// The Long-lived Stale Time is a 24-bit field
+    pub const MAX_STALE_TIME: u32 = 0x00ff_ffff;
+
+    pub const fn new(forwarding_state: bool, address_type: AddressType, stale_time: u32) -> Self {
+        Self {
+            forwarding_state,
+            address_type,
+            stale_time,
+        }
+    }
+
+    pub const fn forwarding_state(&self) -> bool {
+        self.forwarding_state
+    }
+
+    pub const fn address_type(&self) -> AddressType {
+        self.address_type
+    }
+
+    /// Long-lived Stale Time in seconds
+    pub const fn stale_time(&self) -> u32 {
+        self.stale_time
+    }
 }
 
 impl GracefulRestartAddressFamily {
