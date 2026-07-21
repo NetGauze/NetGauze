@@ -41,7 +41,7 @@ use crate::wire::serializer::update::BgpUpdateMessageWritingError;
 /// Helper method to round up the number of bytes based on a given length
 #[inline]
 pub(crate) fn round_len(len: u8) -> u8 {
-    (len as f32 / 8.0).ceil() as u8
+    len.div_ceil(8)
 }
 
 #[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
