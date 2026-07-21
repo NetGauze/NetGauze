@@ -94,10 +94,9 @@ impl WritablePdu<BgpSidAttributeWritingError> for BgpSidAttribute {
                     subtlv.write(writer)?;
                 }
             }
-            BgpSidAttribute::Unknown { code, value } => {
-                writer.write_u8(*code)?;
-                writer.write_all(value)?;
-            }
+            // `code` is already emitted as the TLV type by the header above, so only
+            // the raw value belongs here (same as the sub-TLV and sub-sub-TLV cases).
+            BgpSidAttribute::Unknown { value, .. } => writer.write_all(value)?,
         }
         Ok(())
     }
