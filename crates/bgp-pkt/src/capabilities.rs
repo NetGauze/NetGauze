@@ -59,6 +59,9 @@ pub enum BgpCapability {
     /// Defined in [RFC9494](https://datatracker.ietf.org/doc/html/rfc9494)
     LongLivedGracefulRestart(LongLivedGracefulRestartCapability),
 
+    /// Defined in [draft-walton-bgp-hostname-capability](https://datatracker.ietf.org/doc/html/draft-walton-bgp-hostname-capability-01)
+    Fqdn(FqdnCapability),
+
     /// Defined in [RFC7911](https://datatracker.ietf.org/doc/html/rfc7911)
     AddPath(AddPathCapability),
 
@@ -97,6 +100,7 @@ impl BgpCapability {
             Self::LongLivedGracefulRestart(_) => {
                 Ok(BgpCapabilityCode::LongLivedGracefulRestartLLGRCapability)
             }
+            Self::Fqdn(_) => Ok(BgpCapabilityCode::FQDN),
             Self::AddPath(_) => Ok(BgpCapabilityCode::AddPathCapability),
             Self::ExtendedMessage => Ok(BgpCapabilityCode::BgpExtendedMessage),
             Self::MultipleLabels(_) => Ok(BgpCapabilityCode::MultipleLabelsCapability),
@@ -403,6 +407,61 @@ impl LongLivedGracefulRestartAddressFamily {
     /// Long-lived Stale Time in seconds
     pub const fn stale_time(&self) -> u32 {
         self.stale_time
+    }
+}
+
+/// Fully Qualified Domain Name (FQDN) Capability
+///
+/// Advertises the hostname and domain name of the BGP speaker, which is
+/// primarily an operational aid: it lets a peer or a monitoring station label
+/// a session with a human-readable name rather than just an IP address.
+///
+/// ```text
+/// +--------------------------------+
+/// |  Hostname Length (1 octet)     |
+/// +--------------------------------+
+/// |  Hostname (variable)           |
+/// +--------------------------------+
+/// |  Domain Name Length (1 octet)  |
+/// +--------------------------------+
+/// |  Domain Name (variable)        |
+/// +--------------------------------+
+/// ```
+///
+/// Both fields are UTF-8 and both length fields are a single octet, so neither
+/// string can exceed [`Self::MAX_NAME_LEN`] bytes. Speakers that have no domain
+/// name configured advertise a zero-length domain name rather than omitting the
+/// field.
+///
+/// Defined in [draft-walton-bgp-hostname-capability](https://datatracker.ietf.org/doc/html/draft-walton-bgp-hostname-capability-01).
+/// This is an individual draft rather than a published RFC, but it is widely
+/// implemented (FRRouting, Cisco, and others advertise it by default).
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct FqdnCapability {
+    hostname: String,
+    domain_name: String,
+}
+
+impl FqdnCapability {
+    /// Both lengths are carried in a single octet
+    pub const MAX_NAME_LEN: usize = u8::MAX as usize;
+
+    pub const fn new(hostname: String, domain_name: String) -> Self {
+        Self {
+            hostname,
+            domain_name,
+        }
+    }
+
+    pub fn hostname(&self) -> &str {
+        &self.hostname
+    }
+
+    /// The domain name, empty when the speaker did not advertise one
+    pub fn domain_name(&self) -> &str {
+        &self.domain_name
     }
 }
 

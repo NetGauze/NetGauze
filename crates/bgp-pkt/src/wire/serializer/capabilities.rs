@@ -40,6 +40,9 @@ pub enum BGPCapabilityWritingError {
     #[error("in long-lived graceful restart capability: {0}")]
     LongLivedGracefulRestartCapabilityError(#[from] LongLivedGracefulRestartCapabilityWritingError),
 
+    #[error("in FQDN capability: {0}")]
+    FqdnCapabilityError(#[from] FqdnCapabilityWritingError),
+
     #[error("in add path capability: {0}")]
     AddPathCapabilityError(#[from] AddPathCapabilityWritingError),
 
@@ -70,6 +73,7 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
             // GracefulRestartCapability carries n length field, so need to account for it here
             Self::GracefulRestartCapability(value) => value.len() - 2,
             Self::LongLivedGracefulRestart(value) => value.len(),
+            Self::Fqdn(value) => value.len(),
             Self::AddPath(value) => value.len(),
             // ExtendedNextHopEncoding carries n length field, so need to account for it here
             Self::ExtendedNextHopEncoding(value) => value.len() - 1,
@@ -84,61 +88,70 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BGPCapabilityWritingError> {
         let len = (self.len() - Self::BASE_LENGTH) as u8;
+        let code: u8 = match self.code() {
+            Ok(code) => code.into(),
+            Err(code) => code,
+        };
         match self {
             Self::MultiProtocolExtensions(value) => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 writer.write_all(&[value.len() as u8])?;
                 value.write(writer)?;
             }
             Self::RouteRefresh => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 writer.write_all(&[len])?;
             }
             Self::EnhancedRouteRefresh => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 writer.write_all(&[len])?;
             }
             Self::CiscoRouteRefresh => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 writer.write_all(&[len])?;
             }
             Self::ExtendedMessage => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 writer.write_all(&[len])?;
             }
             Self::MultipleLabels(value) => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 for addr in value {
                     addr.write(writer)?;
                 }
             }
             Self::BgpRole(value) => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 writer.write_all(&[len])?;
                 value.write(writer)?;
             }
             Self::GracefulRestartCapability(value) => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 writer.write_all(&[len])?;
                 value.write(writer)?;
             }
             Self::LongLivedGracefulRestart(value) => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
+                writer.write_all(&[len])?;
+                value.write(writer)?;
+            }
+            Self::Fqdn(value) => {
+                writer.write_all(&[code])?;
                 writer.write_all(&[len])?;
                 value.write(writer)?;
             }
             Self::AddPath(value) => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 writer.write_all(&[len])?;
                 value.write(writer)?;
             }
             Self::FourOctetAs(value) => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 writer.write_all(&[value.len() as u8])?;
                 value.write(writer)?;
             }
             Self::ExtendedNextHopEncoding(value) => {
-                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[code])?;
                 value.write(writer)?;
             }
             Self::Experimental(value) => {
@@ -289,6 +302,45 @@ impl WritablePdu<LongLivedGracefulRestartCapabilityWritingError>
         writer.write_all(&[if self.forwarding_state() { 0x80 } else { 0x00 }])?;
         // The stale time is carried in the low 24 bits
         writer.write_all(&self.stale_time().to_be_bytes()[1..])?;
+        Ok(())
+    }
+}
+
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
+pub enum FqdnCapabilityWritingError {
+    #[error("IO error while writing FQDN capability: {0}")]
+    StdIOError(Box<str>),
+
+    #[error(
+        "{field} is {length} bytes, exceeding the maximum of {} that the 1-octet length field can carry",
+        FqdnCapability::MAX_NAME_LEN
+    )]
+    NameTooLong { field: &'static str, length: usize },
+}
+impl_from_io_error!(FqdnCapabilityWritingError);
+
+impl WritablePdu<FqdnCapabilityWritingError> for FqdnCapability {
+    /// 1-octet hostname length and 1-octet domain name length
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.hostname().len() + self.domain_name().len()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), FqdnCapabilityWritingError> {
+        for (field, value) in [
+            ("hostname", self.hostname()),
+            ("domain name", self.domain_name()),
+        ] {
+            if value.len() > FqdnCapability::MAX_NAME_LEN {
+                return Err(FqdnCapabilityWritingError::NameTooLong {
+                    field,
+                    length: value.len(),
+                });
+            }
+            writer.write_all(&[value.len() as u8])?;
+            writer.write_all(value.as_bytes())?;
+        }
         Ok(())
     }
 }

@@ -455,3 +455,56 @@ fn test_long_lived_graceful_restart_bad_length() {
     );
     test_parse_error_bytes_reader::<BgpCapability, BgpCapabilityParsingError>(&bad_wire, &bad);
 }
+
+/// FQDN / hostname capability,
+/// [draft-walton-bgp-hostname-capability](https://datatracker.ietf.org/doc/html/draft-walton-bgp-hostname-capability-01)
+///
+/// `good_wire` is taken verbatim off the wire from FRRouting 10.8: capability
+/// code 73, length 4, hostname "r1", and a zero-length domain name.
+#[test]
+fn test_fqdn_capability() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [0x49, 0x04, 0x02, 0x72, 0x31, 0x00];
+    let good = BgpCapability::Fqdn(FqdnCapability::new("r1".into(), String::new()));
+
+    // Both names populated
+    let with_domain_wire = [
+        0x49, 0x10, 0x03, 0x72, 0x74, 0x72, 0x0b, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2e,
+        0x63, 0x6f, 0x6d,
+    ];
+    let with_domain = BgpCapability::Fqdn(FqdnCapability::new("rtr".into(), "example.com".into()));
+
+    // Both names empty is legal: two zero-length fields
+    let empty_wire = [0x49, 0x02, 0x00, 0x00];
+    let empty = BgpCapability::Fqdn(FqdnCapability::new(String::new(), String::new()));
+
+    // The draft specifies UTF-8, so non-ASCII names must round-trip
+    let utf8_wire = [
+        0x49, 0x0a, 0x05, 0x72, 0xc3, 0xb6, 0x75, 0x74, 0x03, 0x6e, 0x65, 0x74,
+    ];
+    let utf8 = BgpCapability::Fqdn(FqdnCapability::new("röut".into(), "net".into()));
+
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&with_domain_wire, &with_domain);
+    test_parsed_completely_bytes_reader(&empty_wire, &empty);
+    test_parsed_completely_bytes_reader(&utf8_wire, &utf8);
+    test_write(&good, &good_wire)?;
+    test_write(&with_domain, &with_domain_wire)?;
+    test_write(&empty, &empty_wire)?;
+    test_write(&utf8, &utf8_wire)?;
+    Ok(())
+}
+
+/// A name that is not valid UTF-8 must be reported rather than silently
+/// replaced, since the value is operator-facing.
+#[test]
+fn test_fqdn_capability_invalid_utf8() {
+    // 0xff is not a valid UTF-8 byte
+    let bad_wire = [0x49, 0x04, 0x02, 0x72, 0xff, 0x00];
+    let bad =
+        BgpCapabilityParsingError::FqdnCapabilityError(FqdnCapabilityParsingError::InvalidUtf8 {
+            offset: 3,
+            field: "hostname".to_string(),
+            error: "invalid utf-8 sequence of 1 bytes from index 1".to_string(),
+        });
+    test_parse_error_bytes_reader::<BgpCapability, BgpCapabilityParsingError>(&bad_wire, &bad);
+}
