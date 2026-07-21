@@ -22,6 +22,44 @@ pub mod reader;
 pub mod test_helpers;
 pub mod traits;
 
+/// Generates `From<std::io::Error>` for one or more serializer error enums.
+///
+/// Serializer errors store the IO failure as a string rather than a
+/// [`std::io::Error`], because they derive `Eq`/`PartialEq`/`Clone` (the
+/// `test_write*` helpers require `E: Eq`) and `std::io::Error` implements none
+/// of those. That lossy conversion is why `thiserror`'s `#[from]` cannot be
+/// used here: it requires the variant field to *be* the source error type.
+///
+/// Each enum is expected to carry a `StdIOError` variant holding anything
+/// convertible from [`String`] — [`Box<str>`] is preferred, since it is 8 bytes
+/// smaller and these errors sit in the `Result` of every write call. Pass
+/// `Type => Variant` explicitly if the variant is spelled differently.
+///
+/// ```
+/// # use netgauze_parse_utils::impl_from_io_error;
+/// #[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
+/// pub enum MyWritingError {
+///     #[error("IO error while writing: {0}")]
+///     StdIOError(Box<str>),
+/// }
+/// impl_from_io_error!(MyWritingError);
+/// ```
+#[macro_export]
+macro_rules! impl_from_io_error {
+    ($($ty:ty),+ $(,)?) => {
+        $( $crate::impl_from_io_error!($ty => StdIOError); )+
+    };
+    ($ty:ty => $variant:ident) => {
+        #[automatically_derived]
+        impl From<std::io::Error> for $ty {
+            fn from(err: std::io::Error) -> Self {
+                // `.into()` so the variant can hold `Box<str>` or `String`
+                <$ty>::$variant(err.to_string().into())
+            }
+        }
+    };
+}
+
 use netgauze_locate::BinarySpan;
 use nom::IResult;
 use std::fmt::Debug;
