@@ -407,16 +407,16 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
                 false,
                 false,
                 true,
-                PathAttributeValue::BgpLs(BgpLsAttribute {
-                    attributes: vec![BgpLsAttributeValue::NodeFlagBits {
+                PathAttributeValue::BgpLs(BgpLsAttribute::new(vec![
+                    BgpLsAttributeValue::NodeFlagBits {
                         overload: false,
                         attached: false,
                         external: false,
                         abr: false,
                         router: false,
                         v6: false,
-                    }],
-                }),
+                    },
+                ])),
             )
             .unwrap(),
             PathAttribute::from(
@@ -427,70 +427,56 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
                 PathAttributeValue::MpReach(MpReach::BgpLs {
                     next_hop: IpAddr::from_str("100.100.100.1").unwrap(),
                     nlri: vec![
-                        BgpLsNlri {
-                            path_id: None,
-                            value: BgpLsNlriValue::Node(BgpLsNlriNode {
-                                protocol_id: BgpLsProtocolId::OspfV2,
-                                identifier: 0,
-                                local_node_descriptors: BgpLsLocalNodeDescriptors(
-                                    BgpLsNodeDescriptors(vec![
-                                        BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
-                                        BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
-                                        BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![
-                                            100, 100, 100, 1,
-                                        ]),
+                        BgpLsNlri::new(
+                            None,
+                            BgpLsNlriValue::Node(BgpLsNlriNode::new(
+                                BgpLsProtocolId::OspfV2,
+                                0,
+                                BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
+                                    BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
+                                    BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
+                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![100, 100, 100, 1]),
+                                ])),
+                            )),
+                        ),
+                        BgpLsNlri::new(
+                            None,
+                            BgpLsNlriValue::Node(BgpLsNlriNode::new(
+                                BgpLsProtocolId::OspfV2,
+                                0,
+                                BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
+                                    BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
+                                    BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
+                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![100, 100, 100, 2]),
+                                ])),
+                            )),
+                        ),
+                        BgpLsNlri::new(
+                            None,
+                            BgpLsNlriValue::Node(BgpLsNlriNode::new(
+                                BgpLsProtocolId::OspfV2,
+                                0,
+                                BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
+                                    BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
+                                    BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
+                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![100, 100, 100, 3]),
+                                ])),
+                            )),
+                        ),
+                        BgpLsNlri::new(
+                            None,
+                            BgpLsNlriValue::Node(BgpLsNlriNode::new(
+                                BgpLsProtocolId::OspfV2,
+                                0,
+                                BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
+                                    BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
+                                    BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
+                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![
+                                        100, 100, 100, 255,
                                     ]),
-                                ),
-                            }),
-                        },
-                        BgpLsNlri {
-                            path_id: None,
-                            value: BgpLsNlriValue::Node(BgpLsNlriNode {
-                                protocol_id: BgpLsProtocolId::OspfV2,
-                                identifier: 0,
-                                local_node_descriptors: BgpLsLocalNodeDescriptors(
-                                    BgpLsNodeDescriptors(vec![
-                                        BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
-                                        BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
-                                        BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![
-                                            100, 100, 100, 2,
-                                        ]),
-                                    ]),
-                                ),
-                            }),
-                        },
-                        BgpLsNlri {
-                            path_id: None,
-                            value: BgpLsNlriValue::Node(BgpLsNlriNode {
-                                protocol_id: BgpLsProtocolId::OspfV2,
-                                identifier: 0,
-                                local_node_descriptors: BgpLsLocalNodeDescriptors(
-                                    BgpLsNodeDescriptors(vec![
-                                        BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
-                                        BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
-                                        BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![
-                                            100, 100, 100, 3,
-                                        ]),
-                                    ]),
-                                ),
-                            }),
-                        },
-                        BgpLsNlri {
-                            path_id: None,
-                            value: BgpLsNlriValue::Node(BgpLsNlriNode {
-                                protocol_id: BgpLsProtocolId::OspfV2,
-                                identifier: 0,
-                                local_node_descriptors: BgpLsLocalNodeDescriptors(
-                                    BgpLsNodeDescriptors(vec![
-                                        BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
-                                        BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
-                                        BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![
-                                            100, 100, 100, 255,
-                                        ]),
-                                    ]),
-                                ),
-                            }),
-                        },
+                                ])),
+                            )),
+                        ),
                     ],
                 }),
             )

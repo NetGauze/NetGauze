@@ -54,7 +54,7 @@ impl WritablePduWithOneInput<bool, BgpLsAttributeWritingError> for BgpLsAttribut
         let len = Self::BASE_LENGTH;
 
         len + usize::from(extended_length)
-            + self.attributes.iter().map(|tlv| tlv.len()).sum::<usize>()
+            + self.attributes().iter().map(|tlv| tlv.len()).sum::<usize>()
     }
 
     fn write<T: Write>(
@@ -64,7 +64,7 @@ impl WritablePduWithOneInput<bool, BgpLsAttributeWritingError> for BgpLsAttribut
     ) -> Result<(), BgpLsAttributeWritingError> {
         write_length(self, extended_length, writer)?;
 
-        for tlv in &self.attributes {
+        for tlv in self.attributes() {
             tlv.write(writer)?;
         }
 

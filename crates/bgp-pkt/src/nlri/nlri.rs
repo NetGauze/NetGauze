@@ -659,17 +659,47 @@ impl NlriAddressType for Ipv6MulticastAddress {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct EthernetSegmentIdentifier(pub [u8; 10]);
+pub struct EthernetSegmentIdentifier([u8; 10]);
+
+impl EthernetSegmentIdentifier {
+    pub const fn new(value: [u8; 10]) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(&self) -> &[u8; 10] {
+        &self.0
+    }
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct EthernetTag(pub u32);
+pub struct EthernetTag(u32);
+
+impl EthernetTag {
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(&self) -> u32 {
+        self.0
+    }
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct MacAddress(pub [u8; 6]);
+pub struct MacAddress([u8; 6]);
+
+impl MacAddress {
+    pub const fn new(value: [u8; 6]) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(&self) -> &[u8; 6] {
+        &self.0
+    }
+}
 
 impl std::fmt::Display for MacAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

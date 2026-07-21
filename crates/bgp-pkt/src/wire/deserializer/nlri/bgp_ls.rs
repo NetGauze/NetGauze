@@ -106,7 +106,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsNlri {
         let nlri_len = cur.read_u16_be()?;
         let mut data = cur.take_slice(nlri_len as usize)?;
         let value = BgpLsNlriValue::parse(&mut data, nlri_type)?;
-        Ok(BgpLsNlri { path_id, value })
+        Ok(BgpLsNlri::new(path_id, value))
     }
 }
 
@@ -130,7 +130,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsVpnNlri {
         let mut data = cur.take_slice(nlri_len as usize)?;
         let rd = RouteDistinguisher::parse(&mut data)?;
         let value = BgpLsNlriValue::parse(&mut data, nlri_type)?;
-        Ok(BgpLsVpnNlri { path_id, rd, value })
+        Ok(BgpLsVpnNlri::new(path_id, rd, value))
     }
 }
 
@@ -188,13 +188,13 @@ impl<'a> ParseFrom<'a> for BgpLsNlriLink {
             link_descriptors.push(link_descriptor);
         }
 
-        Ok(BgpLsNlriLink {
+        Ok(BgpLsNlriLink::new(
             protocol_id,
             identifier,
             local_node_descriptors,
             remote_node_descriptors,
             link_descriptors,
-        })
+        ))
     }
 }
 
@@ -266,11 +266,11 @@ impl<'a> ParseFrom<'a> for BgpLsNlriNode {
         let identifier = cur.read_u64_be()?;
         let local_node_descriptors = BgpLsLocalNodeDescriptors::parse(cur)?;
 
-        Ok(BgpLsNlriNode {
+        Ok(BgpLsNlriNode::new(
             protocol_id,
             identifier,
             local_node_descriptors,
-        })
+        ))
     }
 }
 
@@ -278,7 +278,7 @@ impl<'a> ParseFrom<'a> for BgpLsLocalNodeDescriptors {
     type Error = BgpLsNlriParsingError;
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let value = BgpLsNodeDescriptors::parse(cur, BgpLsNodeDescriptorType::LocalNodeDescriptor)?;
-        Ok(BgpLsLocalNodeDescriptors(value))
+        Ok(BgpLsLocalNodeDescriptors::new(value))
     }
 }
 
@@ -287,7 +287,7 @@ impl<'a> ParseFrom<'a> for BgpLsRemoteNodeDescriptors {
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let value =
             BgpLsNodeDescriptors::parse(cur, BgpLsNodeDescriptorType::RemoteNodeDescriptor)?;
-        Ok(BgpLsRemoteNodeDescriptors(value))
+        Ok(BgpLsRemoteNodeDescriptors::new(value))
     }
 }
 
@@ -323,7 +323,7 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNodeDescriptorType> for BgpLsNodeDescrip
             subtlvs.push(subtlv);
         }
 
-        Ok(BgpLsNodeDescriptors(subtlvs))
+        Ok(BgpLsNodeDescriptors::new(subtlvs))
     }
 }
 
@@ -397,12 +397,12 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for BgpLsNlriIpPrefix {
             prefix_descriptors.push(descriptor);
         }
 
-        Ok(BgpLsNlriIpPrefix {
+        Ok(BgpLsNlriIpPrefix::new(
             protocol_id,
             identifier,
             local_node_descriptors,
             prefix_descriptors,
-        })
+        ))
     }
 }
 
@@ -465,7 +465,7 @@ impl<'a> ParseFrom<'a> for MultiTopologyIdData {
             let id = MultiTopologyId::from(cur.read_u16_be()?);
             ids.push(id);
         }
-        Ok(MultiTopologyIdData(ids))
+        Ok(MultiTopologyIdData::new(ids))
     }
 }
 
@@ -502,11 +502,11 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for IpReachabilityInformationD
         match nlri_type {
             BgpLsNlriType::Ipv4TopologyPrefix => {
                 let ipv4 = <Ipv4Net as ParseFrom>::parse(cur)?;
-                Ok(IpReachabilityInformationData(IpNet::V4(ipv4)))
+                Ok(IpReachabilityInformationData::new(IpNet::V4(ipv4)))
             }
             BgpLsNlriType::Ipv6TopologyPrefix => {
                 let ipv6 = <Ipv6Net as ParseFrom>::parse(cur)?;
-                Ok(IpReachabilityInformationData(IpNet::V6(ipv6)))
+                Ok(IpReachabilityInformationData::new(IpNet::V6(ipv6)))
             }
             BgpLsNlriType::Node
             | BgpLsNlriType::Link

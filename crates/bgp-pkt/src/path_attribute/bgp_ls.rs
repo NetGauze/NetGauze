@@ -26,7 +26,17 @@ use strum_macros::{Display, FromRepr};
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsAttribute {
-    pub attributes: Vec<BgpLsAttributeValue>,
+    attributes: Vec<BgpLsAttributeValue>,
+}
+
+impl BgpLsAttribute {
+    pub const fn new(attributes: Vec<BgpLsAttributeValue>) -> Self {
+        Self { attributes }
+    }
+
+    pub fn attributes(&self) -> &[BgpLsAttributeValue] {
+        &self.attributes
+    }
 }
 
 impl PathAttributeValueProperties for BgpLsAttribute {

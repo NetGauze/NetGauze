@@ -122,7 +122,7 @@ fn test_evpn_extended_community() -> Result<(), EvpnExtendedCommunityWritingErro
     };
 
     let good_router_mac = EvpnExtendedCommunity::EvpnRoutersMac {
-        mac: MacAddress([0xaa, 0xbb, 0xcc, 0x00, 0x00, 0xc8]),
+        mac: MacAddress::new([0xaa, 0xbb, 0xcc, 0x00, 0x00, 0xc8]),
     };
     let good_l2_attribute = EvpnExtendedCommunity::EvpnL2Attribute {
         control_flags: 2,

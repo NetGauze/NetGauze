@@ -21,8 +21,25 @@ use strum_macros::Display;
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SegmentRoutingGlobalBlock {
-    pub first_label: MplsLabel,
-    pub range_size: [u8; 3],
+    first_label: MplsLabel,
+    range_size: [u8; 3],
+}
+
+impl SegmentRoutingGlobalBlock {
+    pub const fn new(first_label: MplsLabel, range_size: [u8; 3]) -> Self {
+        Self {
+            first_label,
+            range_size,
+        }
+    }
+
+    pub const fn first_label(&self) -> &MplsLabel {
+        &self.first_label
+    }
+
+    pub const fn range_size(&self) -> &[u8; 3] {
+        &self.range_size
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

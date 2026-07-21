@@ -41,11 +41,15 @@ use strum_macros::{Display, FromRepr};
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsNlri {
-    pub path_id: Option<u32>,
-    pub value: BgpLsNlriValue,
+    path_id: Option<u32>,
+    value: BgpLsNlriValue,
 }
 
 impl BgpLsNlri {
+    pub const fn new(path_id: Option<u32>, value: BgpLsNlriValue) -> Self {
+        Self { path_id, value }
+    }
+
     pub fn nlri(&self) -> &BgpLsNlriValue {
         &self.value
     }
@@ -74,12 +78,16 @@ impl BgpLsNlri {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsVpnNlri {
-    pub path_id: Option<u32>,
-    pub rd: RouteDistinguisher,
-    pub value: BgpLsNlriValue,
+    path_id: Option<u32>,
+    rd: RouteDistinguisher,
+    value: BgpLsNlriValue,
 }
 
 impl BgpLsVpnNlri {
+    pub const fn new(path_id: Option<u32>, rd: RouteDistinguisher, value: BgpLsNlriValue) -> Self {
+        Self { path_id, rd, value }
+    }
+
     pub fn nlri(&self) -> &BgpLsNlriValue {
         &self.value
     }
@@ -218,10 +226,42 @@ impl BgpLsNlriValue {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsNlriIpPrefix {
-    pub protocol_id: BgpLsProtocolId,
-    pub identifier: u64,
-    pub local_node_descriptors: BgpLsLocalNodeDescriptors,
-    pub prefix_descriptors: Vec<BgpLsPrefixDescriptor>,
+    protocol_id: BgpLsProtocolId,
+    identifier: u64,
+    local_node_descriptors: BgpLsLocalNodeDescriptors,
+    prefix_descriptors: Vec<BgpLsPrefixDescriptor>,
+}
+
+impl BgpLsNlriIpPrefix {
+    pub const fn new(
+        protocol_id: BgpLsProtocolId,
+        identifier: u64,
+        local_node_descriptors: BgpLsLocalNodeDescriptors,
+        prefix_descriptors: Vec<BgpLsPrefixDescriptor>,
+    ) -> Self {
+        Self {
+            protocol_id,
+            identifier,
+            local_node_descriptors,
+            prefix_descriptors,
+        }
+    }
+
+    pub const fn protocol_id(&self) -> BgpLsProtocolId {
+        self.protocol_id
+    }
+
+    pub const fn identifier(&self) -> u64 {
+        self.identifier
+    }
+
+    pub const fn local_node_descriptors(&self) -> &BgpLsLocalNodeDescriptors {
+        &self.local_node_descriptors
+    }
+
+    pub fn prefix_descriptors(&self) -> &[BgpLsPrefixDescriptor] {
+        &self.prefix_descriptors
+    }
 }
 
 #[repr(u8)]
@@ -311,10 +351,14 @@ pub enum IgpFlags {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct IpReachabilityInformationData(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipnet))] pub IpNet,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipnet))] IpNet,
 );
 
 impl IpReachabilityInformationData {
+    pub const fn new(address: IpNet) -> Self {
+        Self(address)
+    }
+
     /// Count of most significant bytes of the Prefix to send
     /// as described in [RFC7752 Section-3.2.3.2](https://datatracker.ietf.org/doc/html/rfc7752#section-3.2.3.2)
     pub fn most_significant_bytes(prefix_len: u8) -> usize {
@@ -433,9 +477,35 @@ impl BgpLsPrefixDescriptor {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsNlriNode {
-    pub protocol_id: BgpLsProtocolId,
-    pub identifier: u64,
-    pub local_node_descriptors: BgpLsLocalNodeDescriptors,
+    protocol_id: BgpLsProtocolId,
+    identifier: u64,
+    local_node_descriptors: BgpLsLocalNodeDescriptors,
+}
+
+impl BgpLsNlriNode {
+    pub const fn new(
+        protocol_id: BgpLsProtocolId,
+        identifier: u64,
+        local_node_descriptors: BgpLsLocalNodeDescriptors,
+    ) -> Self {
+        Self {
+            protocol_id,
+            identifier,
+            local_node_descriptors,
+        }
+    }
+
+    pub const fn protocol_id(&self) -> BgpLsProtocolId {
+        self.protocol_id
+    }
+
+    pub const fn identifier(&self) -> u64 {
+        self.identifier
+    }
+
+    pub const fn local_node_descriptors(&self) -> &BgpLsLocalNodeDescriptors {
+        &self.local_node_descriptors
+    }
 }
 
 /// ```text
@@ -452,7 +522,7 @@ pub struct BgpLsNlriNode {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct BgpLsNodeDescriptors(pub Vec<BgpLsNodeDescriptorSubTlv>);
+pub struct BgpLsNodeDescriptors(Vec<BgpLsNodeDescriptorSubTlv>);
 
 /// ```text
 ///  0                   1                   2                   3
@@ -468,7 +538,21 @@ pub struct BgpLsNodeDescriptors(pub Vec<BgpLsNodeDescriptorSubTlv>);
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct BgpLsLocalNodeDescriptors(pub BgpLsNodeDescriptors);
+pub struct BgpLsLocalNodeDescriptors(BgpLsNodeDescriptors);
+
+impl BgpLsLocalNodeDescriptors {
+    pub const fn new(descriptors: BgpLsNodeDescriptors) -> Self {
+        Self(descriptors)
+    }
+
+    pub const fn descriptors(&self) -> &BgpLsNodeDescriptors {
+        &self.0
+    }
+
+    pub fn subtlvs(&self) -> &[BgpLsNodeDescriptorSubTlv] {
+        self.0.subtlvs()
+    }
+}
 /// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -483,9 +567,27 @@ pub struct BgpLsLocalNodeDescriptors(pub BgpLsNodeDescriptors);
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct BgpLsRemoteNodeDescriptors(pub BgpLsNodeDescriptors);
+pub struct BgpLsRemoteNodeDescriptors(BgpLsNodeDescriptors);
+
+impl BgpLsRemoteNodeDescriptors {
+    pub const fn new(descriptors: BgpLsNodeDescriptors) -> Self {
+        Self(descriptors)
+    }
+
+    pub const fn descriptors(&self) -> &BgpLsNodeDescriptors {
+        &self.0
+    }
+
+    pub fn subtlvs(&self) -> &[BgpLsNodeDescriptorSubTlv] {
+        self.0.subtlvs()
+    }
+}
 
 impl BgpLsNodeDescriptors {
+    pub const fn new(subtlvs: Vec<BgpLsNodeDescriptorSubTlv>) -> Self {
+        Self(subtlvs)
+    }
+
     pub fn subtlvs(&self) -> &[BgpLsNodeDescriptorSubTlv] {
         &self.0
     }
@@ -641,11 +743,49 @@ impl BgpLsNodeDescriptorSubTlv {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsNlriLink {
-    pub protocol_id: BgpLsProtocolId,
-    pub identifier: u64,
-    pub local_node_descriptors: BgpLsLocalNodeDescriptors,
-    pub remote_node_descriptors: BgpLsRemoteNodeDescriptors,
-    pub link_descriptors: Vec<BgpLsLinkDescriptor>,
+    protocol_id: BgpLsProtocolId,
+    identifier: u64,
+    local_node_descriptors: BgpLsLocalNodeDescriptors,
+    remote_node_descriptors: BgpLsRemoteNodeDescriptors,
+    link_descriptors: Vec<BgpLsLinkDescriptor>,
+}
+
+impl BgpLsNlriLink {
+    pub const fn new(
+        protocol_id: BgpLsProtocolId,
+        identifier: u64,
+        local_node_descriptors: BgpLsLocalNodeDescriptors,
+        remote_node_descriptors: BgpLsRemoteNodeDescriptors,
+        link_descriptors: Vec<BgpLsLinkDescriptor>,
+    ) -> Self {
+        Self {
+            protocol_id,
+            identifier,
+            local_node_descriptors,
+            remote_node_descriptors,
+            link_descriptors,
+        }
+    }
+
+    pub const fn protocol_id(&self) -> BgpLsProtocolId {
+        self.protocol_id
+    }
+
+    pub const fn identifier(&self) -> u64 {
+        self.identifier
+    }
+
+    pub const fn local_node_descriptors(&self) -> &BgpLsLocalNodeDescriptors {
+        &self.local_node_descriptors
+    }
+
+    pub const fn remote_node_descriptors(&self) -> &BgpLsRemoteNodeDescriptors {
+        &self.remote_node_descriptors
+    }
+
+    pub fn link_descriptors(&self) -> &[BgpLsLinkDescriptor] {
+        &self.link_descriptors
+    }
 }
 
 /// ```text
@@ -668,7 +808,7 @@ pub struct BgpLsNlriLink {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct MultiTopologyIdData(pub Vec<MultiTopologyId>);
+pub struct MultiTopologyIdData(Vec<MultiTopologyId>);
 
 impl From<Vec<MultiTopologyId>> for MultiTopologyIdData {
     fn from(value: Vec<MultiTopologyId>) -> Self {
@@ -677,6 +817,14 @@ impl From<Vec<MultiTopologyId>> for MultiTopologyIdData {
 }
 
 impl MultiTopologyIdData {
+    pub const fn new(ids: Vec<MultiTopologyId>) -> Self {
+        Self(ids)
+    }
+
+    pub fn id(&self) -> &[MultiTopologyId] {
+        &self.0
+    }
+
     pub fn id_count(&self) -> usize {
         self.0.len()
     }
@@ -707,7 +855,7 @@ impl MultiTopologyIdData {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct MultiTopologyId(pub u16);
+pub struct MultiTopologyId(u16);
 
 impl MultiTopologyId {
     pub fn value(&self) -> u16 {
@@ -753,9 +901,13 @@ impl From<u16> for MultiTopologyId {
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct SharedRiskLinkGroupValue(pub u32);
+pub struct SharedRiskLinkGroupValue(u32);
 
 impl SharedRiskLinkGroupValue {
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
     pub fn value(&self) -> u32 {
         self.0
     }

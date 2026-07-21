@@ -279,10 +279,7 @@ impl<'a> ParseFrom<'a> for SegmentRoutingGlobalBlock {
         let first_label = MplsLabel::parse(cur)?;
         let range_size = cur.read_array()?;
 
-        Ok(SegmentRoutingGlobalBlock {
-            first_label,
-            range_size,
-        })
+        Ok(SegmentRoutingGlobalBlock::new(first_label, range_size))
     }
 }
 
