@@ -15,8 +15,7 @@
 
 use std::io::Write;
 
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 
 use crate::BgpOpenMessage;
 use crate::capabilities::BgpCapability;
@@ -24,11 +23,15 @@ use crate::iana::BgpOpenMessageParameterType;
 use crate::open::BgpOpenMessageParameter;
 use crate::wire::serializer::capabilities::BGPCapabilityWritingError;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpOpenMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP open message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in capability: {0}")]
     CapabilityError(#[from] BGPCapabilityWritingError),
 }
+impl_from_io_error!(BgpOpenMessageWritingError);
 
 impl WritablePdu<BgpOpenMessageWritingError> for BgpOpenMessage {
     /// Base length is 10 = 1 (bgp ver) + 2 (my as) + 2 (hold time) + 4 (bgp-id)

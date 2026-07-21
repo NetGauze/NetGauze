@@ -24,34 +24,75 @@ use crate::wire::serializer::community::*;
 use crate::wire::serializer::nlri::*;
 use crate::wire::serializer::path_attribute::BgpLsAttributeWritingError;
 use crate::wire::serializer::path_attribute::bgp_sid::SegmentIdentifierWritingError;
-use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput, impl_from_io_error};
 use std::net::IpAddr;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing path attribute: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in origin: {0}")]
     OriginError(#[from] OriginWritingError),
+
+    #[error("in AS path: {0}")]
     AsPathError(#[from] AsPathWritingError),
+
+    #[error("in next hop: {0}")]
     NextHopError(#[from] NextHopWritingError),
+
+    #[error("in multi exit discriminator: {0}")]
     MultiExitDiscriminatorError(#[from] MultiExitDiscriminatorWritingError),
+
+    #[error("in local preference: {0}")]
     LocalPreferenceError(#[from] LocalPreferenceWritingError),
+
+    #[error("in atomic aggregate: {0}")]
     AtomicAggregateError(#[from] AtomicAggregateWritingError),
+
+    #[error("in aggregator: {0}")]
     AggregatorError(#[from] AggregatorWritingError),
+
+    #[error("in communities: {0}")]
     CommunitiesError(#[from] CommunitiesWritingError),
+
+    #[error("in extended communities: {0}")]
     ExtendedCommunitiesError(#[from] ExtendedCommunitiesWritingError),
+
+    #[error("in extended communities IPv6: {0}")]
     ExtendedCommunitiesIpv6Error(#[from] ExtendedCommunitiesIpv6WritingError),
+
+    #[error("in large communities: {0}")]
     LargeCommunitiesError(#[from] LargeCommunitiesWritingError),
+
+    #[error("in originator: {0}")]
     OriginatorError(#[from] OriginatorWritingError),
+
+    #[error("in cluster list: {0}")]
     ClusterListError(#[from] ClusterListWritingError),
+
+    #[error("in MP reach: {0}")]
     MpReachError(#[from] MpReachWritingError),
+
+    #[error("in MP unreach: {0}")]
     MpUnreachError(#[from] MpUnreachWritingError),
+
+    #[error("in BGP-LS attribute: {0}")]
     BgpLsAttributeError(#[from] BgpLsAttributeWritingError),
+
+    #[error("in only to customer: {0}")]
     OnlyToCustomerError(#[from] OnlyToCustomerWritingError),
+
+    #[error("in AIGP: {0}")]
     AigpError(#[from] AigpWritingError),
+
+    #[error("in segment identifier: {0}")]
     SegmentIdentifierError(#[from] SegmentIdentifierWritingError),
+
+    #[error("in unknown attribute: {0}")]
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
 }
+impl_from_io_error!(PathAttributeWritingError);
 
 impl WritablePdu<PathAttributeWritingError> for PathAttribute {
     const BASE_LENGTH: usize = 2;
@@ -170,10 +211,12 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum OriginWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing origin: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(OriginWritingError);
 
 impl WritablePduWithOneInput<bool, OriginWritingError> for Origin {
     // One octet length (if extended is not enabled) and second for the origin value
@@ -198,10 +241,12 @@ impl WritablePduWithOneInput<bool, OriginWritingError> for Origin {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum AsPathWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing AS path: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(AsPathWritingError);
 
 impl WritablePdu<AsPathWritingError> for As2PathSegment {
     // one octet length + one more for segment type
@@ -306,10 +351,12 @@ impl WritablePduWithOneInput<bool, AsPathWritingError> for As4Path {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum NextHopWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing next hop: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(NextHopWritingError);
 
 impl WritablePduWithOneInput<bool, NextHopWritingError> for NextHop {
     // One octet length (if extended is not enabled) and 4 for ipv4
@@ -334,10 +381,12 @@ impl WritablePduWithOneInput<bool, NextHopWritingError> for NextHop {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MultiExitDiscriminatorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing multi exit discriminator: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(MultiExitDiscriminatorWritingError);
 
 impl WritablePduWithOneInput<bool, MultiExitDiscriminatorWritingError> for MultiExitDiscriminator {
     // One octet length (if extended is not enabled) and 4 for u32 metric
@@ -362,10 +411,12 @@ impl WritablePduWithOneInput<bool, MultiExitDiscriminatorWritingError> for Multi
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum LocalPreferenceWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing local preference: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(LocalPreferenceWritingError);
 
 impl WritablePduWithOneInput<bool, LocalPreferenceWritingError> for LocalPreference {
     // One octet length (if extended is not enabled) and 4 for u32 local pref
@@ -390,10 +441,12 @@ impl WritablePduWithOneInput<bool, LocalPreferenceWritingError> for LocalPrefere
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum AtomicAggregateWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing atomic aggregate: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(AtomicAggregateWritingError);
 
 impl WritablePduWithOneInput<bool, AtomicAggregateWritingError> for AtomicAggregate {
     // One octet length (if extended is not enabled)
@@ -417,10 +470,12 @@ impl WritablePduWithOneInput<bool, AtomicAggregateWritingError> for AtomicAggreg
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum AggregatorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing aggregator: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(AggregatorWritingError);
 
 impl WritablePduWithOneInput<bool, AggregatorWritingError> for As2Aggregator {
     // one length (not extended) + two octets as2 + 4 more for ipv4
@@ -484,10 +539,12 @@ impl WritablePduWithOneInput<bool, AggregatorWritingError> for Aggregator {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum OriginatorWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing originator: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(OriginatorWritingError);
 
 impl WritablePduWithOneInput<bool, OriginatorWritingError> for Originator {
     // 4-octet for BGP ID
@@ -512,10 +569,12 @@ impl WritablePduWithOneInput<bool, OriginatorWritingError> for Originator {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum ClusterIdWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing cluster id: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(ClusterIdWritingError);
 
 impl WritablePdu<ClusterIdWritingError> for ClusterId {
     // 4-octet for BGP ID
@@ -531,11 +590,15 @@ impl WritablePdu<ClusterIdWritingError> for ClusterId {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum ClusterListWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing cluster list: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in cluster id: {0}")]
     ClusterIdError(#[from] ClusterIdWritingError),
 }
+impl_from_io_error!(ClusterListWritingError);
 
 impl WritablePduWithOneInput<bool, ClusterListWritingError> for ClusterList {
     const BASE_LENGTH: usize = 1;
@@ -562,10 +625,12 @@ impl WritablePduWithOneInput<bool, ClusterListWritingError> for ClusterList {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum UnknownAttributeWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing unknown attribute: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(UnknownAttributeWritingError);
 
 impl WritablePduWithOneInput<bool, UnknownAttributeWritingError> for UnknownAttribute {
     // One octet length (if extended is not enabled) and one octet for code
@@ -592,11 +657,15 @@ impl WritablePduWithOneInput<bool, UnknownAttributeWritingError> for UnknownAttr
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum CommunitiesWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing communities: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in community: {0}")]
     CommunityError(#[from] CommunityWritingError),
 }
+impl_from_io_error!(CommunitiesWritingError);
 
 impl WritablePduWithOneInput<bool, CommunitiesWritingError> for Communities {
     // One octet length (if extended is not enabled)
@@ -621,11 +690,15 @@ impl WritablePduWithOneInput<bool, CommunitiesWritingError> for Communities {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedCommunitiesWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing extended communities: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in extended community: {0}")]
     ExtendedCommunityError(#[from] ExtendedCommunityWritingError),
 }
+impl_from_io_error!(ExtendedCommunitiesWritingError);
 
 impl WritablePduWithOneInput<bool, ExtendedCommunitiesWritingError> for ExtendedCommunities {
     // One octet length (if extended is not enabled)
@@ -650,11 +723,15 @@ impl WritablePduWithOneInput<bool, ExtendedCommunitiesWritingError> for Extended
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedCommunitiesIpv6WritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing extended communities IPv6: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in extended community IPv6: {0}")]
     ExtendedCommunityIpv6Error(#[from] ExtendedCommunityIpv6WritingError),
 }
+impl_from_io_error!(ExtendedCommunitiesIpv6WritingError);
 
 impl WritablePduWithOneInput<bool, ExtendedCommunitiesIpv6WritingError>
     for ExtendedCommunitiesIpv6
@@ -681,11 +758,15 @@ impl WritablePduWithOneInput<bool, ExtendedCommunitiesIpv6WritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum LargeCommunitiesWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing large communities: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in large community: {0}")]
     LargeCommunityError(#[from] LargeCommunityWritingError),
 }
+impl_from_io_error!(LargeCommunitiesWritingError);
 
 impl WritablePduWithOneInput<bool, LargeCommunitiesWritingError> for LargeCommunities {
     // One octet length (if extended is not enabled)
@@ -710,24 +791,54 @@ impl WritablePduWithOneInput<bool, LargeCommunitiesWritingError> for LargeCommun
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MpReachWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing MP reach: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in IP address: {0}")]
     IpAddrError(#[from] IpAddrWritingError),
+
+    #[error("in IPv4 unicast address: {0}")]
     Ipv4UnicastAddressError(#[from] Ipv4UnicastAddressWritingError),
+
+    #[error("in IPv4 multicast address: {0}")]
     Ipv4MulticastAddressError(#[from] Ipv4MulticastAddressWritingError),
+
+    #[error("in IPv6 unicast address: {0}")]
     Ipv6UnicastAddressError(#[from] Ipv6UnicastAddressWritingError),
+
+    #[error("in IPv6 multicast address: {0}")]
     Ipv6MulticastAddressError(#[from] Ipv6MulticastAddressWritingError),
+
+    #[error("in IPv4 MPLS VPN unicast address: {0}")]
     Ipv4MplsVpnUnicastAddressError(#[from] Ipv4MplsVpnUnicastAddressWritingError),
+
+    #[error("in IPv6 MPLS VPN unicast address: {0}")]
     Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressWritingError),
+
+    #[error("in IPv4 NLRI MPLS labels address: {0}")]
     Ipv4NlriMplsLabelsAddressError(#[from] Ipv4NlriMplsLabelsAddressWritingError),
+
+    #[error("in IPv6 NLRI MPLS labels address: {0}")]
     Ipv6NlriMplsLabelsAddressError(#[from] Ipv6NlriMplsLabelsAddressWritingError),
+
+    #[error("in L2 EVPN address: {0}")]
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
+
+    #[error("in labeled next hop: {0}")]
     LabeledNextHopError(#[from] LabeledNextHopWritingError),
+
+    #[error("in route target membership address: {0}")]
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
+
+    #[error("in BGP-LS NLRI: {0}")]
     BgpLsNlriWritingError(#[from] BgpLsNlriWritingError),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherWritingError(#[from] RouteDistinguisherWritingError),
 }
+impl_from_io_error!(MpReachWritingError);
 
 impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
     // 2-octets AFI, 1-octet SAFI, and 1-octet reserved , 1-octet len
@@ -1133,21 +1244,45 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MpUnreachWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing MP unreach: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in IPv4 unicast address: {0}")]
     Ipv4UnicastAddressError(#[from] Ipv4UnicastAddressWritingError),
+
+    #[error("in IPv4 multicast address: {0}")]
     Ipv4MulticastAddressError(#[from] Ipv4MulticastAddressWritingError),
+
+    #[error("in IPv4 NLRI MPLS labels address: {0}")]
     Ipv4NlriMplsLabelsAddressError(#[from] Ipv4NlriMplsLabelsAddressWritingError),
+
+    #[error("in IPv4 MPLS VPN unicast: {0}")]
     Ipv4MplsVpnUnicastError(#[from] Ipv4MplsVpnUnicastAddressWritingError),
+
+    #[error("in IPv6 unicast address: {0}")]
     Ipv6UnicastAddressError(#[from] Ipv6UnicastAddressWritingError),
+
+    #[error("in IPv6 multicast address: {0}")]
     Ipv6MulticastAddressError(#[from] Ipv6MulticastAddressWritingError),
+
+    #[error("in IPv6 NLRI MPLS labels address: {0}")]
     Ipv6NlriMplsLabelsAddressError(#[from] Ipv6NlriMplsLabelsAddressWritingError),
+
+    #[error("in IPv6 MPLS VPN unicast address: {0}")]
     Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressWritingError),
+
+    #[error("in L2 EVPN address: {0}")]
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
+
+    #[error("in route target membership address: {0}")]
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
+
+    #[error("in BGP-LS: {0}")]
     BgpLsError(#[from] BgpLsNlriWritingError),
 }
+impl_from_io_error!(MpUnreachWritingError);
 
 impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
     // 1 len, 2-octets AFI, 1-octet SAFI
@@ -1282,10 +1417,12 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum OnlyToCustomerWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing only to customer: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(OnlyToCustomerWritingError);
 
 impl WritablePduWithOneInput<bool, OnlyToCustomerWritingError> for OnlyToCustomer {
     // 1-octet length + 4-octets for ASN
@@ -1310,10 +1447,12 @@ impl WritablePduWithOneInput<bool, OnlyToCustomerWritingError> for OnlyToCustome
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum AigpWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing AIGP: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(AigpWritingError);
 
 impl WritablePduWithOneInput<bool, AigpWritingError> for Aigp {
     // 1-octet length + 1-octet for type + 2 octet for length

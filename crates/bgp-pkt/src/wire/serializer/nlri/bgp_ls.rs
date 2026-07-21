@@ -21,17 +21,22 @@ use crate::nlri::{
 };
 use crate::wire::serializer::nlri::nlri::RouteDistinguisherWritingError;
 use crate::wire::serializer::{MultiTopologyIdWritingError, write_tlv_header_t16_l16};
-use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput, impl_from_io_error};
 use std::io::Write;
 use std::net::IpAddr;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpLsNlriWritingError {
-    StdIoError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP-LS NLRI: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in multi-topology ID: {0}")]
     MultiTopologyIdWritingError(#[from] MultiTopologyIdWritingError),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherWritingError(#[from] RouteDistinguisherWritingError),
 }
+impl_from_io_error!(BgpLsNlriWritingError);
 
 impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlri {
     const BASE_LENGTH: usize = 4; // nlri type u16 + total nlri length u16

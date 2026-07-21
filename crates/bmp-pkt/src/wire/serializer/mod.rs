@@ -19,16 +19,21 @@ pub mod v3;
 pub mod v4;
 
 use crate::BmpMessage;
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 use std::io::Write;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BMP message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in BMP v3 message: {0}")]
     BmpV3MessageValueError(#[from] v3::BmpMessageValueWritingError),
+
+    #[error("in BMP v4 message: {0}")]
     BmpV4MessageValueError(#[from] v4::BmpMessageValueWritingError),
 }
+impl_from_io_error!(BmpMessageWritingError);
 
 impl WritablePdu<BmpMessageWritingError> for BmpMessage {
     /// 1-octet version, 4-octets msg length

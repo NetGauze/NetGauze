@@ -26,22 +26,37 @@ use crate::v3::{
 use crate::{BmpPeerType, PeerHeader};
 use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
 use netgauze_bgp_pkt::wire::serializer::nlri::RouteDistinguisherWritingError;
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 use std::io::Write;
 use std::net::IpAddr;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageValueWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BMP message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in route monitoring message: {0}")]
     RouteMonitoringMessageError(#[from] RouteMonitoringMessageWritingError),
+
+    #[error("in route mirroring message: {0}")]
     RouteMirroringMessageError(#[from] RouteMirroringMessageWritingError),
+
+    #[error("in initiation message: {0}")]
     InitiationMessageError(#[from] InitiationMessageWritingError),
+
+    #[error("in peer up notification message: {0}")]
     PeerUpNotificationMessageError(#[from] PeerUpNotificationMessageWritingError),
+
+    #[error("in peer down notification message: {0}")]
     PeerDownNotificationMessageError(#[from] PeerDownNotificationMessageWritingError),
+
+    #[error("in termination message: {0}")]
     TerminationMessageError(#[from] TerminationMessageWritingError),
+
+    #[error("in statistics report message: {0}")]
     StatisticsReportMessageError(#[from] StatisticsReportMessageWritingError),
 }
+impl_from_io_error!(BmpMessageValueWritingError);
 
 impl WritablePdu<BmpMessageValueWritingError> for BmpMessageValue {
     /// 1-octet msg type,
@@ -83,12 +98,18 @@ impl WritablePdu<BmpMessageValueWritingError> for BmpMessageValue {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteMirroringMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route mirroring message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in peer header: {0}")]
     PeerHeaderError(#[from] PeerHeaderWritingError),
+
+    #[error("in route mirroring value: {0}")]
     RouteMirroringValueError(#[from] RouteMirroringValueWritingError),
 }
+impl_from_io_error!(RouteMirroringMessageWritingError);
 
 impl WritablePdu<RouteMirroringMessageWritingError> for RouteMirroringMessage {
     const BASE_LENGTH: usize = 0;
@@ -131,10 +152,12 @@ const fn compute_peer_flags_value(
     flags
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BmpPeerTypeWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BMP peer type: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(BmpPeerTypeWritingError);
 
 impl BmpPeerType {
     pub fn get_flags_value(&self) -> u8 {
@@ -186,12 +209,18 @@ impl WritablePdu<BmpPeerTypeWritingError> for BmpPeerType {
         Ok(())
     }
 }
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum PeerHeaderWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing peer header: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in BMP peer type: {0}")]
     BmpPeerTypeError(#[from] BmpPeerTypeWritingError),
+
+    #[error("in route distinguisher: {0}")]
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
 }
+impl_from_io_error!(PeerHeaderWritingError);
 
 impl WritablePdu<PeerHeaderWritingError> for PeerHeader {
     ///  1-octet peer type
@@ -238,11 +267,15 @@ impl WritablePdu<PeerHeaderWritingError> for PeerHeader {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteMirroringValueWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route mirroring value: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in BGP message: {0}")]
     BgpMessageError(#[from] BgpMessageWritingError),
 }
+impl_from_io_error!(RouteMirroringValueWritingError);
 
 impl WritablePdu<RouteMirroringValueWritingError> for RouteMirroringValue {
     /// 2-octet type and 2-octet length
@@ -281,12 +314,18 @@ impl WritablePdu<RouteMirroringValueWritingError> for RouteMirroringValue {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum RouteMonitoringMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing route monitoring message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in peer header: {0}")]
     PeerHeaderError(#[from] PeerHeaderWritingError),
+
+    #[error("in BGP message: {0}")]
     BgpMessageError(#[from] BgpMessageWritingError),
 }
+impl_from_io_error!(RouteMonitoringMessageWritingError);
 
 impl WritablePdu<RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
     const BASE_LENGTH: usize = 0;
@@ -302,11 +341,15 @@ impl WritablePdu<RouteMonitoringMessageWritingError> for RouteMonitoringMessage 
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum InitiationMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing initiation message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in initiation information: {0}")]
     InitiationInformationError(#[from] InitiationInformationWritingError),
 }
+impl_from_io_error!(InitiationMessageWritingError);
 
 impl WritablePdu<InitiationMessageWritingError> for InitiationMessage {
     const BASE_LENGTH: usize = 0;
@@ -323,10 +366,12 @@ impl WritablePdu<InitiationMessageWritingError> for InitiationMessage {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum InitiationInformationWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing initiation information: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(InitiationInformationWritingError);
 
 impl WritablePdu<InitiationInformationWritingError> for InitiationInformation {
     const BASE_LENGTH: usize = 4;
@@ -395,13 +440,21 @@ impl WritablePdu<InitiationInformationWritingError> for InitiationInformation {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum PeerUpNotificationMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing peer up notification message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in peer header: {0}")]
     PeerHeaderError(#[from] PeerHeaderWritingError),
+
+    #[error("in BGP message: {0}")]
     BgpMessageError(#[from] BgpMessageWritingError),
+
+    #[error("in initiation information: {0}")]
     InitiationInformationError(#[from] InitiationInformationWritingError),
 }
+impl_from_io_error!(PeerUpNotificationMessageWritingError);
 
 impl WritablePdu<PeerUpNotificationMessageWritingError> for PeerUpNotificationMessage {
     // 16 local addr + 2 local port + 2 remote port
@@ -440,13 +493,21 @@ impl WritablePdu<PeerUpNotificationMessageWritingError> for PeerUpNotificationMe
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum PeerDownNotificationMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing peer down notification message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in peer header: {0}")]
     PeerHeaderError(#[from] PeerHeaderWritingError),
+
+    #[error("in initiation information: {0}")]
     InitiationInformationError(#[from] InitiationInformationWritingError),
+
+    #[error("in peer down notification reason: {0}")]
     PeerDownNotificationReasonError(#[from] PeerDownNotificationReasonWritingError),
 }
+impl_from_io_error!(PeerDownNotificationMessageWritingError);
 
 impl WritablePdu<PeerDownNotificationMessageWritingError> for PeerDownNotificationMessage {
     const BASE_LENGTH: usize = 0;
@@ -465,13 +526,21 @@ impl WritablePdu<PeerDownNotificationMessageWritingError> for PeerDownNotificati
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum PeerDownNotificationReasonWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing peer down notification reason: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in peer header: {0}")]
     PeerHeaderError(#[from] PeerHeaderWritingError),
+
+    #[error("in BGP message: {0}")]
     BgpMessageError(#[from] BgpMessageWritingError),
+
+    #[error("in initiation information: {0}")]
     InitiationInformationError(#[from] InitiationInformationWritingError),
 }
+impl_from_io_error!(PeerDownNotificationReasonWritingError);
 
 impl WritablePdu<PeerDownNotificationReasonWritingError> for PeerDownNotificationReason {
     // 1 reason
@@ -516,12 +585,18 @@ impl WritablePdu<PeerDownNotificationReasonWritingError> for PeerDownNotificatio
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum TerminationMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing termination message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in peer header: {0}")]
     PeerHeaderError(#[from] PeerHeaderWritingError),
+
+    #[error("in termination information: {0}")]
     TerminationInformationError(#[from] TerminationInformationWritingError),
 }
+impl_from_io_error!(TerminationMessageWritingError);
 
 impl WritablePdu<TerminationMessageWritingError> for TerminationMessage {
     const BASE_LENGTH: usize = 0;
@@ -538,10 +613,12 @@ impl WritablePdu<TerminationMessageWritingError> for TerminationMessage {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum TerminationInformationWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing termination information: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(TerminationInformationWritingError);
 
 impl WritablePdu<TerminationInformationWritingError> for TerminationInformation {
     /// 2-octet information type + 2-octet information length
@@ -574,12 +651,18 @@ impl WritablePdu<TerminationInformationWritingError> for TerminationInformation 
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum StatisticsReportMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing statistics report message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in peer header: {0}")]
     PeerHeaderError(#[from] PeerHeaderWritingError),
+
+    #[error("in statistics counter message: {0}")]
     StatisticsCounterMessageError(#[from] StatisticsCounterMessageWritingError),
 }
+impl_from_io_error!(StatisticsReportMessageWritingError);
 
 impl WritablePdu<StatisticsReportMessageWritingError> for StatisticsReportMessage {
     /// 4-octets Number of counters
@@ -601,10 +684,12 @@ impl WritablePdu<StatisticsReportMessageWritingError> for StatisticsReportMessag
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum StatisticsCounterMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing statistics counter message: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(StatisticsCounterMessageWritingError);
 
 impl WritablePdu<StatisticsCounterMessageWritingError> for StatisticsCounter {
     /// 2-octets type and 2-octets length

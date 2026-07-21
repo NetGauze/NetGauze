@@ -27,8 +27,7 @@ pub mod update;
 use std::io::Write;
 use std::net::IpAddr;
 
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 
 use crate::BgpMessage;
 use crate::nlri::{MultiTopologyId, MultiTopologyIdData};
@@ -45,24 +44,33 @@ pub(crate) fn round_len(len: u8) -> u8 {
     (len as f32 / 8.0).ceil() as u8
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpMessageWritingError {
     /// The size of written message is larger than allowed size: 4,096 for open
     /// and keepalive and 2^16 for the rest
+    #[error(
+        "BGP message length {0} exceeds the maximum allowed (4096 for OPEN and KEEPALIVE, 65535 otherwise)"
+    )]
     BgpMessageLengthOverflow(usize),
 
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP message: {0}")]
+    StdIOError(Box<str>),
 
     /// Error encountered during parsing a [crate::open::BgpOpenMessage]
+    #[error("in open: {0}")]
     OpenError(#[from] BgpOpenMessageWritingError),
 
     /// Error encountered during parsing a [crate::update::BgpUpdateMessage]
+    #[error("in update: {0}")]
     UpdateError(#[from] BgpUpdateMessageWritingError),
 
+    #[error("in notification: {0}")]
     NotificationError(#[from] BgpNotificationMessageWritingError),
 
+    #[error("in route refresh: {0}")]
     RouteRefreshError(#[from] BgpRouteRefreshMessageWritingError),
 }
+impl_from_io_error!(BgpMessageWritingError);
 
 impl WritablePdu<BgpMessageWritingError> for BgpMessage {
     const BASE_LENGTH: usize = BGP_MIN_MESSAGE_LENGTH as usize;
@@ -114,10 +122,12 @@ impl WritablePdu<BgpMessageWritingError> for BgpMessage {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum IpAddrWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IP address: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(IpAddrWritingError);
 
 impl WritablePdu<IpAddrWritingError> for IpAddr {
     const BASE_LENGTH: usize = 0;
@@ -207,10 +217,12 @@ fn write_tlv_header_t8_l16<T: Write>(
     Ok(())
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MultiTopologyIdWritingError {
-    StdIoError(#[from_std_io_error] String),
+    #[error("IO error while writing multi-topology ID: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(MultiTopologyIdWritingError);
 
 impl WritablePdu<MultiTopologyIdWritingError> for MultiTopologyIdData {
     const BASE_LENGTH: usize = 0;

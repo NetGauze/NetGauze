@@ -21,13 +21,14 @@ use crate::iana::{
     TransitiveOpaqueExtendedCommunitySubType, TransitiveTwoOctetExtendedCommunitySubType,
 };
 use crate::wire::serializer::nlri::MacAddressWritingError;
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum CommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(CommunityWritingError);
 
 impl WritablePdu<CommunityWritingError> for Community {
     // u32 community value
@@ -43,31 +44,55 @@ impl WritablePdu<CommunityWritingError> for Community {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing extended community: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in transitive two-octet extended community: {0}")]
     TransitiveTwoOctetExtendedCommunityError(
         #[from] TransitiveTwoOctetExtendedCommunityWritingError,
     ),
+
+    #[error("in non-transitive two-octet extended community: {0}")]
     NonTransitiveTwoOctetExtendedCommunityError(
         #[from] NonTransitiveTwoOctetExtendedCommunityWritingError,
     ),
+
+    #[error("in transitive IPv4 extended community: {0}")]
     TransitiveIpv4ExtendedCommunityError(#[from] TransitiveIpv4ExtendedCommunityWritingError),
+
+    #[error("in non-transitive IPv4 extended community: {0}")]
     NonTransitiveIpv4ExtendedCommunityError(#[from] NonTransitiveIpv4ExtendedCommunityWritingError),
+
+    #[error("in transitive four-octet extended community: {0}")]
     TransitiveFourOctetExtendedCommunityError(
         #[from] TransitiveFourOctetExtendedCommunityWritingError,
     ),
+
+    #[error("in non-transitive four-octet extended community: {0}")]
     NonTransitiveFourOctetExtendedCommunityError(
         #[from] NonTransitiveFourOctetExtendedCommunityWritingError,
     ),
+
+    #[error("in transitive opaque extended community: {0}")]
     TransitiveOpaqueExtendedCommunityError(#[from] TransitiveOpaqueExtendedCommunityWritingError),
+
+    #[error("in non-transitive opaque extended community: {0}")]
     NonTransitiveOpaqueExtendedCommunityError(
         #[from] NonTransitiveOpaqueExtendedCommunityWritingError,
     ),
+
+    #[error("in EVPN extended community: {0}")]
     EvpnExtendedCommunityError(#[from] EvpnExtendedCommunityWritingError),
+
+    #[error("in experimental extended community: {0}")]
     ExperimentalExtendedCommunityError(#[from] ExperimentalExtendedCommunityWritingError),
+
+    #[error("in unknown extended community: {0}")]
     UnknownExtendedCommunityError(#[from] UnknownExtendedCommunityWritingError),
 }
+impl_from_io_error!(ExtendedCommunityWritingError);
 
 impl WritablePdu<ExtendedCommunityWritingError> for ExtendedCommunity {
     const BASE_LENGTH: usize = 1;
@@ -143,13 +168,21 @@ impl WritablePdu<ExtendedCommunityWritingError> for ExtendedCommunity {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedCommunityIpv6WritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing extended community IPv6: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in transitive IPv6 extended community: {0}")]
     TransitiveIpv6ExtendedCommunityError(#[from] TransitiveIpv6ExtendedCommunityWritingError),
+
+    #[error("in non-transitive ip64 extended community: {0}")]
     NonTransitiveIp64ExtendedCommunityError(#[from] NonTransitiveIpv6ExtendedCommunityWritingError),
+
+    #[error("in unknown extended community IPv6: {0}")]
     UnknownExtendedCommunityIpv6Error(#[from] UnknownExtendedCommunityIpv6WritingError),
 }
+impl_from_io_error!(ExtendedCommunityIpv6WritingError);
 
 impl WritablePdu<ExtendedCommunityIpv6WritingError> for ExtendedCommunityIpv6 {
     const BASE_LENGTH: usize = 1;
@@ -185,10 +218,12 @@ impl WritablePdu<ExtendedCommunityIpv6WritingError> for ExtendedCommunityIpv6 {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum LargeCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing large community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(LargeCommunityWritingError);
 
 impl WritablePdu<LargeCommunityWritingError> for LargeCommunity {
     /// 4-octet global admin + 4-octets local data part 1 + 4-octets local data
@@ -207,10 +242,12 @@ impl WritablePdu<LargeCommunityWritingError> for LargeCommunity {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum TransitiveTwoOctetExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing transitive two-octet extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(TransitiveTwoOctetExtendedCommunityWritingError);
 
 impl WritablePdu<TransitiveTwoOctetExtendedCommunityWritingError>
     for TransitiveTwoOctetExtendedCommunity
@@ -320,10 +357,12 @@ impl WritablePdu<TransitiveTwoOctetExtendedCommunityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum NonTransitiveTwoOctetExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing non-transitive two-octet extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(NonTransitiveTwoOctetExtendedCommunityWritingError);
 
 impl WritablePdu<NonTransitiveTwoOctetExtendedCommunityWritingError>
     for NonTransitiveTwoOctetExtendedCommunity
@@ -369,10 +408,12 @@ impl WritablePdu<NonTransitiveTwoOctetExtendedCommunityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum TransitiveIpv4ExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing transitive IPv4 extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(TransitiveIpv4ExtendedCommunityWritingError);
 
 impl WritablePdu<TransitiveIpv4ExtendedCommunityWritingError> for TransitiveIpv4ExtendedCommunity {
     // 1-octet subtype + 4-octets global admin + 2-octets local admin
@@ -520,10 +561,12 @@ impl WritablePdu<TransitiveIpv4ExtendedCommunityWritingError> for TransitiveIpv4
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum NonTransitiveIpv4ExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing non-transitive IPv4 extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(NonTransitiveIpv4ExtendedCommunityWritingError);
 
 impl WritablePdu<NonTransitiveIpv4ExtendedCommunityWritingError>
     for NonTransitiveIpv4ExtendedCommunity
@@ -553,10 +596,12 @@ impl WritablePdu<NonTransitiveIpv4ExtendedCommunityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum TransitiveFourOctetExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing transitive four-octet extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(TransitiveFourOctetExtendedCommunityWritingError);
 
 impl WritablePdu<TransitiveFourOctetExtendedCommunityWritingError>
     for TransitiveFourOctetExtendedCommunity
@@ -650,10 +695,12 @@ impl WritablePdu<TransitiveFourOctetExtendedCommunityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum NonTransitiveFourOctetExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing non-transitive four-octet extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(NonTransitiveFourOctetExtendedCommunityWritingError);
 
 impl WritablePdu<NonTransitiveFourOctetExtendedCommunityWritingError>
     for NonTransitiveFourOctetExtendedCommunity
@@ -683,10 +730,12 @@ impl WritablePdu<NonTransitiveFourOctetExtendedCommunityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum TransitiveOpaqueExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing transitive opaque extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(TransitiveOpaqueExtendedCommunityWritingError);
 
 impl WritablePdu<TransitiveOpaqueExtendedCommunityWritingError>
     for TransitiveOpaqueExtendedCommunity
@@ -718,10 +767,12 @@ impl WritablePdu<TransitiveOpaqueExtendedCommunityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum NonTransitiveOpaqueExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing non-transitive opaque extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(NonTransitiveOpaqueExtendedCommunityWritingError);
 
 impl WritablePdu<NonTransitiveOpaqueExtendedCommunityWritingError>
     for NonTransitiveOpaqueExtendedCommunity
@@ -747,10 +798,12 @@ impl WritablePdu<NonTransitiveOpaqueExtendedCommunityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum ExperimentalExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing experimental extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(ExperimentalExtendedCommunityWritingError);
 
 impl WritablePdu<ExperimentalExtendedCommunityWritingError> for ExperimentalExtendedCommunity {
     // 1-octet subtype + 6-octets value
@@ -770,10 +823,12 @@ impl WritablePdu<ExperimentalExtendedCommunityWritingError> for ExperimentalExte
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum UnknownExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing unknown extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(UnknownExtendedCommunityWritingError);
 
 impl WritablePdu<UnknownExtendedCommunityWritingError> for UnknownExtendedCommunity {
     // 1-octet subtype + 6-octets value
@@ -793,10 +848,12 @@ impl WritablePdu<UnknownExtendedCommunityWritingError> for UnknownExtendedCommun
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum TransitiveIpv6ExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing transitive IPv6 extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(TransitiveIpv6ExtendedCommunityWritingError);
 
 impl WritablePdu<TransitiveIpv6ExtendedCommunityWritingError> for TransitiveIpv6ExtendedCommunity {
     // 1-octet subtype + 16-octets global admin + 2-octets local admin
@@ -896,10 +953,12 @@ impl WritablePdu<TransitiveIpv6ExtendedCommunityWritingError> for TransitiveIpv6
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum NonTransitiveIpv6ExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing non-transitive IPv6 extended community: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(NonTransitiveIpv6ExtendedCommunityWritingError);
 
 impl WritablePdu<NonTransitiveIpv6ExtendedCommunityWritingError>
     for NonTransitiveIpv6ExtendedCommunity
@@ -929,10 +988,12 @@ impl WritablePdu<NonTransitiveIpv6ExtendedCommunityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum UnknownExtendedCommunityIpv6WritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing unknown extended community IPv6: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(UnknownExtendedCommunityIpv6WritingError);
 
 impl WritablePdu<UnknownExtendedCommunityIpv6WritingError> for UnknownExtendedCommunityIpv6 {
     // 1-octet subtype + 18-octets value
@@ -952,11 +1013,15 @@ impl WritablePdu<UnknownExtendedCommunityIpv6WritingError> for UnknownExtendedCo
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum EvpnExtendedCommunityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing EVPN extended community: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in MAC address: {0}")]
     MacAddressError(#[from] MacAddressWritingError),
 }
+impl_from_io_error!(EvpnExtendedCommunityWritingError);
 
 impl WritablePdu<EvpnExtendedCommunityWritingError> for EvpnExtendedCommunity {
     // 1-octet subtype + 2-octets global admin + 4-octets local admin

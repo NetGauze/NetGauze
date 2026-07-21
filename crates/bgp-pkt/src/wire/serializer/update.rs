@@ -18,15 +18,20 @@
 use crate::BgpUpdateMessage;
 use crate::wire::serializer::nlri::Ipv4UnicastAddressWritingError;
 use crate::wire::serializer::path_attribute::PathAttributeWritingError;
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpUpdateMessageWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP update message: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in IPv4 unicast address: {0}")]
     Ipv4UnicastAddressError(#[from] Ipv4UnicastAddressWritingError),
+
+    #[error("in path attribute: {0}")]
     PathAttributeError(#[from] PathAttributeWritingError),
 }
+impl_from_io_error!(BgpUpdateMessageWritingError);
 
 impl WritablePdu<BgpUpdateMessageWritingError> for BgpUpdateMessage {
     const BASE_LENGTH: usize = 4;

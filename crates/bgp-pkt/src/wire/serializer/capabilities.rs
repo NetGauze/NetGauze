@@ -20,21 +20,36 @@ use crate::wire::{
     FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
     ROUTE_REFRESH_CAPABILITY_LENGTH,
 };
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 use std::io::Write;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BGPCapabilityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing b g p capability: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in four-octet AS capability: {0}")]
     FourOctetAsCapabilityError(#[from] FourOctetAsCapabilityWritingError),
+
+    #[error("in multi protocol extensions capability: {0}")]
     MultiProtocolExtensionsCapabilityError(#[from] MultiProtocolExtensionsCapabilityWritingError),
+
+    #[error("in graceful restart capability: {0}")]
     GracefulRestartCapabilityError(#[from] GracefulRestartCapabilityWritingError),
+
+    #[error("in add path capability: {0}")]
     AddPathCapabilityError(#[from] AddPathCapabilityWritingError),
+
+    #[error("in extended next hop encoding capability: {0}")]
     ExtendedNextHopEncodingCapabilityError(#[from] ExtendedNextHopEncodingCapabilityWritingError),
+
+    #[error("in multiple label: {0}")]
     MultipleLabelError(#[from] MultipleLabelWritingError),
+
+    #[error("in BGP role capability: {0}")]
     BgpRoleCapabilityError(#[from] BgpRoleCapabilityWritingError),
 }
+impl_from_io_error!(BGPCapabilityWritingError);
 
 impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
     // 1-octet length and 1-octet capability type
@@ -132,10 +147,12 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum FourOctetAsCapabilityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing four-octet AS capability: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(FourOctetAsCapabilityWritingError);
 
 impl WritablePdu<FourOctetAsCapabilityWritingError> for FourOctetAsCapability {
     const BASE_LENGTH: usize = FOUR_OCTET_AS_CAPABILITY_LENGTH as usize;
@@ -149,10 +166,12 @@ impl WritablePdu<FourOctetAsCapabilityWritingError> for FourOctetAsCapability {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MultiProtocolExtensionsCapabilityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing multi protocol extensions capability: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(MultiProtocolExtensionsCapabilityWritingError);
 
 impl WritablePdu<MultiProtocolExtensionsCapabilityWritingError>
     for MultiProtocolExtensionsCapability
@@ -173,10 +192,12 @@ impl WritablePdu<MultiProtocolExtensionsCapabilityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum GracefulRestartCapabilityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing graceful restart capability: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(GracefulRestartCapabilityWritingError);
 
 impl WritablePdu<GracefulRestartCapabilityWritingError> for GracefulRestartCapability {
     /// 4-octet time and flags
@@ -222,10 +243,12 @@ impl WritablePdu<GracefulRestartCapabilityWritingError> for GracefulRestartAddre
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum AddPathCapabilityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing add path capability: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(AddPathCapabilityWritingError);
 
 impl WritablePdu<AddPathCapabilityWritingError> for AddPathCapability {
     const BASE_LENGTH: usize = 0;
@@ -265,10 +288,12 @@ impl WritablePdu<AddPathCapabilityWritingError> for AddPathAddressFamily {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedNextHopEncodingCapabilityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing extended next hop encoding capability: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(ExtendedNextHopEncodingCapabilityWritingError);
 
 impl WritablePdu<ExtendedNextHopEncodingCapabilityWritingError> for ExtendedNextHopEncoding {
     const BASE_LENGTH: usize = EXTENDED_NEXT_HOP_ENCODING_LENGTH as usize;
@@ -307,10 +332,12 @@ impl WritablePdu<ExtendedNextHopEncodingCapabilityWritingError>
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum MultipleLabelWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing multiple label: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(MultipleLabelWritingError);
 
 impl WritablePdu<MultipleLabelWritingError> for MultipleLabel {
     // 2 octets afi  + 1 octet safi + 1 octet count
@@ -326,10 +353,12 @@ impl WritablePdu<MultipleLabelWritingError> for MultipleLabel {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpRoleCapabilityWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP role capability: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(BgpRoleCapabilityWritingError);
 
 impl WritablePdu<BgpRoleCapabilityWritingError> for BgpRoleCapability {
     // 1 octet as defined by RFC9234

@@ -1,7 +1,6 @@
 use std::io::Write;
 
-use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput, impl_from_io_error};
 
 use crate::path_attribute::{
     BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv,
@@ -11,11 +10,15 @@ use crate::wire::serializer::nlri::MplsLabelWritingError;
 use crate::wire::serializer::path_attribute::write_length;
 use crate::wire::serializer::write_tlv_header_t8_l16;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum SegmentIdentifierWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing segment identifier: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in BGP SID attribute: {0}")]
     BgpSidAttributeWritingError(#[from] BgpSidAttributeWritingError),
 }
+impl_from_io_error!(SegmentIdentifierWritingError);
 
 impl WritablePduWithOneInput<bool, SegmentIdentifierWritingError> for PrefixSegmentIdentifier {
     // One is extended length is not enabled, the rest is variable
@@ -42,12 +45,18 @@ impl WritablePduWithOneInput<bool, SegmentIdentifierWritingError> for PrefixSegm
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum BgpSidAttributeWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing BGP SID attribute: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in BGP SID SRGB: {0}")]
     BgpSidSrgb(#[from] SrgbWritingError),
+
+    #[error("in SRv6 service sub-TLV: {0}")]
     BgpSRv6SubTlvService(#[from] SRv6ServiceSubTlvWritingError),
 }
+impl_from_io_error!(BgpSidAttributeWritingError);
 
 impl WritablePdu<BgpSidAttributeWritingError> for BgpSidAttribute {
     const BASE_LENGTH: usize = 3; /* type u8 + length u16 */
@@ -100,11 +109,15 @@ impl WritablePdu<BgpSidAttributeWritingError> for BgpSidAttribute {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum SrgbWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing SRGB: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in MPLS label: {0}")]
     MplsLabelError(#[from] MplsLabelWritingError),
 }
+impl_from_io_error!(SrgbWritingError);
 
 impl WritablePdu<SrgbWritingError> for SegmentRoutingGlobalBlock {
     const BASE_LENGTH: usize = 6; /* 3 bytes MPLS Label + 3 bytes range size */
@@ -121,11 +134,15 @@ impl WritablePdu<SrgbWritingError> for SegmentRoutingGlobalBlock {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum SRv6ServiceSubTlvWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing SRv6 service sub-TLV: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in SRv6 service sub-sub-TLV: {0}")]
     SRv6ServiceSubSubTlvError(#[from] SRv6ServiceSubSubTlvWritingError),
 }
+impl_from_io_error!(SRv6ServiceSubTlvWritingError);
 
 impl WritablePdu<SRv6ServiceSubTlvWritingError> for SRv6ServiceSubTlv {
     const BASE_LENGTH: usize = 3;
@@ -176,10 +193,12 @@ impl WritablePdu<SRv6ServiceSubTlvWritingError> for SRv6ServiceSubTlv {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum SRv6ServiceSubSubTlvWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing SRv6 service sub-sub-TLV: {0}")]
+    StdIOError(Box<str>),
 }
+impl_from_io_error!(SRv6ServiceSubSubTlvWritingError);
 
 impl WritablePdu<SRv6ServiceSubSubTlvWritingError> for SRv6ServiceSubSubTlv {
     const BASE_LENGTH: usize = 3;
