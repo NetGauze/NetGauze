@@ -617,6 +617,18 @@ impl<'a> ParseFrom<'a> for TransitiveOpaqueExtendedCommunity {
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let community = match TransitiveOpaqueExtendedCommunitySubType::try_from(sub_type) {
+            Ok(TransitiveOpaqueExtendedCommunitySubType::Upa) => {
+                let flags = cur.read_u8()?;
+                // Only the most significant `D` bit is defined; the remaining
+                // flag bits and the Reserved octet MUST be ignored on receipt.
+                let drop = flags & 0x80 == 0x80;
+                let _reserved = cur.read_u8()?;
+                let bgp_router_id = Ipv4Addr::from(cur.read_u32_be()?);
+                TransitiveOpaqueExtendedCommunity::Upa {
+                    drop,
+                    bgp_router_id,
+                }
+            }
             Ok(TransitiveOpaqueExtendedCommunitySubType::DefaultGateway) => {
                 let _ = cur.read_bytes(6)?;
                 TransitiveOpaqueExtendedCommunity::DefaultGateway

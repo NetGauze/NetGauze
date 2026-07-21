@@ -1307,6 +1307,9 @@ impl TryFrom<u8> for EvpnExtendedCommunitySubType {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TransitiveOpaqueExtendedCommunitySubType {
+    /// [draft-krierhorn-idr-upa](https://datatracker.ietf.org/doc/html/draft-krierhorn-idr-upa-02)
+    Upa = 0x09,
+
     /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
     DefaultGateway = 0x0d,
 }

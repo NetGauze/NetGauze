@@ -752,6 +752,17 @@ impl WritablePdu<TransitiveOpaqueExtendedCommunityWritingError>
         writer: &mut T,
     ) -> Result<(), TransitiveOpaqueExtendedCommunityWritingError> {
         match self {
+            Self::Upa {
+                drop,
+                bgp_router_id,
+            } => {
+                writer.write_all(&[TransitiveOpaqueExtendedCommunitySubType::Upa as u8])?;
+                // Flags: only the `D` bit is defined, the rest MUST be zero
+                writer.write_all(&[if *drop { 0x80 } else { 0x00 }])?;
+                // Reserved octet, MUST be zero on transmission
+                writer.write_all(&[0x00])?;
+                writer.write_all(&bgp_router_id.octets())?;
+            }
             Self::DefaultGateway => {
                 writer
                     .write_all(&[TransitiveOpaqueExtendedCommunitySubType::DefaultGateway as u8])?;

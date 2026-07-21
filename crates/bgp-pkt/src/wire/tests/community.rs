@@ -151,3 +151,60 @@ fn test_unknown_extended_community() -> Result<(), UnknownExtendedCommunityWriti
     test_write(&good, &good_wire)?;
     Ok(())
 }
+
+/// UPA Extended Community,
+/// [draft-krierhorn-idr-upa](https://datatracker.ietf.org/doc/html/draft-krierhorn-idr-upa-02)
+///
+/// `good_wire` is taken verbatim from
+/// `assets/pcaps/bmp/unreachable-prefix-announcement`: transitive opaque
+/// (0x03), sub-type 0x09, D-bit set, reserved 0, and the originating router's
+/// BGP Router ID.
+#[test]
+fn test_upa_extended_community() -> Result<(), ExtendedCommunityWritingError> {
+    let good_wire = [0x03, 0x09, 0x80, 0x00, 0x01, 0x01, 0x01, 0x01];
+    let good = ExtendedCommunity::TransitiveOpaque(TransitiveOpaqueExtendedCommunity::Upa {
+        drop: true,
+        bgp_router_id: Ipv4Addr::new(1, 1, 1, 1),
+    });
+
+    // D-bit clear: the prefix is unreachable but traffic should not be dropped
+    let no_drop_wire = [0x03, 0x09, 0x00, 0x00, 0xc0, 0x00, 0x02, 0x01];
+    let no_drop = ExtendedCommunity::TransitiveOpaque(TransitiveOpaqueExtendedCommunity::Upa {
+        drop: false,
+        bgp_router_id: Ipv4Addr::new(192, 0, 2, 1),
+    });
+
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&no_drop_wire, &no_drop);
+    test_write(&good, &good_wire)?;
+    test_write(&no_drop, &no_drop_wire)?;
+    Ok(())
+}
+
+/// The reserved flag bits and the Reserved octet MUST be ignored on receipt,
+/// so a sender setting them must not change how the community decodes.
+#[test]
+fn test_upa_extended_community_ignores_reserved() {
+    // every reserved flag bit set, and a non-zero Reserved octet
+    let reserved_set = [0x03, 0x09, 0xff, 0xff, 0x0a, 0x00, 0x00, 0x01];
+    let expected = ExtendedCommunity::TransitiveOpaque(TransitiveOpaqueExtendedCommunity::Upa {
+        drop: true,
+        bgp_router_id: Ipv4Addr::new(10, 0, 0, 1),
+    });
+    test_parsed_completely_bytes_reader(&reserved_set, &expected);
+}
+
+/// Operator-facing rendering, since these show up in logs and dashboards.
+#[test]
+fn test_upa_extended_community_display() {
+    let drop = ExtendedCommunity::TransitiveOpaque(TransitiveOpaqueExtendedCommunity::Upa {
+        drop: true,
+        bgp_router_id: Ipv4Addr::new(1, 1, 1, 1),
+    });
+    let keep = ExtendedCommunity::TransitiveOpaque(TransitiveOpaqueExtendedCommunity::Upa {
+        drop: false,
+        bgp_router_id: Ipv4Addr::new(1, 1, 1, 1),
+    });
+    assert_eq!(drop.to_string(), "upa-drop:1.1.1.1");
+    assert_eq!(keep.to_string(), "upa:1.1.1.1");
+}

@@ -501,6 +501,16 @@ impl std::fmt::Display for ExtendedCommunity {
                 }
             },
             Self::TransitiveOpaque(value) => match value {
+                TransitiveOpaqueExtendedCommunity::Upa {
+                    drop,
+                    bgp_router_id,
+                } => {
+                    if *drop {
+                        write!(f, "upa-drop:{bgp_router_id}")
+                    } else {
+                        write!(f, "upa:{bgp_router_id}")
+                    }
+                }
                 TransitiveOpaqueExtendedCommunity::DefaultGateway => write!(f, "default-gateway"),
                 TransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value } => {
                     write!(f, "unassigned-{sub_type}:{value:x?}")
@@ -900,6 +910,30 @@ impl ExtendedCommunityProperties for NonTransitiveIpv4ExtendedCommunity {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TransitiveOpaqueExtendedCommunity {
+    /// Unreachable Prefix Announcement (UPA).
+    ///
+    /// Attached to a route that is announced purely to signal that a prefix has
+    /// become unreachable, so that receivers can converge without waiting for
+    /// the covering aggregate to be re-evaluated.
+    ///
+    /// ```text
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |     Type      |   Sub-Type    |     Flags     |   Reserved    |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                       BGP Router ID                           |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    ///
+    /// Defined in [draft-krierhorn-idr-upa](https://datatracker.ietf.org/doc/html/draft-krierhorn-idr-upa-02)
+    Upa {
+        /// The `D` bit, the most significant bit of the Flags octet. When set,
+        /// the forwarding entry for the route SHOULD be set to drop traffic.
+        drop: bool,
+        /// Identifies the originating node. Does not influence route selection
+        /// or forwarding behaviour.
+        bgp_router_id: Ipv4Addr,
+    },
+
     /// The Default Gateway community  It is a transitive community,
     /// which means that the first octet is 0x03.  The value of the second
     /// octet (Sub-Type) is 0x0d (Default Gateway) as assigned by IANA.  The
