@@ -241,7 +241,7 @@ impl WritablePduWithOneInput<BgpLsNodeDescriptorType, BgpLsNlriWritingError>
     const BASE_LENGTH: usize = 4; // tlv type 16bits + tlv length 16bits
 
     fn len(&self, _input: BgpLsNodeDescriptorType) -> usize {
-        Self::BASE_LENGTH + self.subtlvs_len()
+        Self::BASE_LENGTH + self.subtlvs().iter().map(|tlv| tlv.len()).sum::<usize>()
     }
 
     fn write<T: Write>(
