@@ -19,7 +19,6 @@ use crate::iana::BmpVersion;
 use crate::wire::deserializer::BmpMessageParsingError;
 use crate::wire::serializer::BmpMessageWritingError;
 use crate::{BmpMessage, BmpPeerType, PeerKey, v3, v4};
-use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::capabilities::BgpCapability;
@@ -270,7 +269,11 @@ impl Decoder for BmpCodec {
                 ));
             }
             // Read the length, starting form after the version
-            let length = NetworkEndian::read_u32(&buf[1..BMP_MESSAGE_MIN_LENGTH]) as usize;
+            let length = u32::from_be_bytes(
+                buf[1..BMP_MESSAGE_MIN_LENGTH]
+                    .try_into()
+                    .expect("the 4-octet length field spans buf[1..BMP_MESSAGE_MIN_LENGTH]"),
+            ) as usize;
             // BMP has no synchronization marker (RFC 7854 §4.1). If the length
             // is too small to even cover the common header, advance past the
             // header so we resync on the next bytes rather than getting stuck

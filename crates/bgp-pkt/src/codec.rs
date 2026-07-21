@@ -19,7 +19,6 @@ use crate::wire::deserializer::{
     BgpMessageParsingError, BgpParsingContext, BgpParsingIgnoredErrors,
 };
 use crate::wire::serializer::BgpMessageWritingError;
-use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{BufMut, BytesMut};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_parse_utils::reader::SliceReader;
@@ -97,8 +96,8 @@ impl Decoder for BgpCodec {
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if buf.len() >= 19 {
-            let length: u16 = NetworkEndian::read_u16(&buf[16..19]);
-            let length = length as usize;
+            // Length is the 2 octets following the 16-octet marker
+            let length = u16::from_be_bytes([buf[16], buf[17]]) as usize;
             if buf.len() < length {
                 Ok(None)
             } else {

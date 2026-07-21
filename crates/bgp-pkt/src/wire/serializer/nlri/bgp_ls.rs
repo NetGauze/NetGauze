@@ -21,7 +21,6 @@ use crate::nlri::{
 };
 use crate::wire::serializer::nlri::nlri::RouteDistinguisherWritingError;
 use crate::wire::serializer::{MultiTopologyIdWritingError, write_tlv_header_t16_l16};
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::io::Write;
@@ -43,7 +42,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlri {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
         let nlri = self.nlri();
 
@@ -66,7 +65,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsVpnNlri {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
 
         // do not count add_path length since it is before the tlv
@@ -118,8 +117,8 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriIpPrefix {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
-        writer.write_u8(self.protocol_id as u8)?;
-        writer.write_u64::<NetworkEndian>(self.identifier)?;
+        writer.write_all(&[self.protocol_id as u8])?;
+        writer.write_all(&self.identifier.to_be_bytes())?;
 
         self.local_node_descriptors.write(writer)?;
 
@@ -139,7 +138,7 @@ impl WritablePdu<BgpLsNlriWritingError> for IpReachabilityInformationData {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
-        writer.write_u8(self.address().prefix_len())?;
+        writer.write_all(&[self.address().prefix_len()])?;
 
         match self.address().network() {
             IpAddr::V4(ipv4) => {
@@ -179,7 +178,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsPrefixDescriptor {
         write_tlv_header_t16_l16(writer, self.raw_code(), self.len() as u16)?;
         match self {
             BgpLsPrefixDescriptor::MultiTopologyIdentifier(data) => data.write(writer)?,
-            BgpLsPrefixDescriptor::OspfRouteType(data) => writer.write_u8(*data as u8)?,
+            BgpLsPrefixDescriptor::OspfRouteType(data) => writer.write_all(&[*data as u8])?,
             BgpLsPrefixDescriptor::IpReachabilityInformation(data) => data.write(writer)?,
             BgpLsPrefixDescriptor::Unknown { value, .. } => writer.write_all(value)?,
         }
@@ -196,8 +195,8 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriNode {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
-        writer.write_u8(self.protocol_id as u8)?;
-        writer.write_u64::<NetworkEndian>(self.identifier)?;
+        writer.write_all(&[self.protocol_id as u8])?;
+        writer.write_all(&self.identifier.to_be_bytes())?;
 
         self.local_node_descriptors.write(writer)?;
 
@@ -278,14 +277,14 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsLinkDescriptor {
                 link_local_identifier,
                 link_remote_identifier,
             } => {
-                writer.write_u32::<NetworkEndian>(*link_local_identifier)?;
-                writer.write_u32::<NetworkEndian>(*link_remote_identifier)?;
+                writer.write_all(&(*link_local_identifier).to_be_bytes())?;
+                writer.write_all(&(*link_remote_identifier).to_be_bytes())?;
             }
             BgpLsLinkDescriptor::IPv4InterfaceAddress(ipv4) => {
-                writer.write_u32::<NetworkEndian>((*ipv4).into())?
+                writer.write_all(&u32::from(*ipv4).to_be_bytes())?
             }
             BgpLsLinkDescriptor::IPv4NeighborAddress(ipv4) => {
-                writer.write_u32::<NetworkEndian>((*ipv4).into())?
+                writer.write_all(&u32::from(*ipv4).to_be_bytes())?
             }
             BgpLsLinkDescriptor::IPv6InterfaceAddress(ipv6) => writer.write_all(&ipv6.octets())?,
             BgpLsLinkDescriptor::IPv6NeighborAddress(ipv6) => writer.write_all(&ipv6.octets())?,
@@ -318,20 +317,20 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorSubTlv {
 
         match self {
             BgpLsNodeDescriptorSubTlv::AutonomousSystem(data) => {
-                writer.write_u32::<NetworkEndian>(*data)?
+                writer.write_all(&(*data).to_be_bytes())?
             }
             BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(data) => {
-                writer.write_u32::<NetworkEndian>(*data)?
+                writer.write_all(&(*data).to_be_bytes())?
             }
             BgpLsNodeDescriptorSubTlv::OspfAreaId(data) => {
-                writer.write_u32::<NetworkEndian>(*data)?
+                writer.write_all(&(*data).to_be_bytes())?
             }
             BgpLsNodeDescriptorSubTlv::IgpRouterId(data) => writer.write_all(data)?,
             BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(data) => {
-                writer.write_u32::<NetworkEndian>(*data)?
+                writer.write_all(&(*data).to_be_bytes())?
             }
             BgpLsNodeDescriptorSubTlv::MemberAsNumber(data) => {
-                writer.write_u32::<NetworkEndian>(*data)?
+                writer.write_all(&(*data).to_be_bytes())?
             }
             BgpLsNodeDescriptorSubTlv::Unknown { value, .. } => writer.write_all(value)?,
         };
@@ -355,8 +354,8 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriLink {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
-        writer.write_u8(self.protocol_id as u8)?;
-        writer.write_u64::<NetworkEndian>(self.identifier)?;
+        writer.write_all(&[self.protocol_id as u8])?;
+        writer.write_all(&self.identifier.to_be_bytes())?;
 
         self.local_node_descriptors.write(writer)?;
         self.remote_node_descriptors.write(writer)?;

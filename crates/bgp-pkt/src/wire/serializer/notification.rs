@@ -23,7 +23,6 @@ use crate::notification::{
     CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
     OpenMessageError, RouteRefreshError, UpdateMessageError,
 };
-use byteorder::WriteBytesExt;
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
@@ -62,31 +61,31 @@ impl WritablePdu<BgpNotificationMessageWritingError> for BgpNotificationMessage 
     ) -> Result<(), BgpNotificationMessageWritingError> {
         match self {
             Self::MessageHeaderError(value) => {
-                writer.write_u8(BgpErrorNotificationCode::MessageHeaderError.into())?;
+                writer.write_all(&[BgpErrorNotificationCode::MessageHeaderError.into()])?;
                 value.write(writer)?;
             }
             Self::OpenMessageError(value) => {
-                writer.write_u8(BgpErrorNotificationCode::OpenMessageError.into())?;
+                writer.write_all(&[BgpErrorNotificationCode::OpenMessageError.into()])?;
                 value.write(writer)?;
             }
             Self::UpdateMessageError(value) => {
-                writer.write_u8(BgpErrorNotificationCode::UpdateMessageError.into())?;
+                writer.write_all(&[BgpErrorNotificationCode::UpdateMessageError.into()])?;
                 value.write(writer)?;
             }
             Self::HoldTimerExpiredError(value) => {
-                writer.write_u8(BgpErrorNotificationCode::HoldTimerExpired.into())?;
+                writer.write_all(&[BgpErrorNotificationCode::HoldTimerExpired.into()])?;
                 value.write(writer)?;
             }
             Self::FiniteStateMachineError(value) => {
-                writer.write_u8(BgpErrorNotificationCode::FiniteStateMachineError.into())?;
+                writer.write_all(&[BgpErrorNotificationCode::FiniteStateMachineError.into()])?;
                 value.write(writer)?;
             }
             Self::CeaseError(value) => {
-                writer.write_u8(BgpErrorNotificationCode::Cease.into())?;
+                writer.write_all(&[BgpErrorNotificationCode::Cease.into()])?;
                 value.write(writer)?;
             }
             Self::RouteRefreshError(value) => {
-                writer.write_u8(BgpErrorNotificationCode::RouteRefreshMessageError.into())?;
+                writer.write_all(&[BgpErrorNotificationCode::RouteRefreshMessageError.into()])?;
                 value.write(writer)?;
             }
         }
@@ -119,19 +118,19 @@ impl WritablePdu<MessageHeaderErrorWritingError> for MessageHeaderError {
     ) -> Result<(), MessageHeaderErrorWritingError> {
         match self {
             Self::Unspecific { value } => {
-                writer.write_u8(MessageHeaderErrorSubCode::Unspecific.into())?;
+                writer.write_all(&[MessageHeaderErrorSubCode::Unspecific.into()])?;
                 writer.write_all(value)?;
             }
             Self::ConnectionNotSynchronized { value } => {
-                writer.write_u8(MessageHeaderErrorSubCode::ConnectionNotSynchronized.into())?;
+                writer.write_all(&[MessageHeaderErrorSubCode::ConnectionNotSynchronized.into()])?;
                 writer.write_all(value)?;
             }
             Self::BadMessageLength { value } => {
-                writer.write_u8(MessageHeaderErrorSubCode::BadMessageLength.into())?;
+                writer.write_all(&[MessageHeaderErrorSubCode::BadMessageLength.into()])?;
                 writer.write_all(value)?;
             }
             Self::BadMessageType { value } => {
-                writer.write_u8(MessageHeaderErrorSubCode::BadMessageType.into())?;
+                writer.write_all(&[MessageHeaderErrorSubCode::BadMessageType.into()])?;
                 writer.write_all(value)?;
             }
         }
@@ -165,35 +164,36 @@ impl WritablePdu<OpenMessageErrorWritingError> for OpenMessageError {
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), OpenMessageErrorWritingError> {
         match self {
             OpenMessageError::Unspecific { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::Unspecific.into())?;
+                writer.write_all(&[OpenMessageErrorSubCode::Unspecific.into()])?;
                 writer.write_all(value)?;
             }
             OpenMessageError::UnsupportedVersionNumber { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::UnsupportedVersionNumber.into())?;
+                writer.write_all(&[OpenMessageErrorSubCode::UnsupportedVersionNumber.into()])?;
                 writer.write_all(value)?;
             }
             OpenMessageError::BadPeerAs { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::BadPeerAs.into())?;
+                writer.write_all(&[OpenMessageErrorSubCode::BadPeerAs.into()])?;
                 writer.write_all(value)?;
             }
             OpenMessageError::BadBgpIdentifier { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::BadBgpIdentifier.into())?;
+                writer.write_all(&[OpenMessageErrorSubCode::BadBgpIdentifier.into()])?;
                 writer.write_all(value)?;
             }
             OpenMessageError::UnsupportedOptionalParameter { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::UnsupportedOptionalParameter.into())?;
+                writer
+                    .write_all(&[OpenMessageErrorSubCode::UnsupportedOptionalParameter.into()])?;
                 writer.write_all(value)?;
             }
             OpenMessageError::UnacceptableHoldTime { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::UnacceptableHoldTime.into())?;
+                writer.write_all(&[OpenMessageErrorSubCode::UnacceptableHoldTime.into()])?;
                 writer.write_all(value)?;
             }
             OpenMessageError::UnsupportedCapability { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::UnsupportedCapability.into())?;
+                writer.write_all(&[OpenMessageErrorSubCode::UnsupportedCapability.into()])?;
                 writer.write_all(value)?;
             }
             OpenMessageError::RoleMismatch { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::RoleMismatch.into())?;
+                writer.write_all(&[OpenMessageErrorSubCode::RoleMismatch.into()])?;
                 writer.write_all(value)?;
             }
         }
@@ -233,48 +233,49 @@ impl WritablePdu<UpdateMessageErrorWritingError> for UpdateMessageError {
     ) -> Result<(), UpdateMessageErrorWritingError> {
         match self {
             Self::Unspecific { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::Unspecific.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::Unspecific.into()])?;
                 writer.write_all(value)?;
             }
             Self::MalformedAttributeList { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::MalformedAttributeList.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::MalformedAttributeList.into()])?;
                 writer.write_all(value)?;
             }
             Self::UnrecognizedWellKnownAttribute { value } => {
-                writer
-                    .write_u8(UpdateMessageErrorSubCode::UnrecognizedWellKnownAttribute.into())?;
+                writer.write_all(&[
+                    UpdateMessageErrorSubCode::UnrecognizedWellKnownAttribute.into()
+                ])?;
                 writer.write_all(value)?;
             }
             Self::MissingWellKnownAttribute { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::MissingWellKnownAttribute.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::MissingWellKnownAttribute.into()])?;
                 writer.write_all(value)?;
             }
             Self::AttributeFlagsError { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::AttributeFlagsError.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::AttributeFlagsError.into()])?;
                 writer.write_all(value)?;
             }
             Self::AttributeLengthError { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::AttributeLengthError.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::AttributeLengthError.into()])?;
                 writer.write_all(value)?;
             }
             Self::InvalidOriginAttribute { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::InvalidOriginAttribute.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::InvalidOriginAttribute.into()])?;
                 writer.write_all(value)?;
             }
             Self::InvalidNextHopAttribute { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::InvalidNextHopAttribute.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::InvalidNextHopAttribute.into()])?;
                 writer.write_all(value)?;
             }
             Self::OptionalAttributeError { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::OptionalAttributeError.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::OptionalAttributeError.into()])?;
                 writer.write_all(value)?;
             }
             Self::InvalidNetworkField { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::InvalidNetworkField.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::InvalidNetworkField.into()])?;
                 writer.write_all(value)?;
             }
             Self::MalformedAsPath { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::MalformedAsPath.into())?;
+                writer.write_all(&[UpdateMessageErrorSubCode::MalformedAsPath.into()])?;
                 writer.write_all(value)?;
             }
         }
@@ -304,7 +305,7 @@ impl WritablePdu<HoldTimerExpiredErrorWritingError> for HoldTimerExpiredError {
     ) -> Result<(), HoldTimerExpiredErrorWritingError> {
         match self {
             Self::Unspecific { sub_code, value } => {
-                writer.write_u8(*sub_code)?;
+                writer.write_all(&[*sub_code])?;
                 writer.write_all(value)?;
             }
         }
@@ -337,27 +338,27 @@ impl WritablePdu<FiniteStateMachineErrorWritingError> for FiniteStateMachineErro
     ) -> Result<(), FiniteStateMachineErrorWritingError> {
         match self {
             Self::Unspecific { value } => {
-                writer.write_u8(FiniteStateMachineErrorSubCode::UnspecifiedError.into())?;
+                writer.write_all(&[FiniteStateMachineErrorSubCode::UnspecifiedError.into()])?;
                 writer.write_all(value)?;
             }
             Self::ReceiveUnexpectedMessageInOpenSentState { value } => {
-                writer.write_u8(
+                writer.write_all(&[
                     FiniteStateMachineErrorSubCode::ReceiveUnexpectedMessageInOpenSentState.into(),
-                )?;
+                ])?;
                 writer.write_all(value)?;
             }
             Self::ReceiveUnexpectedMessageInOpenConfirmState { value } => {
-                writer.write_u8(
+                writer.write_all(&[
                     FiniteStateMachineErrorSubCode::ReceiveUnexpectedMessageInOpenConfirmState
                         .into(),
-                )?;
+                ])?;
                 writer.write_all(value)?;
             }
             Self::ReceiveUnexpectedMessageInEstablishedState { value } => {
-                writer.write_u8(
+                writer.write_all(&[
                     FiniteStateMachineErrorSubCode::ReceiveUnexpectedMessageInEstablishedState
                         .into(),
-                )?;
+                ])?;
                 writer.write_all(value)?;
             }
         }
@@ -393,43 +394,43 @@ impl WritablePdu<CeaseErrorWritingError> for CeaseError {
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), CeaseErrorWritingError> {
         match self {
             Self::MaximumNumberOfPrefixesReached { value } => {
-                writer.write_u8(CeaseErrorSubCode::MaximumNumberOfPrefixesReached.into())?;
+                writer.write_all(&[CeaseErrorSubCode::MaximumNumberOfPrefixesReached.into()])?;
                 writer.write_all(value)?;
             }
             Self::AdministrativeShutdown { value } => {
-                writer.write_u8(CeaseErrorSubCode::AdministrativeShutdown.into())?;
+                writer.write_all(&[CeaseErrorSubCode::AdministrativeShutdown.into()])?;
                 writer.write_all(value)?;
             }
             Self::PeerDeConfigured { value } => {
-                writer.write_u8(CeaseErrorSubCode::PeerDeConfigured.into())?;
+                writer.write_all(&[CeaseErrorSubCode::PeerDeConfigured.into()])?;
                 writer.write_all(value)?;
             }
             Self::AdministrativeReset { value } => {
-                writer.write_u8(CeaseErrorSubCode::AdministrativeReset.into())?;
+                writer.write_all(&[CeaseErrorSubCode::AdministrativeReset.into()])?;
                 writer.write_all(value)?;
             }
             Self::ConnectionRejected { value } => {
-                writer.write_u8(CeaseErrorSubCode::ConnectionRejected.into())?;
+                writer.write_all(&[CeaseErrorSubCode::ConnectionRejected.into()])?;
                 writer.write_all(value)?;
             }
             Self::OtherConfigurationChange { value } => {
-                writer.write_u8(CeaseErrorSubCode::OtherConfigurationChange.into())?;
+                writer.write_all(&[CeaseErrorSubCode::OtherConfigurationChange.into()])?;
                 writer.write_all(value)?;
             }
             Self::ConnectionCollisionResolution { value } => {
-                writer.write_u8(CeaseErrorSubCode::ConnectionCollisionResolution.into())?;
+                writer.write_all(&[CeaseErrorSubCode::ConnectionCollisionResolution.into()])?;
                 writer.write_all(value)?;
             }
             Self::OutOfResources { value } => {
-                writer.write_u8(CeaseErrorSubCode::OutOfResources.into())?;
+                writer.write_all(&[CeaseErrorSubCode::OutOfResources.into()])?;
                 writer.write_all(value)?;
             }
             Self::HardReset { value } => {
-                writer.write_u8(CeaseErrorSubCode::HardReset.into())?;
+                writer.write_all(&[CeaseErrorSubCode::HardReset.into()])?;
                 writer.write_all(value)?;
             }
             Self::BfdDown { value } => {
-                writer.write_u8(CeaseErrorSubCode::BfdDown.into())?;
+                writer.write_all(&[CeaseErrorSubCode::BfdDown.into()])?;
                 writer.write_all(value)?;
             }
         }
@@ -459,7 +460,8 @@ impl WritablePdu<RouteRefreshErrorWritingError> for RouteRefreshError {
     ) -> Result<(), RouteRefreshErrorWritingError> {
         match self {
             Self::InvalidMessageLength { value } => {
-                writer.write_u8(RouteRefreshMessageErrorSubCode::InvalidMessageLength.into())?;
+                writer
+                    .write_all(&[RouteRefreshMessageErrorSubCode::InvalidMessageLength.into()])?;
                 writer.write_all(value)?;
             }
         }

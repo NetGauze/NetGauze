@@ -2658,7 +2658,6 @@ version = "0.12.1"
 dependencies = [
  "arbitrary",
  "arbitrary_ext",
- "byteorder",
  "bytes",
  "criterion",
  "ipnet",
@@ -2711,7 +2710,6 @@ dependencies = [
  "arbitrary",
  "arbitrary_ext",
  "bitflags 2.13.0",
- "byteorder",
  "bytes",
  "chrono",
  "criterion",

@@ -23,7 +23,6 @@ use crate::wire::serializer::path_attribute::write_length;
 use crate::wire::serializer::{
     IpAddrWritingError, MultiTopologyIdWritingError, write_tlv_header_t16_l16,
 };
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::io::Write;
@@ -113,21 +112,21 @@ impl WritablePdu<BgpLsAttributeWritingError> for BgpLsAttributeValue {
                 writer.write_all(&ipv6.octets())?
             }
             BgpLsAttributeValue::RemoteNodeAdministrativeGroupColor(color) => {
-                writer.write_u32::<NetworkEndian>(*color)?
+                writer.write_all(&(*color).to_be_bytes())?
             }
             BgpLsAttributeValue::MaximumLinkBandwidth(bandwidth) => {
-                writer.write_f32::<NetworkEndian>(*bandwidth)?
+                writer.write_all(&(*bandwidth).to_be_bytes())?
             }
             BgpLsAttributeValue::MaximumReservableLinkBandwidth(bandwidth) => {
-                writer.write_f32::<NetworkEndian>(*bandwidth)?
+                writer.write_all(&(*bandwidth).to_be_bytes())?
             }
             BgpLsAttributeValue::UnreservedBandwidth(bandwidths) => {
                 for bandwidth in bandwidths {
-                    writer.write_f32::<NetworkEndian>(*bandwidth)?;
+                    writer.write_all(&(*bandwidth).to_be_bytes())?;
                 }
             }
             BgpLsAttributeValue::TeDefaultMetric(metric) => {
-                writer.write_u32::<NetworkEndian>(*metric)?
+                writer.write_all(&(*metric).to_be_bytes())?
             }
             BgpLsAttributeValue::LinkProtectionType {
                 extra_traffic,
@@ -163,7 +162,7 @@ impl WritablePdu<BgpLsAttributeWritingError> for BgpLsAttributeValue {
                     protection_cap |= LinkProtectionType::Enhanced as u8
                 }
 
-                writer.write_u8(protection_cap)?
+                writer.write_all(&[protection_cap])?
             }
             BgpLsAttributeValue::MplsProtocolMask { ldp, rsvp_te } => {
                 let mut flags = 0;
@@ -176,12 +175,12 @@ impl WritablePdu<BgpLsAttributeWritingError> for BgpLsAttributeValue {
                     flags |= MplsProtocolMask::ExtensionToRsvpForLspTunnels as u8
                 }
 
-                writer.write_u8(flags)?
+                writer.write_all(&[flags])?
             }
             BgpLsAttributeValue::IgpMetric(metric) => writer.write_all(metric)?,
             BgpLsAttributeValue::SharedRiskLinkGroup(groups) => {
                 for group in groups {
-                    writer.write_u32::<NetworkEndian>(group.value())?;
+                    writer.write_all(&group.value().to_be_bytes())?;
                 }
             }
             BgpLsAttributeValue::OpaqueLinkAttribute(attr) => writer.write_all(attr)?,
@@ -210,20 +209,20 @@ impl WritablePdu<BgpLsAttributeWritingError> for BgpLsAttributeValue {
                     igp_flags |= IgpFlags::OspfPropagateNssa as u8
                 }
 
-                writer.write_u8(igp_flags)?
+                writer.write_all(&[igp_flags])?
             }
             BgpLsAttributeValue::IgpRouteTag(tags) => {
                 for tag in tags {
-                    writer.write_u32::<NetworkEndian>(*tag)?;
+                    writer.write_all(&(*tag).to_be_bytes())?;
                 }
             }
             BgpLsAttributeValue::IgpExtendedRouteTag(tags) => {
                 for tag in tags {
-                    writer.write_u64::<NetworkEndian>(*tag)?;
+                    writer.write_all(&(*tag).to_be_bytes())?;
                 }
             }
             BgpLsAttributeValue::PrefixMetric(metric) => {
-                writer.write_u32::<NetworkEndian>(*metric)?
+                writer.write_all(&(*metric).to_be_bytes())?
             }
             BgpLsAttributeValue::OspfForwardingAddress(addr) => addr.write(writer)?,
             BgpLsAttributeValue::OpaquePrefixAttribute(attr) => writer.write_all(attr)?,
@@ -262,7 +261,7 @@ impl WritablePdu<BgpLsAttributeWritingError> for BgpLsAttributeValue {
                     flags |= BgpLsNodeFlagsBits::V6 as u8;
                 }
 
-                writer.write_u8(flags)?;
+                writer.write_all(&[flags])?;
             }
             BgpLsAttributeValue::OpaqueNodeAttribute(bytes) => writer.write_all(bytes)?,
             BgpLsAttributeValue::NodeNameTlv(ascii) => {
@@ -304,13 +303,13 @@ impl WritablePdu<BgpLsPeerSidWritingError> for BgpLsPeerSid {
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsPeerSidWritingError> {
         // tlv header is already written in BgpLsAttributeTlv
 
-        writer.write_u8(self.flags())?;
-        writer.write_u8(self.weight())?;
-        writer.write_u16::<NetworkEndian>(0)?;
+        writer.write_all(&[self.flags()])?;
+        writer.write_all(&[self.weight()])?;
+        writer.write_all(&0u16.to_be_bytes())?;
 
         match self {
             BgpLsPeerSid::LabelValue { label, .. } => label.write(writer)?,
-            BgpLsPeerSid::IndexValue { index, .. } => writer.write_u32::<NetworkEndian>(*index)?,
+            BgpLsPeerSid::IndexValue { index, .. } => writer.write_all(&(*index).to_be_bytes())?,
         }
 
         Ok(())

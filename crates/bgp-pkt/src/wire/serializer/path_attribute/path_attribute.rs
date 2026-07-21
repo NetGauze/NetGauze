@@ -24,7 +24,6 @@ use crate::wire::serializer::community::*;
 use crate::wire::serializer::nlri::*;
 use crate::wire::serializer::path_attribute::BgpLsAttributeWritingError;
 use crate::wire::serializer::path_attribute::bgp_sid::SegmentIdentifierWritingError;
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::net::IpAddr;
@@ -98,9 +97,9 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
         if self.extended_length() {
             attributes |= 0b00010000;
         }
-        writer.write_u8(attributes)?;
+        writer.write_all(&[attributes])?;
         if let Ok(path_attribute_type) = self.path_attribute_type() {
-            writer.write_u8(path_attribute_type.into())?;
+            writer.write_all(&[path_attribute_type.into()])?;
         }
         match self.value() {
             PathAttributeValue::Origin(value) => {
@@ -194,7 +193,7 @@ impl WritablePduWithOneInput<bool, OriginWritingError> for Origin {
         extended_length: bool,
     ) -> Result<(), OriginWritingError> {
         write_length(self, extended_length, writer)?;
-        writer.write_u8((*self) as u8)?;
+        writer.write_all(&[(*self) as u8])?;
         Ok(())
     }
 }
@@ -214,10 +213,10 @@ impl WritablePdu<AsPathWritingError> for As2PathSegment {
     }
 
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), AsPathWritingError> {
-        writer.write_u8(self.segment_type() as u8)?;
-        writer.write_u8(self.as_numbers().len() as u8)?;
+        writer.write_all(&[self.segment_type() as u8])?;
+        writer.write_all(&[self.as_numbers().len() as u8])?;
         for as_num in self.as_numbers() {
-            writer.write_u16::<NetworkEndian>(*as_num)?;
+            writer.write_all(&(*as_num).to_be_bytes())?;
         }
         Ok(())
     }
@@ -233,10 +232,10 @@ impl WritablePdu<AsPathWritingError> for As4PathSegment {
     }
 
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), AsPathWritingError> {
-        writer.write_u8(self.segment_type() as u8)?;
-        writer.write_u8(self.as_numbers().len() as u8)?;
+        writer.write_all(&[self.segment_type() as u8])?;
+        writer.write_all(&[self.as_numbers().len() as u8])?;
         for as_num in self.as_numbers() {
-            writer.write_u32::<NetworkEndian>(*as_num)?;
+            writer.write_all(&(*as_num).to_be_bytes())?;
         }
         Ok(())
     }
@@ -358,7 +357,7 @@ impl WritablePduWithOneInput<bool, MultiExitDiscriminatorWritingError> for Multi
         extended_length: bool,
     ) -> Result<(), MultiExitDiscriminatorWritingError> {
         write_length(self, extended_length, writer)?;
-        writer.write_u32::<NetworkEndian>(self.metric())?;
+        writer.write_all(&self.metric().to_be_bytes())?;
         Ok(())
     }
 }
@@ -386,7 +385,7 @@ impl WritablePduWithOneInput<bool, LocalPreferenceWritingError> for LocalPrefere
         extended_length: bool,
     ) -> Result<(), LocalPreferenceWritingError> {
         write_length(self, extended_length, writer)?;
-        writer.write_u32::<NetworkEndian>(self.metric())?;
+        writer.write_all(&self.metric().to_be_bytes())?;
         Ok(())
     }
 }
@@ -437,7 +436,7 @@ impl WritablePduWithOneInput<bool, AggregatorWritingError> for As2Aggregator {
         extended_length: bool,
     ) -> Result<(), AggregatorWritingError> {
         write_length(self, extended_length, writer)?;
-        writer.write_u16::<NetworkEndian>(*self.asn())?;
+        writer.write_all(&(*self.asn()).to_be_bytes())?;
         writer.write_all(&self.origin().octets())?;
         Ok(())
     }
@@ -457,7 +456,7 @@ impl WritablePduWithOneInput<bool, AggregatorWritingError> for As4Aggregator {
         extended_length: bool,
     ) -> Result<(), AggregatorWritingError> {
         write_length(self, extended_length, writer)?;
-        writer.write_u32::<NetworkEndian>(*self.asn())?;
+        writer.write_all(&(*self.asn()).to_be_bytes())?;
         writer.write_all(&self.origin().octets())?;
         Ok(())
     }
@@ -581,12 +580,12 @@ impl WritablePduWithOneInput<bool, UnknownAttributeWritingError> for UnknownAttr
         writer: &mut T,
         extended_length: bool,
     ) -> Result<(), UnknownAttributeWritingError> {
-        writer.write_u8(self.code())?;
+        writer.write_all(&[self.code()])?;
         let len = self.len(extended_length) - Self::BASE_LENGTH;
         if extended_length || len > u8::MAX.into() {
-            writer.write_u16::<NetworkEndian>((len - 1) as u16)?;
+            writer.write_all(&((len - 1) as u16).to_be_bytes())?;
         } else {
-            writer.write_u8(len as u8)?;
+            writer.write_all(&[len as u8])?;
         }
         writer.write_all(self.value())?;
         Ok(())
@@ -893,8 +892,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 let next_hop_len = if next_hop.is_ipv4() {
                     IPV4_LEN
                 } else {
@@ -905,7 +904,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 } else {
                     0
                 };
-                writer.write_u8(next_hop_len + local_len)?;
+                writer.write_all(&[next_hop_len + local_len])?;
                 match next_hop {
                     IpAddr::V4(addr) => {
                         writer.write_all(&addr.octets())?;
@@ -917,7 +916,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 if let Some(addr) = next_hop_local {
                     writer.write_all(&addr.octets())?;
                 }
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
@@ -927,8 +926,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 let mut next_hop_len = if next_hop.is_ipv4() {
                     IPV4_LEN
                 } else {
@@ -937,7 +936,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 if next_hop_local.is_some() {
                     next_hop_len += IPV6_LEN
                 }
-                writer.write_u8(next_hop_len)?;
+                writer.write_all(&[next_hop_len])?;
                 match next_hop {
                     IpAddr::V4(addr) => {
                         writer.write_all(&addr.octets())?;
@@ -949,7 +948,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 if let Some(addr) = next_hop_local {
                     writer.write_all(&addr.octets())?;
                 }
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
@@ -959,8 +958,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 let next_hop_len = if next_hop.is_ipv4() {
                     IPV4_LEN
                 } else {
@@ -971,7 +970,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 } else {
                     0
                 };
-                writer.write_u8(next_hop_len + local_len)?;
+                writer.write_all(&[next_hop_len + local_len])?;
                 match next_hop {
                     IpAddr::V4(addr) => {
                         writer.write_all(&addr.octets())?;
@@ -983,16 +982,16 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 if let Some(addr) = next_hop_local {
                     writer.write_all(&addr.octets())?;
                 }
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv4MplsVpnUnicast { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 next_hop.write(writer)?;
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
@@ -1002,17 +1001,17 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 if let Some(local) = next_hop_local {
-                    writer.write_u8(32)?;
+                    writer.write_all(&[32])?;
                     writer.write_all(&next_hop_global.octets())?;
                     writer.write_all(&local.octets())?;
                 } else {
-                    writer.write_u8(16)?;
+                    writer.write_all(&[16])?;
                     writer.write_all(&next_hop_global.octets())?;
                 }
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
@@ -1022,17 +1021,17 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 if let Some(local) = next_hop_local {
-                    writer.write_u8(32)?;
+                    writer.write_all(&[32])?;
                     writer.write_all(&next_hop_global.octets())?;
                     writer.write_all(&local.octets())?;
                 } else {
-                    writer.write_u8(16)?;
+                    writer.write_all(&[16])?;
                     writer.write_all(&next_hop_global.octets())?;
                 }
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
@@ -1042,8 +1041,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 let next_hop_len = if next_hop.is_ipv4() {
                     IPV4_LEN
                 } else {
@@ -1054,7 +1053,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 } else {
                     0
                 };
-                writer.write_u8(next_hop_len + local_len)?;
+                writer.write_all(&[next_hop_len + local_len])?;
                 match next_hop {
                     IpAddr::V4(addr) => {
                         writer.write_all(&addr.octets())?;
@@ -1066,67 +1065,67 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 if let Some(addr) = next_hop_local {
                     writer.write_all(&addr.octets())?;
                 }
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv6MplsVpnUnicast { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 next_hop.write(writer)?;
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::L2Evpn { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 next_hop.write(writer)?;
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::RouteTargetMembership { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 next_hop.write(writer)?;
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::BgpLs { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 next_hop.write(writer)?;
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
                 for nlri in nlri {
                     nlri.write(writer)?;
                 }
             }
             Self::BgpLsVpn { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 // The RD of the next-hop is set to all zeros (https://www.rfc-editor.org/rfc/rfc7752#section-3.4)
-                writer.write_u8((next_hop.len() - 1) as u8 /* len field */)?;
+                writer.write_all(&[(next_hop.len() - 1) as u8 /* len field */])?;
                 writer.write_all(&[0u8; 8])?;
                 match next_hop.next_hop() {
                     IpAddr::V4(ip) => writer.write(&ip.octets())?,
                     IpAddr::V6(ip) => writer.write(&ip.octets())?,
                 };
 
-                writer.write_u8(0)?;
+                writer.write_all(&[0])?;
 
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Unknown { value, .. } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 writer.write_all(value)?;
             }
         }
@@ -1186,85 +1185,85 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
         write_length(self, extended_length, writer)?;
         match self {
             Self::Ipv4Unicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv4Multicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv4NlriMplsLabels { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv4MplsVpnUnicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv6Unicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv6Multicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv6NlriMplsLabels { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv6MplsVpnUnicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::L2Evpn { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::RouteTargetMembership { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::BgpLs { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::BgpLsVpn { nlri } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
@@ -1274,8 +1273,8 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
                 safi: _safi,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(self.afi().into())?;
-                writer.write_u8(self.safi().into())?;
+                writer.write_all(&u16::from(self.afi()).to_be_bytes())?;
+                writer.write_all(&[self.safi().into()])?;
                 writer.write_all(nlri)?;
             }
         }
@@ -1306,7 +1305,7 @@ impl WritablePduWithOneInput<bool, OnlyToCustomerWritingError> for OnlyToCustome
         extended_length: bool,
     ) -> Result<(), OnlyToCustomerWritingError> {
         write_length(self, extended_length, writer)?;
-        writer.write_u32::<NetworkEndian>(self.asn())?;
+        writer.write_all(&self.asn().to_be_bytes())?;
         Ok(())
     }
 }
@@ -1339,9 +1338,9 @@ impl WritablePduWithOneInput<bool, AigpWritingError> for Aigp {
         write_length(self, extended_length, writer)?;
         match self {
             Self::AccumulatedIgpMetric(metric) => {
-                writer.write_u8(AigpAttributeType::AccumulatedIgpMetric as u8)?;
-                writer.write_u16::<NetworkEndian>(ACCUMULATED_IGP_METRIC)?;
-                writer.write_u64::<NetworkEndian>(*metric)?;
+                writer.write_all(&[AigpAttributeType::AccumulatedIgpMetric as u8])?;
+                writer.write_all(&ACCUMULATED_IGP_METRIC.to_be_bytes())?;
+                writer.write_all(&(*metric).to_be_bytes())?;
             }
         }
         Ok(())
@@ -1360,9 +1359,9 @@ where
 {
     let len = attribute.len(extended_length) - 1;
     if extended_length || len > u8::MAX.into() {
-        writer.write_u16::<NetworkEndian>((len - 1) as u16)?;
+        writer.write_all(&((len - 1) as u16).to_be_bytes())?;
     } else {
-        writer.write_u8(len as u8)?;
+        writer.write_all(&[len as u8])?;
     }
     Ok(())
 }

@@ -23,7 +23,6 @@ use crate::wire::serializer::v3::{
     PeerUpNotificationMessageWritingError, RouteMirroringMessageWritingError,
     StatisticsReportMessageWritingError, TerminationMessageWritingError,
 };
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::wire::serializer::capabilities::BGPCapabilityWritingError;
 use netgauze_bgp_pkt::wire::serializer::{BgpMessageWritingError, write_tlv_header_t16_l16};
 use netgauze_parse_utils::WritablePdu;
@@ -66,7 +65,7 @@ impl WritablePdu<BmpMessageValueWritingError> for BmpMessageValue {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpMessageValueWritingError> {
-        writer.write_u8(self.get_type().into())?;
+        writer.write_all(&[self.get_type().into()])?;
         match self {
             Self::RouteMonitoring(value) => value.write(writer)?,
             Self::StatisticsReport(value) => value.write(writer)?,
@@ -199,7 +198,7 @@ impl WritablePdu<RouteMonitoringTlvWritingError> for RouteMonitoringTlv {
             self.get_type().either(|x| x as u16, identity),
             (self.len() - 2) as u16,
         )?;
-        writer.write_u16::<NetworkEndian>(self.index())?;
+        writer.write_all(&self.index().to_be_bytes())?;
         self.value().write(writer)?;
         Ok(())
     }
@@ -238,15 +237,15 @@ impl WritablePdu<RouteMonitoringTlvValueWritingError> for RouteMonitoringTlvValu
             RouteMonitoringTlvValue::VrfTableName(str) => writer.write_all(str.as_bytes())?,
             RouteMonitoringTlvValue::GroupTlv(values) => {
                 for value in values {
-                    writer.write_u16::<NetworkEndian>(*value)?
+                    writer.write_all(&(*value).to_be_bytes())?
                 }
             }
             RouteMonitoringTlvValue::StatelessParsing(capability) => capability.write(writer)?,
             RouteMonitoringTlvValue::Unknown { value, .. } => writer.write_all(value)?,
             RouteMonitoringTlvValue::PathMarking(path_marking) => {
-                writer.write_u32::<NetworkEndian>((*path_marking.path_status()).bits())?;
+                writer.write_all(&(*path_marking.path_status()).bits().to_be_bytes())?;
                 if let Some(reason_code) = path_marking.reason_code() {
-                    writer.write_u16::<NetworkEndian>(reason_code)?
+                    writer.write_all(&reason_code.to_be_bytes())?
                 }
             }
         }

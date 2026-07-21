@@ -20,7 +20,6 @@ use crate::wire::{
     FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
     ROUTE_REFRESH_CAPABILITY_LENGTH,
 };
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 use std::io::Write;
@@ -68,64 +67,64 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
         let len = (self.len() - Self::BASE_LENGTH) as u8;
         match self {
             Self::MultiProtocolExtensions(value) => {
-                writer.write_u8(self.code().unwrap().into())?;
-                writer.write_u8(value.len() as u8)?;
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[value.len() as u8])?;
                 value.write(writer)?;
             }
             Self::RouteRefresh => {
-                writer.write_u8(self.code().unwrap().into())?;
-                writer.write_u8(len)?;
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[len])?;
             }
             Self::EnhancedRouteRefresh => {
-                writer.write_u8(self.code().unwrap().into())?;
-                writer.write_u8(len)?;
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[len])?;
             }
             Self::CiscoRouteRefresh => {
-                writer.write_u8(self.code().unwrap().into())?;
-                writer.write_u8(len)?;
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[len])?;
             }
             Self::ExtendedMessage => {
-                writer.write_u8(self.code().unwrap().into())?;
-                writer.write_u8(len)?;
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[len])?;
             }
             Self::MultipleLabels(value) => {
-                writer.write_u8(self.code().unwrap().into())?;
+                writer.write_all(&[self.code().unwrap().into()])?;
                 for addr in value {
                     addr.write(writer)?;
                 }
             }
             Self::BgpRole(value) => {
-                writer.write_u8(self.code().unwrap().into())?;
-                writer.write_u8(len)?;
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[len])?;
                 value.write(writer)?;
             }
             Self::GracefulRestartCapability(value) => {
-                writer.write_u8(self.code().unwrap().into())?;
-                writer.write_u8(len)?;
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[len])?;
                 value.write(writer)?;
             }
             Self::AddPath(value) => {
-                writer.write_u8(self.code().unwrap().into())?;
-                writer.write_u8(len)?;
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[len])?;
                 value.write(writer)?;
             }
             Self::FourOctetAs(value) => {
-                writer.write_u8(self.code().unwrap().into())?;
-                writer.write_u8(value.len() as u8)?;
+                writer.write_all(&[self.code().unwrap().into()])?;
+                writer.write_all(&[value.len() as u8])?;
                 value.write(writer)?;
             }
             Self::ExtendedNextHopEncoding(value) => {
-                writer.write_u8(self.code().unwrap().into())?;
+                writer.write_all(&[self.code().unwrap().into()])?;
                 value.write(writer)?;
             }
             Self::Experimental(value) => {
-                writer.write_u8(value.code() as u8)?;
-                writer.write_u8(len)?;
+                writer.write_all(&[value.code() as u8])?;
+                writer.write_all(&[len])?;
                 writer.write_all(value.value())?;
             }
             Self::Unrecognized(value) => {
-                writer.write_u8(*value.code())?;
-                writer.write_u8(len)?;
+                writer.write_all(&[*value.code()])?;
+                writer.write_all(&[len])?;
                 writer.write_all(value.value())?;
             }
         }
@@ -145,7 +144,7 @@ impl WritablePdu<FourOctetAsCapabilityWritingError> for FourOctetAsCapability {
         Self::BASE_LENGTH
     }
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), FourOctetAsCapabilityWritingError> {
-        writer.write_u32::<NetworkEndian>(self.asn4())?;
+        writer.write_all(&self.asn4().to_be_bytes())?;
         Ok(())
     }
 }
@@ -167,9 +166,9 @@ impl WritablePdu<MultiProtocolExtensionsCapabilityWritingError>
         &self,
         writer: &mut T,
     ) -> Result<(), MultiProtocolExtensionsCapabilityWritingError> {
-        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
-        writer.write_u8(0)?;
-        writer.write_u8(self.address_type().subsequent_address_family().into())?;
+        writer.write_all(&u16::from(self.address_type().address_family()).to_be_bytes())?;
+        writer.write_all(&[0])?;
+        writer.write_all(&[self.address_type().subsequent_address_family().into()])?;
         Ok(())
     }
 }
@@ -200,7 +199,7 @@ impl WritablePdu<GracefulRestartCapabilityWritingError> for GracefulRestartCapab
             0x0000
         };
         flags |= self.time();
-        writer.write_u16::<NetworkEndian>(flags)?;
+        writer.write_all(&flags.to_be_bytes())?;
         for value in self.address_families() {
             value.write(writer)?;
         }
@@ -216,9 +215,9 @@ impl WritablePdu<GracefulRestartCapabilityWritingError> for GracefulRestartAddre
         Self::BASE_LENGTH
     }
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), GracefulRestartCapabilityWritingError> {
-        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
-        writer.write_u8(self.address_type().subsequent_address_family().into())?;
-        writer.write_u8(if self.forwarding_state() { 0x80 } else { 0x00 })?;
+        writer.write_all(&u16::from(self.address_type().address_family()).to_be_bytes())?;
+        writer.write_all(&[self.address_type().subsequent_address_family().into()])?;
+        writer.write_all(&[if self.forwarding_state() { 0x80 } else { 0x00 }])?;
         Ok(())
     }
 }
@@ -255,13 +254,13 @@ impl WritablePdu<AddPathCapabilityWritingError> for AddPathAddressFamily {
         Self::BASE_LENGTH
     }
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), AddPathCapabilityWritingError> {
-        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
-        writer.write_u8(self.address_type().subsequent_address_family().into())?;
+        writer.write_all(&u16::from(self.address_type().address_family()).to_be_bytes())?;
+        writer.write_all(&[self.address_type().subsequent_address_family().into()])?;
         // Flip second bit if send is enabled
         let send = u8::from(self.send()) * 2;
         // Flip first bit if send is enabled
         let receive = u8::from(self.receive());
-        writer.write_u8(send | receive)?;
+        writer.write_all(&[send | receive])?;
         Ok(())
     }
 }
@@ -280,9 +279,10 @@ impl WritablePdu<ExtendedNextHopEncodingCapabilityWritingError> for ExtendedNext
         &self,
         writer: &mut T,
     ) -> Result<(), ExtendedNextHopEncodingCapabilityWritingError> {
-        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
-        writer.write_u16::<NetworkEndian>(self.address_type().subsequent_address_family() as u16)?;
-        writer.write_u16::<NetworkEndian>(self.next_hop_afi().into())?;
+        writer.write_all(&u16::from(self.address_type().address_family()).to_be_bytes())?;
+        writer
+            .write_all(&(self.address_type().subsequent_address_family() as u16).to_be_bytes())?;
+        writer.write_all(&u16::from(self.next_hop_afi()).to_be_bytes())?;
         Ok(())
     }
 }
@@ -299,7 +299,7 @@ impl WritablePdu<ExtendedNextHopEncodingCapabilityWritingError>
         &self,
         writer: &mut T,
     ) -> Result<(), ExtendedNextHopEncodingCapabilityWritingError> {
-        writer.write_u8(self.len() as u8 - 1)?;
+        writer.write_all(&[self.len() as u8 - 1])?;
         for encoding in self.encodings() {
             encoding.write(writer)?;
         }
@@ -319,9 +319,9 @@ impl WritablePdu<MultipleLabelWritingError> for MultipleLabel {
         Self::BASE_LENGTH
     }
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultipleLabelWritingError> {
-        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
-        writer.write_u8(self.address_type().subsequent_address_family().into())?;
-        writer.write_u8(self.count())?;
+        writer.write_all(&u16::from(self.address_type().address_family()).to_be_bytes())?;
+        writer.write_all(&[self.address_type().subsequent_address_family().into()])?;
+        writer.write_all(&[self.count()])?;
         Ok(())
     }
 }
@@ -338,7 +338,7 @@ impl WritablePdu<BgpRoleCapabilityWritingError> for BgpRoleCapability {
         Self::BASE_LENGTH
     }
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpRoleCapabilityWritingError> {
-        writer.write_u8(self.role().into())?;
+        writer.write_all(&[self.role().into()])?;
         Ok(())
     }
 }
