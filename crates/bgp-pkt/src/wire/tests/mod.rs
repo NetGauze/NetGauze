@@ -28,8 +28,8 @@ use netgauze_parse_utils::test_helpers::{
 use crate::capabilities::{
     AddPathAddressFamily, AddPathCapability, BgpCapability, BgpRoleCapability,
     ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
-    GracefulRestartCapability, LongLivedGracefulRestartAddressFamily,
-    LongLivedGracefulRestartCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
+    FqdnCapability, GracefulRestartCapability, LongLivedGracefulRestartAddressFamily,
+    LongLivedGracefulRestartCapability, MultiProtocolExtensionsCapability,
 };
 use crate::community::{
     ExtendedCommunity, TransitiveFourOctetExtendedCommunity, TransitiveTwoOctetExtendedCommunity,
@@ -453,9 +453,10 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
                 ]),
             )]),
             // FQDN
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
-                UnrecognizedCapability::new(73, vec![0x02, 0x72, 0x32, 0x00]),
-            )]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Fqdn(FqdnCapability::new(
+                "r2".into(),
+                String::new(),
+            ))]),
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::GracefulRestartCapability(
                 GracefulRestartCapability::new(true, true, 120, vec![]),
             )]),

@@ -67,6 +67,9 @@ pub enum BgpCapabilityParsingError {
     #[error("in long-lived graceful restart capability: {0}")]
     LongLivedGracefulRestartCapabilityError(#[from] LongLivedGracefulRestartCapabilityParsingError),
 
+    #[error("in FQDN capability: {0}")]
+    FqdnCapabilityError(#[from] FqdnCapabilityParsingError),
+
     #[error("in add-path capability: {0}")]
     AddPathCapabilityError(#[from] AddPathCapabilityParsingError),
 
@@ -220,7 +223,10 @@ impl<'a> ParseFrom<'a> for BgpCapability {
                 BgpCapabilityCode::RoutingPolicyDistribution => {
                     parse_unrecognized_capability(code.into(), cur)
                 }
-                BgpCapabilityCode::FQDN => parse_unrecognized_capability(code.into(), cur),
+                BgpCapabilityCode::FQDN => {
+                    let cap = FqdnCapability::parse(cur)?;
+                    Ok(BgpCapability::Fqdn(cap))
+                }
                 BgpCapabilityCode::Experimental239 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental239, cur)
                 }
@@ -421,6 +427,47 @@ pub enum LongLivedGracefulRestartCapabilityParsingError {
 
     #[error("unsupported address family pair (afi {afi}, safi {safi}) at byte offset {offset}")]
     AddressTypeError { offset: usize, afi: u16, safi: u8 },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
+pub enum FqdnCapabilityParsingError {
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("invalid UTF-8 in FQDN {field} at byte offset {offset}: {error}")]
+    InvalidUtf8 {
+        offset: usize,
+        field: String,
+        error: String,
+    },
+}
+
+impl<'a> ParseFrom<'a> for FqdnCapability {
+    type Error = FqdnCapabilityParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let len = cur.read_u8()?;
+        let mut value_buf = cur.take_slice(len as usize)?;
+
+        let mut read_name = |field: &str| -> Result<String, FqdnCapabilityParsingError> {
+            let name_len = value_buf.read_u8()?;
+            let offset = value_buf.offset();
+            let bytes = value_buf.read_bytes(name_len as usize)?;
+            String::from_utf8(bytes.to_vec()).map_err(|error| {
+                FqdnCapabilityParsingError::InvalidUtf8 {
+                    offset,
+                    field: field.to_string(),
+                    error: error.to_string(),
+                }
+            })
+        };
+
+        let hostname = read_name("hostname")?;
+        // Speakers with no domain configured still send the length field, as a
+        // zero-length name, so this read is not conditional.
+        let domain_name = read_name("domain name")?;
+
+        Ok(FqdnCapability::new(hostname, domain_name))
+    }
 }
 
 impl<'a> ParseFrom<'a> for LongLivedGracefulRestartCapability {
