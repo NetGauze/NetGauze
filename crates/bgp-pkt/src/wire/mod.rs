@@ -44,6 +44,10 @@ pub(crate) const GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH: u8 = 4;
 /// as per RFC9494
 pub(crate) const LONG_LIVED_GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH: u8 = 7;
 
+/// 2-octet AFI + 1-octet SAFI + 2-octet paths limit as per
+/// draft-abraitis-idr-addpath-paths-limit
+pub(crate) const PATHS_LIMIT_ADDRESS_FAMILY_LENGTH: u8 = 5;
+
 /// 1-octet length as defined by RFC9234
 pub(crate) const BGP_ROLE_CAPABILITY_LENGTH: u8 = 1;
 

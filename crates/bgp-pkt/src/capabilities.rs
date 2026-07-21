@@ -62,6 +62,9 @@ pub enum BgpCapability {
     /// Defined in [draft-walton-bgp-hostname-capability](https://datatracker.ietf.org/doc/html/draft-walton-bgp-hostname-capability-01)
     Fqdn(FqdnCapability),
 
+    /// Defined in [draft-abraitis-idr-addpath-paths-limit](https://datatracker.ietf.org/doc/html/draft-abraitis-idr-addpath-paths-limit)
+    PathsLimit(PathsLimitCapability),
+
     /// Defined in [RFC7911](https://datatracker.ietf.org/doc/html/rfc7911)
     AddPath(AddPathCapability),
 
@@ -101,6 +104,7 @@ impl BgpCapability {
                 Ok(BgpCapabilityCode::LongLivedGracefulRestartLLGRCapability)
             }
             Self::Fqdn(_) => Ok(BgpCapabilityCode::FQDN),
+            Self::PathsLimit(_) => Ok(BgpCapabilityCode::PathsLimit),
             Self::AddPath(_) => Ok(BgpCapabilityCode::AddPathCapability),
             Self::ExtendedMessage => Ok(BgpCapabilityCode::BgpExtendedMessage),
             Self::MultipleLabels(_) => Ok(BgpCapabilityCode::MultipleLabelsCapability),
@@ -407,6 +411,81 @@ impl LongLivedGracefulRestartAddressFamily {
     /// Long-lived Stale Time in seconds
     pub const fn stale_time(&self) -> u32 {
         self.stale_time
+    }
+}
+
+/// PATHS-LIMIT Capability
+///
+/// Advertises, per address family, the maximum number of paths the speaker is
+/// willing to receive for a prefix. It bounds the memory a peer can force on
+/// the speaker when ADD-PATH is in use.
+///
+/// ```text
+/// +------------------------------------------------+
+/// | Address Family Identifier (2 octets)           |
+/// +------------------------------------------------+
+/// | Subsequent Address Family Identifier (1 octet) |
+/// +------------------------------------------------+
+/// | Paths Limit (2 octets)                         |
+/// +------------------------------------------------+
+/// | ...                                            |
+/// +------------------------------------------------+
+/// ```
+///
+/// The value is a sequence of the 5-octet tuples above. An empty capability is
+/// valid and means the sender has no limits to communicate.
+///
+/// Defined in [draft-abraitis-idr-addpath-paths-limit](https://datatracker.ietf.org/doc/html/draft-abraitis-idr-addpath-paths-limit),
+/// an individual draft rather than a published RFC.
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct PathsLimitCapability {
+    address_families: Vec<PathsLimitAddressFamily>,
+}
+
+impl PathsLimitCapability {
+    pub const fn new(address_families: Vec<PathsLimitAddressFamily>) -> Self {
+        Self { address_families }
+    }
+
+    pub const fn address_families(&self) -> &Vec<PathsLimitAddressFamily> {
+        &self.address_families
+    }
+}
+
+/// One `<AFI, SAFI, Paths Limit>` tuple of the [`PathsLimitCapability`].
+///
+/// Defined in [draft-abraitis-idr-addpath-paths-limit](https://datatracker.ietf.org/doc/html/draft-abraitis-idr-addpath-paths-limit)
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct PathsLimitAddressFamily {
+    address_type: AddressType,
+    paths_limit: u16,
+}
+
+impl PathsLimitAddressFamily {
+    pub const fn new(address_type: AddressType, paths_limit: u16) -> Self {
+        Self {
+            address_type,
+            paths_limit,
+        }
+    }
+
+    pub const fn address_type(&self) -> AddressType {
+        self.address_type
+    }
+
+    /// The maximum number of paths the sender is willing to receive for this
+    /// address family.
+    ///
+    /// A limit of zero carries no information: the draft says such a tuple
+    /// SHOULD be ignored. It is preserved here rather than dropped during
+    /// parsing so the capability round-trips byte for byte; callers applying
+    /// the limit should skip zero values. FRRouting advertises zero.
+    pub const fn paths_limit(&self) -> u16 {
+        self.paths_limit
     }
 }
 

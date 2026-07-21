@@ -508,3 +508,54 @@ fn test_fqdn_capability_invalid_utf8() {
         });
     test_parse_error_bytes_reader::<BgpCapability, BgpCapabilityParsingError>(&bad_wire, &bad);
 }
+
+/// PATHS-LIMIT capability,
+/// [draft-abraitis-idr-addpath-paths-limit](https://datatracker.ietf.org/doc/html/draft-abraitis-idr-addpath-paths-limit)
+///
+/// `good_wire` is taken verbatim off the wire from FRRouting 10.8: capability
+/// code 76, length 5, then the tuple `<AFI=1, SAFI=1, limit=0>`. A zero limit
+/// carries no information (the draft says consumers SHOULD ignore the tuple)
+/// but is preserved so the capability round-trips byte for byte.
+#[test]
+fn test_paths_limit_capability() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [0x4c, 0x05, 0x00, 0x01, 0x01, 0x00, 0x00];
+    let good = BgpCapability::PathsLimit(PathsLimitCapability::new(vec![
+        PathsLimitAddressFamily::new(AddressType::Ipv4Unicast, 0),
+    ]));
+
+    // FRRouting also advertises the capability with no tuples at all, which the
+    // draft allows: the sender has no limits to communicate.
+    let empty_wire = [0x4c, 0x00];
+    let empty = BgpCapability::PathsLimit(PathsLimitCapability::new(vec![]));
+
+    // Two families with real limits, exercising the full 16-bit field
+    let multi_wire = [
+        0x4c, 0x0a, 0x00, 0x01, 0x01, 0x00, 0x80, 0x00, 0x02, 0x01, 0xff, 0xff,
+    ];
+    let multi = BgpCapability::PathsLimit(PathsLimitCapability::new(vec![
+        PathsLimitAddressFamily::new(AddressType::Ipv4Unicast, 128),
+        PathsLimitAddressFamily::new(AddressType::Ipv6Unicast, u16::MAX),
+    ]));
+
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&empty_wire, &empty);
+    test_parsed_completely_bytes_reader(&multi_wire, &multi);
+    test_write(&good, &good_wire)?;
+    test_write(&empty, &empty_wire)?;
+    test_write(&multi, &multi_wire)?;
+    Ok(())
+}
+
+/// The value is a whole number of 5-octet tuples; anything else is malformed
+/// rather than an unknown address family.
+#[test]
+fn test_paths_limit_capability_bad_length() {
+    let bad_wire = [0x4c, 0x04, 0x00, 0x01, 0x01, 0x00];
+    let bad = BgpCapabilityParsingError::PathsLimitCapabilityError(
+        PathsLimitCapabilityParsingError::InvalidLength {
+            offset: 1,
+            length: 4,
+        },
+    );
+    test_parse_error_bytes_reader::<BgpCapability, BgpCapabilityParsingError>(&bad_wire, &bad);
+}

@@ -20,7 +20,7 @@ use crate::wire::{
     EXTENDED_MESSAGE_CAPABILITY_LENGTH, EXTENDED_NEXT_HOP_ENCODING_LENGTH,
     FOUR_OCTET_AS_CAPABILITY_LENGTH, GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH,
     LONG_LIVED_GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
-    ROUTE_REFRESH_CAPABILITY_LENGTH,
+    PATHS_LIMIT_ADDRESS_FAMILY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
 };
 use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
 use netgauze_parse_utils::error::ParseError;
@@ -69,6 +69,9 @@ pub enum BgpCapabilityParsingError {
 
     #[error("in FQDN capability: {0}")]
     FqdnCapabilityError(#[from] FqdnCapabilityParsingError),
+
+    #[error("in paths-limit capability: {0}")]
+    PathsLimitCapabilityError(#[from] PathsLimitCapabilityParsingError),
 
     #[error("in add-path capability: {0}")]
     AddPathCapabilityError(#[from] AddPathCapabilityParsingError),
@@ -226,6 +229,10 @@ impl<'a> ParseFrom<'a> for BgpCapability {
                 BgpCapabilityCode::FQDN => {
                     let cap = FqdnCapability::parse(cur)?;
                     Ok(BgpCapability::Fqdn(cap))
+                }
+                BgpCapabilityCode::PathsLimit => {
+                    let cap = PathsLimitCapability::parse(cur)?;
+                    Ok(BgpCapability::PathsLimit(cap))
                 }
                 BgpCapabilityCode::Experimental239 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental239, cur)
@@ -440,6 +447,88 @@ pub enum FqdnCapabilityParsingError {
         field: String,
         error: String,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
+pub enum PathsLimitCapabilityParsingError {
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error(
+        "invalid paths-limit capability length {length} at byte offset {offset} (must be a multiple of {})",
+        PATHS_LIMIT_ADDRESS_FAMILY_LENGTH
+    )]
+    InvalidLength { offset: usize, length: u8 },
+
+    #[error("unknown address family {afi} at byte offset {offset}")]
+    UndefinedAddressFamily { offset: usize, afi: u16 },
+
+    #[error("unknown subsequent address family {safi} at byte offset {offset}")]
+    UndefinedSubsequentAddressFamily { offset: usize, safi: u8 },
+
+    #[error("unsupported address family pair (afi {afi}, safi {safi}) at byte offset {offset}")]
+    AddressTypeError { offset: usize, afi: u16, safi: u8 },
+}
+
+impl<'a> ParseFrom<'a> for PathsLimitCapability {
+    type Error = PathsLimitCapabilityParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let offset = cur.offset();
+        let len = cur.read_u8()?;
+        // The value is a whole number of <AFI, SAFI, Paths Limit> tuples. A
+        // zero length is legal and means the sender has no limits to advertise.
+        if len % PATHS_LIMIT_ADDRESS_FAMILY_LENGTH != 0 {
+            return Err(PathsLimitCapabilityParsingError::InvalidLength {
+                offset,
+                length: len,
+            });
+        }
+        let mut params_buf = cur.take_slice(len as usize)?;
+        let mut address_families =
+            Vec::with_capacity(params_buf.remaining() / PATHS_LIMIT_ADDRESS_FAMILY_LENGTH as usize);
+        while !params_buf.is_empty() {
+            let v = PathsLimitAddressFamily::parse(&mut params_buf)?;
+            address_families.push(v);
+        }
+        Ok(PathsLimitCapability::new(address_families))
+    }
+}
+
+impl<'a> ParseFrom<'a> for PathsLimitAddressFamily {
+    type Error = PathsLimitCapabilityParsingError;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let mut buf = cur.take_slice(PATHS_LIMIT_ADDRESS_FAMILY_LENGTH as usize)?;
+
+        let afi = AddressFamily::try_from(buf.read_u16_be()?).map_err(|err| {
+            PathsLimitCapabilityParsingError::UndefinedAddressFamily {
+                offset: buf.offset() - 2,
+                afi: err.0,
+            }
+        })?;
+        let safi = SubsequentAddressFamily::try_from(buf.read_u8()?).map_err(|err| {
+            PathsLimitCapabilityParsingError::UndefinedSubsequentAddressFamily {
+                offset: buf.offset() - 1,
+                safi: err.0,
+            }
+        })?;
+        let address_type = match AddressType::from_afi_safi(afi, safi) {
+            Ok(address_type) => address_type,
+            Err(err) => {
+                return Err(PathsLimitCapabilityParsingError::AddressTypeError {
+                    // AFI (2 bytes) and SAFI (1 byte) are the last 3 read
+                    offset: buf.offset() - 3,
+                    afi: err.address_family().into(),
+                    safi: err.subsequent_address_family().into(),
+                });
+            }
+        };
+
+        // A limit of zero is preserved as-is so the capability round-trips; the
+        // draft says consumers SHOULD ignore such a tuple.
+        let paths_limit = buf.read_u16_be()?;
+
+        Ok(PathsLimitAddressFamily::new(address_type, paths_limit))
+    }
 }
 
 impl<'a> ParseFrom<'a> for FqdnCapability {

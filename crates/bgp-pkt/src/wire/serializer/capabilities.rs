@@ -43,6 +43,9 @@ pub enum BGPCapabilityWritingError {
     #[error("in FQDN capability: {0}")]
     FqdnCapabilityError(#[from] FqdnCapabilityWritingError),
 
+    #[error("in paths-limit capability: {0}")]
+    PathsLimitCapabilityError(#[from] PathsLimitCapabilityWritingError),
+
     #[error("in add path capability: {0}")]
     AddPathCapabilityError(#[from] AddPathCapabilityWritingError),
 
@@ -74,6 +77,7 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
             Self::GracefulRestartCapability(value) => value.len() - 2,
             Self::LongLivedGracefulRestart(value) => value.len(),
             Self::Fqdn(value) => value.len(),
+            Self::PathsLimit(value) => value.len(),
             Self::AddPath(value) => value.len(),
             // ExtendedNextHopEncoding carries n length field, so need to account for it here
             Self::ExtendedNextHopEncoding(value) => value.len() - 1,
@@ -136,6 +140,11 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
                 value.write(writer)?;
             }
             Self::Fqdn(value) => {
+                writer.write_all(&[code])?;
+                writer.write_all(&[len])?;
+                value.write(writer)?;
+            }
+            Self::PathsLimit(value) => {
                 writer.write_all(&[code])?;
                 writer.write_all(&[len])?;
                 value.write(writer)?;
@@ -318,6 +327,49 @@ pub enum FqdnCapabilityWritingError {
     NameTooLong { field: &'static str, length: usize },
 }
 impl_from_io_error!(FqdnCapabilityWritingError);
+
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
+pub enum PathsLimitCapabilityWritingError {
+    #[error("IO error while writing paths-limit capability: {0}")]
+    StdIOError(Box<str>),
+}
+impl_from_io_error!(PathsLimitCapabilityWritingError);
+
+impl WritablePdu<PathsLimitCapabilityWritingError> for PathsLimitCapability {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self
+                .address_families()
+                .iter()
+                .map(|x| x.len())
+                .sum::<usize>()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), PathsLimitCapabilityWritingError> {
+        for value in self.address_families() {
+            value.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl WritablePdu<PathsLimitCapabilityWritingError> for PathsLimitAddressFamily {
+    /// 2-octet AFI, 1-octet SAFI, and 2-octet paths limit
+    const BASE_LENGTH: usize = 5;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), PathsLimitCapabilityWritingError> {
+        writer.write_all(&u16::from(self.address_type().address_family()).to_be_bytes())?;
+        writer.write_all(&[self.address_type().subsequent_address_family().into()])?;
+        writer.write_all(&self.paths_limit().to_be_bytes())?;
+        Ok(())
+    }
+}
 
 impl WritablePdu<FqdnCapabilityWritingError> for FqdnCapability {
     /// 1-octet hostname length and 1-octet domain name length
