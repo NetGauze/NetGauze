@@ -1,7 +1,5 @@
 use std::io::Write;
 
-use byteorder::{NetworkEndian, WriteBytesExt};
-
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 
@@ -72,24 +70,24 @@ impl WritablePdu<BgpSidAttributeWritingError> for BgpSidAttribute {
 
         match self {
             BgpSidAttribute::LabelIndex { label_index, flags } => {
-                writer.write_u8(0)?; // reserved 8 bits
-                writer.write_u16::<NetworkEndian>(*flags)?;
-                writer.write_u32::<NetworkEndian>(*label_index)?;
+                writer.write_all(&[0])?; // reserved 8 bits
+                writer.write_all(&(*flags).to_be_bytes())?;
+                writer.write_all(&(*label_index).to_be_bytes())?;
             }
             BgpSidAttribute::Originator { flags, srgbs } => {
-                writer.write_u16::<NetworkEndian>(*flags)?;
+                writer.write_all(&(*flags).to_be_bytes())?;
                 for srgb in srgbs {
                     srgb.write(writer)?;
                 }
             }
             BgpSidAttribute::SRv6ServiceL3 { reserved, subtlvs } => {
-                writer.write_u8(*reserved)?;
+                writer.write_all(&[*reserved])?;
                 for subtlv in subtlvs {
                     subtlv.write(writer)?;
                 }
             }
             BgpSidAttribute::SRv6ServiceL2 { reserved, subtlvs } => {
-                writer.write_u8(*reserved)?;
+                writer.write_all(&[*reserved])?;
                 for subtlv in subtlvs {
                     subtlv.write(writer)?;
                 }
@@ -161,11 +159,11 @@ impl WritablePdu<SRv6ServiceSubTlvWritingError> for SRv6ServiceSubTlv {
                 reserved2,
                 subsubtlvs,
             } => {
-                writer.write_u8(*reserved1)?; // reserved1
+                writer.write_all(&[*reserved1])?; // reserved1
                 writer.write_all(&sid.octets())?;
-                writer.write_u8(*service_sid_flags)?;
-                writer.write_u16::<NetworkEndian>(*endpoint_behaviour)?;
-                writer.write_u8(*reserved2)?; // reserved2
+                writer.write_all(&[*service_sid_flags])?;
+                writer.write_all(&(*endpoint_behaviour).to_be_bytes())?;
+                writer.write_all(&[*reserved2])?; // reserved2
 
                 for subsubtlv in subsubtlvs {
                     subsubtlv.write(writer)?;
@@ -206,12 +204,12 @@ impl WritablePdu<SRv6ServiceSubSubTlvWritingError> for SRv6ServiceSubSubTlv {
                 transposition_len,
                 transposition_offset,
             } => {
-                writer.write_u8(*locator_block_len)?;
-                writer.write_u8(*locator_node_len)?;
-                writer.write_u8(*function_len)?;
-                writer.write_u8(*arg_len)?;
-                writer.write_u8(*transposition_len)?;
-                writer.write_u8(*transposition_offset)?;
+                writer.write_all(&[*locator_block_len])?;
+                writer.write_all(&[*locator_node_len])?;
+                writer.write_all(&[*function_len])?;
+                writer.write_all(&[*arg_len])?;
+                writer.write_all(&[*transposition_len])?;
+                writer.write_all(&[*transposition_offset])?;
             }
             SRv6ServiceSubSubTlv::Unknown { value, .. } => {
                 writer.write_all(value)?;

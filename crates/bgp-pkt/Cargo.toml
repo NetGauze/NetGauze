@@ -22,7 +22,6 @@ netgauze-serde-macros = { workspace = true, optional = true }
 ipnet = { workspace = true, features = ["serde"] }
 strum_macros = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-byteorder = { workspace = true, optional = true }
 criterion = { workspace = true, optional = true } # Dev dep for bench
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
@@ -35,7 +34,6 @@ thiserror = { workspace = true }
 [features]
 default = ["serde"]
 serde = [
-    "byteorder",
     "netgauze-parse-utils",
     "netgauze-serde-macros",
 ]

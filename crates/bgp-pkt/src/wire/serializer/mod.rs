@@ -24,7 +24,6 @@ pub mod path_attribute;
 pub mod route_refresh;
 pub mod update;
 
-use byteorder::{NetworkEndian, WriteBytesExt};
 use std::io::Write;
 use std::net::IpAddr;
 
@@ -89,25 +88,25 @@ impl WritablePdu<BgpMessageWritingError> for BgpMessage {
             Self::Update(_) | Self::Notification(_) | Self::RouteRefresh(_) => {}
         }
         writer.write_all(&u128::MAX.to_be_bytes())?;
-        writer.write_u16::<NetworkEndian>(len as u16)?;
+        writer.write_all(&(len as u16).to_be_bytes())?;
         match self {
             Self::Open(open) => {
-                writer.write_u8(self.get_type().into())?;
+                writer.write_all(&[self.get_type().into()])?;
                 open.write(writer)?;
             }
             Self::Update(update) => {
-                writer.write_u8(self.get_type().into())?;
+                writer.write_all(&[self.get_type().into()])?;
                 update.write(writer)?;
             }
             Self::Notification(notification) => {
-                writer.write_u8(self.get_type().into())?;
+                writer.write_all(&[self.get_type().into()])?;
                 notification.write(writer)?;
             }
             Self::KeepAlive => {
-                writer.write_u8(self.get_type().into())?;
+                writer.write_all(&[self.get_type().into()])?;
             }
             Self::RouteRefresh(route_refresh) => {
-                writer.write_u8(self.get_type().into())?;
+                writer.write_all(&[self.get_type().into()])?;
                 route_refresh.write(writer)?;
             }
         }
@@ -134,11 +133,11 @@ impl WritablePdu<IpAddrWritingError> for IpAddr {
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), IpAddrWritingError> {
         match self {
             IpAddr::V4(value) => {
-                writer.write_u8(IPV4_LEN)?;
+                writer.write_all(&[IPV4_LEN])?;
                 writer.write_all(&value.octets())?;
             }
             IpAddr::V6(value) => {
-                writer.write_u8(IPV6_LEN)?;
+                writer.write_all(&[IPV6_LEN])?;
                 writer.write_all(&value.octets())?;
             }
         }
@@ -171,8 +170,8 @@ pub fn write_tlv_header_t16_l16<T: Write>(
     // do not account for the tlv type u16 and tlv length u16
     let effective_length = tlv_length - 4;
 
-    writer.write_u16::<NetworkEndian>(tlv_type)?;
-    writer.write_u16::<NetworkEndian>(effective_length)?;
+    writer.write_all(&tlv_type.to_be_bytes())?;
+    writer.write_all(&effective_length.to_be_bytes())?;
 
     Ok(())
 }
@@ -202,8 +201,8 @@ fn write_tlv_header_t8_l16<T: Write>(
     // do not account for the tlv type u8 and tlv length u16
     let effective_length = tlv_length - 3;
 
-    writer.write_u8(tlv_type)?;
-    writer.write_u16::<NetworkEndian>(effective_length)?;
+    writer.write_all(&[tlv_type])?;
+    writer.write_all(&effective_length.to_be_bytes())?;
 
     Ok(())
 }
@@ -237,7 +236,7 @@ impl WritablePdu<MultiTopologyIdWritingError> for MultiTopologyId {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError> {
-        writer.write_u16::<NetworkEndian>(self.value())?;
+        writer.write_all(&self.value().to_be_bytes())?;
 
         Ok(())
     }

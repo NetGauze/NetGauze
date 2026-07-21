@@ -21,7 +21,6 @@ use crate::iana::{
     TransitiveOpaqueExtendedCommunitySubType, TransitiveTwoOctetExtendedCommunitySubType,
 };
 use crate::wire::serializer::nlri::MacAddressWritingError;
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
@@ -39,7 +38,7 @@ impl WritablePdu<CommunityWritingError> for Community {
     }
 
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), CommunityWritingError> {
-        writer.write_u32::<NetworkEndian>(self.value())?;
+        writer.write_all(&self.value().to_be_bytes())?;
         Ok(())
     }
 }
@@ -96,47 +95,47 @@ impl WritablePdu<ExtendedCommunityWritingError> for ExtendedCommunity {
     ) -> Result<(), ExtendedCommunityWritingError> {
         match self {
             ExtendedCommunity::TransitiveTwoOctet(value) => {
-                writer.write_u8(BgpExtendedCommunityType::TransitiveTwoOctet as u8)?;
+                writer.write_all(&[BgpExtendedCommunityType::TransitiveTwoOctet as u8])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::NonTransitiveTwoOctet(value) => {
-                writer.write_u8(BgpExtendedCommunityType::NonTransitiveTwoOctet as u8)?;
+                writer.write_all(&[BgpExtendedCommunityType::NonTransitiveTwoOctet as u8])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::TransitiveIpv4(value) => {
-                writer.write_u8(BgpExtendedCommunityType::TransitiveIpv4 as u8)?;
+                writer.write_all(&[BgpExtendedCommunityType::TransitiveIpv4 as u8])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::NonTransitiveIpv4(value) => {
-                writer.write_u8(BgpExtendedCommunityType::NonTransitiveIpv4 as u8)?;
+                writer.write_all(&[BgpExtendedCommunityType::NonTransitiveIpv4 as u8])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::TransitiveFourOctet(value) => {
-                writer.write_u8(BgpExtendedCommunityType::TransitiveFourOctet as u8)?;
+                writer.write_all(&[BgpExtendedCommunityType::TransitiveFourOctet as u8])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::NonTransitiveFourOctet(value) => {
-                writer.write_u8(BgpExtendedCommunityType::NonTransitiveFourOctet as u8)?;
+                writer.write_all(&[BgpExtendedCommunityType::NonTransitiveFourOctet as u8])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::TransitiveOpaque(value) => {
-                writer.write_u8(BgpExtendedCommunityType::TransitiveOpaque as u8)?;
+                writer.write_all(&[BgpExtendedCommunityType::TransitiveOpaque as u8])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::NonTransitiveOpaque(value) => {
-                writer.write_u8(BgpExtendedCommunityType::NonTransitiveOpaque as u8)?;
+                writer.write_all(&[BgpExtendedCommunityType::NonTransitiveOpaque as u8])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::Experimental(value) => {
-                writer.write_u8(value.code())?;
+                writer.write_all(&[value.code()])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::Evpn(value) => {
-                writer.write_u8(BgpExtendedCommunityType::Evpn as u8)?;
+                writer.write_all(&[BgpExtendedCommunityType::Evpn as u8])?;
                 value.write(writer)?;
             }
             ExtendedCommunity::Unknown(value) => {
-                writer.write_u8(value.code())?;
+                writer.write_all(&[value.code()])?;
                 value.write(writer)?;
             }
         };
@@ -170,15 +169,15 @@ impl WritablePdu<ExtendedCommunityIpv6WritingError> for ExtendedCommunityIpv6 {
     ) -> Result<(), ExtendedCommunityIpv6WritingError> {
         match self {
             Self::TransitiveIpv6(value) => {
-                writer.write_u8(BgpExtendedCommunityIpv6Type::TransitiveIpv6 as u8)?;
+                writer.write_all(&[BgpExtendedCommunityIpv6Type::TransitiveIpv6 as u8])?;
                 value.write(writer)?;
             }
             Self::NonTransitiveIpv6(value) => {
-                writer.write_u8(BgpExtendedCommunityIpv6Type::NonTransitiveIpv6 as u8)?;
+                writer.write_all(&[BgpExtendedCommunityIpv6Type::NonTransitiveIpv6 as u8])?;
                 value.write(writer)?;
             }
             Self::Unknown(value) => {
-                writer.write_u8(value.code())?;
+                writer.write_all(&[value.code()])?;
                 value.write(writer)?;
             }
         };
@@ -201,9 +200,9 @@ impl WritablePdu<LargeCommunityWritingError> for LargeCommunity {
     }
 
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), LargeCommunityWritingError> {
-        writer.write_u32::<NetworkEndian>(self.global_admin())?;
-        writer.write_u32::<NetworkEndian>(self.local_data1())?;
-        writer.write_u32::<NetworkEndian>(self.local_data2())?;
+        writer.write_all(&self.global_admin().to_be_bytes())?;
+        writer.write_all(&self.local_data1().to_be_bytes())?;
+        writer.write_all(&self.local_data2().to_be_bytes())?;
         Ok(())
     }
 }
@@ -314,9 +313,9 @@ impl WritablePdu<TransitiveTwoOctetExtendedCommunityWritingError>
                 local_admin,
             } => (*sub_type, global_admin, local_admin),
         };
-        writer.write_u8(sub_type)?;
-        writer.write_u16::<NetworkEndian>(*global_admin)?;
-        writer.write_u32::<NetworkEndian>(*local_admin)?;
+        writer.write_all(&[sub_type])?;
+        writer.write_all(&(*global_admin).to_be_bytes())?;
+        writer.write_all(&(*local_admin).to_be_bytes())?;
         Ok(())
     }
 }
@@ -363,9 +362,9 @@ impl WritablePdu<NonTransitiveTwoOctetExtendedCommunityWritingError>
                 local_admin,
             } => (*sub_type, global_admin, local_admin),
         };
-        writer.write_u8(sub_type)?;
-        writer.write_u16::<NetworkEndian>(*global_admin)?;
-        writer.write_u32::<NetworkEndian>(*local_admin)?;
+        writer.write_all(&[sub_type])?;
+        writer.write_all(&(*global_admin).to_be_bytes())?;
+        writer.write_all(&(*local_admin).to_be_bytes())?;
         Ok(())
     }
 }
@@ -514,9 +513,9 @@ impl WritablePdu<TransitiveIpv4ExtendedCommunityWritingError> for TransitiveIpv4
                 local_admin,
             } => (*sub_type, global_admin, local_admin),
         };
-        writer.write_u8(sub_type)?;
+        writer.write_all(&[sub_type])?;
         writer.write_all(&global_admin.octets())?;
-        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        writer.write_all(&(*local_admin).to_be_bytes())?;
         Ok(())
     }
 }
@@ -547,9 +546,9 @@ impl WritablePdu<NonTransitiveIpv4ExtendedCommunityWritingError>
                 local_admin,
             } => (*sub_type, global_admin, local_admin),
         };
-        writer.write_u8(sub_type)?;
+        writer.write_all(&[sub_type])?;
         writer.write_all(&global_admin.octets())?;
-        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        writer.write_all(&(*local_admin).to_be_bytes())?;
         Ok(())
     }
 }
@@ -644,9 +643,9 @@ impl WritablePdu<TransitiveFourOctetExtendedCommunityWritingError>
                 local_admin,
             } => (*sub_type, global_admin, local_admin),
         };
-        writer.write_u8(sub_type)?;
-        writer.write_u32::<NetworkEndian>(*global_admin)?;
-        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        writer.write_all(&[sub_type])?;
+        writer.write_all(&(*global_admin).to_be_bytes())?;
+        writer.write_all(&(*local_admin).to_be_bytes())?;
         Ok(())
     }
 }
@@ -677,9 +676,9 @@ impl WritablePdu<NonTransitiveFourOctetExtendedCommunityWritingError>
                 local_admin,
             } => (*sub_type, global_admin, local_admin),
         };
-        writer.write_u8(sub_type)?;
-        writer.write_u32::<NetworkEndian>(*global_admin)?;
-        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        writer.write_all(&[sub_type])?;
+        writer.write_all(&(*global_admin).to_be_bytes())?;
+        writer.write_all(&(*local_admin).to_be_bytes())?;
         Ok(())
     }
 }
@@ -705,12 +704,13 @@ impl WritablePdu<TransitiveOpaqueExtendedCommunityWritingError>
     ) -> Result<(), TransitiveOpaqueExtendedCommunityWritingError> {
         match self {
             Self::DefaultGateway => {
-                writer.write_u8(TransitiveOpaqueExtendedCommunitySubType::DefaultGateway as u8)?;
-                writer.write_u16::<NetworkEndian>(0)?;
-                writer.write_u32::<NetworkEndian>(0)?;
+                writer
+                    .write_all(&[TransitiveOpaqueExtendedCommunitySubType::DefaultGateway as u8])?;
+                writer.write_all(&0u16.to_be_bytes())?;
+                writer.write_all(&0u32.to_be_bytes())?;
             }
             Self::Unassigned { sub_type, value } => {
-                writer.write_u8(*sub_type)?;
+                writer.write_all(&[*sub_type])?;
                 writer.write_all(value)?;
             }
         }
@@ -739,7 +739,7 @@ impl WritablePdu<NonTransitiveOpaqueExtendedCommunityWritingError>
     ) -> Result<(), NonTransitiveOpaqueExtendedCommunityWritingError> {
         match self {
             Self::Unassigned { sub_type, value } => {
-                writer.write_u8(*sub_type)?;
+                writer.write_all(&[*sub_type])?;
                 writer.write_all(value)?;
             }
         }
@@ -764,7 +764,7 @@ impl WritablePdu<ExperimentalExtendedCommunityWritingError> for ExperimentalExte
         &self,
         writer: &mut T,
     ) -> Result<(), ExperimentalExtendedCommunityWritingError> {
-        writer.write_u8(self.sub_type())?;
+        writer.write_all(&[self.sub_type()])?;
         writer.write_all(self.value())?;
         Ok(())
     }
@@ -787,7 +787,7 @@ impl WritablePdu<UnknownExtendedCommunityWritingError> for UnknownExtendedCommun
         &self,
         writer: &mut T,
     ) -> Result<(), UnknownExtendedCommunityWritingError> {
-        writer.write_u8(self.sub_type())?;
+        writer.write_all(&[self.sub_type()])?;
         writer.write_all(self.value())?;
         Ok(())
     }
@@ -889,9 +889,9 @@ impl WritablePdu<TransitiveIpv6ExtendedCommunityWritingError> for TransitiveIpv6
                 local_admin,
             } => (*sub_type, global_admin, local_admin),
         };
-        writer.write_u8(sub_type)?;
+        writer.write_all(&[sub_type])?;
         writer.write_all(&global_admin.octets())?;
-        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        writer.write_all(&(*local_admin).to_be_bytes())?;
         Ok(())
     }
 }
@@ -922,9 +922,9 @@ impl WritablePdu<NonTransitiveIpv6ExtendedCommunityWritingError>
                 local_admin,
             } => (*sub_type, global_admin, local_admin),
         };
-        writer.write_u8(sub_type)?;
+        writer.write_all(&[sub_type])?;
         writer.write_all(&global_admin.octets())?;
-        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        writer.write_all(&(*local_admin).to_be_bytes())?;
         Ok(())
     }
 }
@@ -946,7 +946,7 @@ impl WritablePdu<UnknownExtendedCommunityIpv6WritingError> for UnknownExtendedCo
         &self,
         writer: &mut T,
     ) -> Result<(), UnknownExtendedCommunityIpv6WritingError> {
-        writer.write_u8(self.sub_type())?;
+        writer.write_all(&[self.sub_type()])?;
         writer.write_all(self.value())?;
         Ok(())
     }
@@ -972,39 +972,39 @@ impl WritablePdu<EvpnExtendedCommunityWritingError> for EvpnExtendedCommunity {
     ) -> Result<(), EvpnExtendedCommunityWritingError> {
         match self {
             Self::MacMobility { flags, seq_no } => {
-                writer.write_u8(EvpnExtendedCommunitySubType::MacMobility as u8)?;
-                writer.write_u8(*flags)?;
+                writer.write_all(&[EvpnExtendedCommunitySubType::MacMobility as u8])?;
+                writer.write_all(&[*flags])?;
                 // reserved
-                writer.write_u8(0)?;
-                writer.write_u32::<NetworkEndian>(*seq_no)?;
+                writer.write_all(&[0])?;
+                writer.write_all(&(*seq_no).to_be_bytes())?;
             }
             Self::EsiLabel { flags, esi_label } => {
-                writer.write_u8(EvpnExtendedCommunitySubType::EsiLabel as u8)?;
-                writer.write_u8(*flags)?;
+                writer.write_all(&[EvpnExtendedCommunitySubType::EsiLabel as u8])?;
+                writer.write_all(&[*flags])?;
                 // reserved
-                writer.write_u16::<NetworkEndian>(0)?;
+                writer.write_all(&0u16.to_be_bytes())?;
                 writer.write_all(esi_label)?;
             }
             Self::EsImportRouteTarget { route_target } => {
-                writer.write_u8(EvpnExtendedCommunitySubType::EsImportRouteTarget as u8)?;
+                writer.write_all(&[EvpnExtendedCommunitySubType::EsImportRouteTarget as u8])?;
                 writer.write_all(route_target)?;
             }
             Self::EvpnRoutersMac { mac } => {
-                writer.write_u8(EvpnExtendedCommunitySubType::EvpnRoutersMac as u8)?;
+                writer.write_all(&[EvpnExtendedCommunitySubType::EvpnRoutersMac as u8])?;
                 mac.write(writer)?;
             }
             Self::EvpnL2Attribute {
                 control_flags,
                 l2_mtu,
             } => {
-                writer.write_u8(EvpnExtendedCommunitySubType::EvpnL2Attribute as u8)?;
-                writer.write_u16::<NetworkEndian>(*control_flags)?;
-                writer.write_u16::<NetworkEndian>(*l2_mtu)?;
+                writer.write_all(&[EvpnExtendedCommunitySubType::EvpnL2Attribute as u8])?;
+                writer.write_all(&(*control_flags).to_be_bytes())?;
+                writer.write_all(&(*l2_mtu).to_be_bytes())?;
                 // Reserved 2-octets
-                writer.write_u16::<NetworkEndian>(0)?;
+                writer.write_all(&0u16.to_be_bytes())?;
             }
             Self::Unassigned { sub_type, value } => {
-                writer.write_u8(*sub_type)?;
+                writer.write_all(&[*sub_type])?;
                 writer.write_all(value)?;
             }
         }

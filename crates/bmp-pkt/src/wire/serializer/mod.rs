@@ -19,7 +19,6 @@ pub mod v3;
 pub mod v4;
 
 use crate::BmpMessage;
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 use std::io::Write;
@@ -44,8 +43,8 @@ impl WritablePdu<BmpMessageWritingError> for BmpMessage {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpMessageWritingError> {
-        writer.write_u8(self.get_version().into())?;
-        writer.write_u32::<NetworkEndian>(self.len() as u32)?;
+        writer.write_all(&[self.get_version().into()])?;
+        writer.write_all(&(self.len() as u32).to_be_bytes())?;
 
         match self {
             Self::V3(value) => {

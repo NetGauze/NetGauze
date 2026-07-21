@@ -15,7 +15,6 @@
 
 use crate::nlri::*;
 use crate::wire::serializer::round_len;
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 use std::io::Write;
@@ -46,7 +45,7 @@ impl WritablePdu<RouteDistinguisherWritingError> for RouteDistinguisher {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteDistinguisherWritingError> {
-        writer.write_u64::<NetworkEndian>(<RouteDistinguisher as Into<u64>>::into(*self))?;
+        writer.write_all(&(<RouteDistinguisher as Into<u64>>::into(*self)).to_be_bytes())?;
         Ok(())
     }
 }
@@ -130,7 +129,7 @@ impl WritablePdu<LabeledNextHopWritingError> for LabeledNextHop {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), LabeledNextHopWritingError> {
-        writer.write_u8((self.len() - Self::BASE_LENGTH) as u8)?;
+        writer.write_all(&[(self.len() - Self::BASE_LENGTH) as u8])?;
         match self {
             Self::Ipv4(value) => value.write(writer)?,
             Self::Ipv6(value) => value.write(writer)?,
@@ -154,7 +153,7 @@ impl WritablePdu<Ipv6UnicastWritingError> for Ipv6Unicast {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv6UnicastWritingError> {
         let len = self.len() - Self::BASE_LENGTH;
-        writer.write_u8(self.address().prefix_len())?;
+        writer.write_all(&[self.address().prefix_len()])?;
         writer.write_all(&self.address().network().octets()[..len])?;
         Ok(())
     }
@@ -175,7 +174,7 @@ impl WritablePdu<Ipv6UnicastAddressWritingError> for Ipv6UnicastAddress {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv6UnicastAddressWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
         self.network().write(writer)?;
         Ok(())
@@ -197,7 +196,7 @@ impl WritablePdu<Ipv6MulticastWritingError> for Ipv6Multicast {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv6MulticastWritingError> {
         let len = self.len() - Self::BASE_LENGTH;
-        writer.write_u8(self.address().prefix_len())?;
+        writer.write_all(&[self.address().prefix_len()])?;
         writer.write_all(&self.address().network().octets()[..len])?;
         Ok(())
     }
@@ -218,7 +217,7 @@ impl WritablePdu<Ipv6MulticastAddressWritingError> for Ipv6MulticastAddress {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv6MulticastAddressWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
         self.network().write(writer)?;
         Ok(())
@@ -246,12 +245,12 @@ impl WritablePdu<Ipv6MplsVpnUnicastAddressWritingError> for Ipv6MplsVpnUnicastAd
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv6MplsVpnUnicastAddressWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
         let prefix_len = self.rd().len() * 8
             + self.label_stack().len() * 3 * 8
             + self.network().address().prefix_len() as usize;
-        writer.write_u8(prefix_len as u8)?;
+        writer.write_all(&[prefix_len as u8])?;
         for label in self.label_stack() {
             label.write(writer)?;
         }
@@ -278,7 +277,7 @@ impl WritablePdu<Ipv4UnicastWritingError> for Ipv4Unicast {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4UnicastWritingError> {
         let len = self.len() - Self::BASE_LENGTH;
-        writer.write_u8(self.address().prefix_len())?;
+        writer.write_all(&[self.address().prefix_len()])?;
         writer.write_all(&self.address().network().octets()[..len])?;
         Ok(())
     }
@@ -299,7 +298,7 @@ impl WritablePdu<Ipv4UnicastAddressWritingError> for Ipv4UnicastAddress {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4UnicastAddressWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
         self.network().write(writer)?;
         Ok(())
@@ -321,7 +320,7 @@ impl WritablePdu<Ipv4MulticastWritingError> for Ipv4Multicast {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4MulticastWritingError> {
         let len = self.len() - Self::BASE_LENGTH;
-        writer.write_u8(self.address().prefix_len())?;
+        writer.write_all(&[self.address().prefix_len()])?;
         writer.write_all(&self.address().network().octets()[..len])?;
         Ok(())
     }
@@ -342,7 +341,7 @@ impl WritablePdu<Ipv4MulticastAddressWritingError> for Ipv4MulticastAddress {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4MulticastAddressWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
         self.network().write(writer)?;
         Ok(())
@@ -370,12 +369,12 @@ impl WritablePdu<Ipv4MplsVpnUnicastAddressWritingError> for Ipv4MplsVpnUnicastAd
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4MplsVpnUnicastAddressWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
         let prefix_len = self.rd().len() * 8
             + self.label_stack().len() * 3 * 8
             + self.network().address().prefix_len() as usize;
-        writer.write_u8(prefix_len as u8)?;
+        writer.write_all(&[prefix_len as u8])?;
         for label in self.label_stack() {
             label.write(writer)?;
         }
@@ -418,7 +417,7 @@ impl WritablePdu<EthernetTagWritingError> for EthernetTag {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), EthernetTagWritingError> {
-        writer.write_u32::<NetworkEndian>(self.0)?;
+        writer.write_all(&self.0.to_be_bytes())?;
         Ok(())
     }
 }
@@ -504,16 +503,16 @@ impl WritablePdu<MacIpAdvertisementWritingError> for MacIpAdvertisement {
         self.rd().write(writer)?;
         self.segment_id().write(writer)?;
         self.tag().write(writer)?;
-        writer.write_u8(MAC_ADDRESS_LEN_BITS)?;
+        writer.write_all(&[MAC_ADDRESS_LEN_BITS])?;
         self.mac().write(writer)?;
         match self.ip() {
-            None => writer.write_u8(0)?,
+            None => writer.write_all(&[0])?,
             Some(IpAddr::V4(addr)) => {
-                writer.write_u8(IPV4_LEN_BITS)?;
+                writer.write_all(&[IPV4_LEN_BITS])?;
                 writer.write_all(&addr.octets())?;
             }
             Some(IpAddr::V6(addr)) => {
-                writer.write_u8(IPV6_LEN_BITS)?;
+                writer.write_all(&[IPV6_LEN_BITS])?;
                 writer.write_all(&addr.octets())?;
             }
         }
@@ -557,11 +556,11 @@ impl WritablePdu<InclusiveMulticastEthernetTagRouteWritingError>
         self.tag().write(writer)?;
         match self.ip() {
             IpAddr::V4(addr) => {
-                writer.write_u8(IPV4_LEN_BITS)?;
+                writer.write_all(&[IPV4_LEN_BITS])?;
                 writer.write_all(&addr.octets())?;
             }
             IpAddr::V6(addr) => {
-                writer.write_u8(IPV6_LEN_BITS)?;
+                writer.write_all(&[IPV6_LEN_BITS])?;
                 writer.write_all(&addr.octets())?;
             }
         }
@@ -596,11 +595,11 @@ impl WritablePdu<EthernetSegmentRouteWritingError> for EthernetSegmentRoute {
         self.segment_id().write(writer)?;
         match self.ip() {
             IpAddr::V4(addr) => {
-                writer.write_u8(IPV4_LEN_BITS)?;
+                writer.write_all(&[IPV4_LEN_BITS])?;
                 writer.write_all(&addr.octets())?;
             }
             IpAddr::V6(addr) => {
-                writer.write_u8(IPV6_LEN_BITS)?;
+                writer.write_all(&[IPV6_LEN_BITS])?;
                 writer.write_all(&addr.octets())?;
             }
         }
@@ -638,10 +637,10 @@ impl WritablePdu<L2EvpnRouteWritingError> for L2EvpnRoute {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), L2EvpnRouteWritingError> {
         match self.route_type() {
-            Ok(code) => writer.write_u8(code as u8)?,
-            Err(code) => writer.write_u8(code)?,
+            Ok(code) => writer.write_all(&[code as u8])?,
+            Err(code) => writer.write_all(&[code])?,
         }
-        writer.write_u8((self.len() - Self::BASE_LENGTH) as u8)?;
+        writer.write_all(&[(self.len() - Self::BASE_LENGTH) as u8])?;
         match self {
             Self::EthernetAutoDiscovery(value) => value.write(writer)?,
             Self::MacIpAdvertisement(value) => value.write(writer)?,
@@ -671,7 +670,7 @@ impl WritablePdu<L2EvpnAddressWritingError> for L2EvpnAddress {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), L2EvpnAddressWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
         self.route().write(writer)?;
         Ok(())
@@ -699,7 +698,7 @@ impl WritablePdu<L2EvpnIpv4PrefixRouteWritingError> for L2EvpnIpv4PrefixRoute {
         self.rd().write(writer)?;
         self.segment_id().write(writer)?;
         self.tag().write(writer)?;
-        writer.write_u8(self.prefix().prefix_len())?;
+        writer.write_all(&[self.prefix().prefix_len()])?;
         writer.write_all(&self.prefix().network().octets())?;
         writer.write_all(&self.gateway().octets())?;
         self.label().write(writer)?;
@@ -728,7 +727,7 @@ impl WritablePdu<L2EvpnIpv6PrefixRouteWritingError> for L2EvpnIpv6PrefixRoute {
         self.rd().write(writer)?;
         self.segment_id().write(writer)?;
         self.tag().write(writer)?;
-        writer.write_u8(self.prefix().prefix_len())?;
+        writer.write_all(&[self.prefix().prefix_len()])?;
         writer.write_all(&self.prefix().network().octets())?;
         writer.write_all(&self.gateway().octets())?;
         self.label().write(writer)?;
@@ -783,15 +782,15 @@ impl WritablePdu<RouteTargetMembershipAddressWritingError> for RouteTargetMember
         writer: &mut T,
     ) -> Result<(), RouteTargetMembershipAddressWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(path_id)?;
+            writer.write_all(&path_id.to_be_bytes())?;
         }
         if let Some(membership) = self.membership() {
             let prefix_len = membership.len() * 8;
-            writer.write_u8(prefix_len as u8)?;
+            writer.write_all(&[prefix_len as u8])?;
             membership.write(writer)?;
         } else {
             // Default route with zero prefix length
-            writer.write_u8(0)?;
+            writer.write_all(&[0])?;
         }
         Ok(())
     }
@@ -811,7 +810,7 @@ impl WritablePdu<RouteTargetMembershipWritingError> for RouteTargetMembership {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteTargetMembershipWritingError> {
-        writer.write_u32::<NetworkEndian>(self.origin_as())?;
+        writer.write_all(&self.origin_as().to_be_bytes())?;
         writer.write_all(self.route_target())?;
         Ok(())
     }
@@ -843,7 +842,7 @@ impl WritablePdu<Ipv4NlriMplsLabelsAddressWritingError> for Ipv4NlriMplsLabelsAd
                 len,
             ));
         }
-        writer.write_u8(len as u8)?;
+        writer.write_all(&[len as u8])?;
         for label in self.labels() {
             label.write(writer)?;
         }
@@ -879,7 +878,7 @@ impl WritablePdu<Ipv6NlriMplsLabelsAddressWritingError> for Ipv6NlriMplsLabelsAd
                 len,
             ));
         }
-        writer.write_u8(len as u8)?;
+        writer.write_all(&[len as u8])?;
         for label in self.labels() {
             label.write(writer)?;
         }

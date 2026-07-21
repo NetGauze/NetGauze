@@ -15,8 +15,6 @@
 
 use std::io::Write;
 
-use byteorder::{NetworkEndian, WriteBytesExt};
-
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
@@ -42,12 +40,12 @@ impl WritablePdu<BgpOpenMessageWritingError> for BgpOpenMessage {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpOpenMessageWritingError> {
-        writer.write_u8(self.version())?;
-        writer.write_u16::<NetworkEndian>(self.my_as())?;
-        writer.write_u16::<NetworkEndian>(self.hold_time())?;
-        writer.write_u32::<NetworkEndian>(self.bgp_id().into())?;
+        writer.write_all(&[self.version()])?;
+        writer.write_all(&self.my_as().to_be_bytes())?;
+        writer.write_all(&self.hold_time().to_be_bytes())?;
+        writer.write_all(&u32::from(self.bgp_id()).to_be_bytes())?;
         let params_length: usize = self.params().iter().map(BgpOpenMessageParameter::len).sum();
-        writer.write_u8(params_length as u8)?;
+        writer.write_all(&[params_length as u8])?;
         for param in self.params() {
             param.write(writer)?;
         }
@@ -72,8 +70,8 @@ impl WritablePdu<BgpOpenMessageWritingError> for BgpOpenMessageParameter {
         let length = self.len() - 2;
         match self {
             BgpOpenMessageParameter::Capabilities(capabilities) => {
-                writer.write_u8(BgpOpenMessageParameterType::Capability.into())?;
-                writer.write_u8(length as u8)?;
+                writer.write_all(&[BgpOpenMessageParameterType::Capability.into()])?;
+                writer.write_all(&[length as u8])?;
                 for capability in capabilities {
                     capability.write(writer)?;
                 }

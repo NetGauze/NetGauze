@@ -18,7 +18,6 @@
 use crate::BgpUpdateMessage;
 use crate::wire::serializer::nlri::Ipv4UnicastAddressWritingError;
 use crate::wire::serializer::path_attribute::PathAttributeWritingError;
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
@@ -53,7 +52,7 @@ impl WritablePdu<BgpUpdateMessageWritingError> for BgpUpdateMessage {
             .iter()
             .map(|w| w.len())
             .sum::<usize>();
-        writer.write_u16::<NetworkEndian>(withdrawn_len as u16)?;
+        writer.write_all(&(withdrawn_len as u16).to_be_bytes())?;
         for withdrawn in self.withdraw_routes() {
             withdrawn.write(writer)?;
         }
@@ -62,7 +61,7 @@ impl WritablePdu<BgpUpdateMessageWritingError> for BgpUpdateMessage {
             .iter()
             .map(|attr| attr.len())
             .sum::<usize>();
-        writer.write_u16::<NetworkEndian>(attrs_len as u16)?;
+        writer.write_all(&(attrs_len as u16).to_be_bytes())?;
         for attr in self.path_attributes() {
             attr.write(writer)?;
         }

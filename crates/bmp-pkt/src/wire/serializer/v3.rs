@@ -24,7 +24,6 @@ use crate::v3::{
     StatisticsReportMessage, TerminationInformation, TerminationMessage,
 };
 use crate::{BmpPeerType, PeerHeader};
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
 use netgauze_bgp_pkt::wire::serializer::nlri::RouteDistinguisherWritingError;
 use netgauze_parse_utils::WritablePdu;
@@ -66,7 +65,7 @@ impl WritablePdu<BmpMessageValueWritingError> for BmpMessageValue {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpMessageValueWritingError> {
-        writer.write_u8(self.get_type().into())?;
+        writer.write_all(&[self.get_type().into()])?;
         match self {
             Self::RouteMonitoring(value) => value.write(writer)?,
             Self::StatisticsReport(value) => value.write(writer)?,
@@ -182,8 +181,8 @@ impl WritablePdu<BmpPeerTypeWritingError> for BmpPeerType {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpPeerTypeWritingError> {
-        writer.write_u8(self.get_type().into())?;
-        writer.write_u8(self.get_flags_value())?;
+        writer.write_all(&[self.get_type().into()])?;
+        writer.write_all(&[self.get_flags_value()])?;
         Ok(())
     }
 }
@@ -212,27 +211,27 @@ impl WritablePdu<PeerHeaderWritingError> for PeerHeader {
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), PeerHeaderWritingError> {
         self.peer_type.write(writer)?;
         match self.rd() {
-            None => writer.write_u64::<NetworkEndian>(0)?,
+            None => writer.write_all(&0u64.to_be_bytes())?,
             Some(value) => value.write(writer)?,
         }
         match self.address() {
             Some(IpAddr::V4(ipv4)) => {
-                writer.write_u64::<NetworkEndian>(0)?;
-                writer.write_u32::<NetworkEndian>(0)?;
+                writer.write_all(&0u64.to_be_bytes())?;
+                writer.write_all(&0u32.to_be_bytes())?;
                 writer.write_all(&ipv4.octets())?;
             }
             Some(IpAddr::V6(ipv6)) => {
                 writer.write_all(&ipv6.octets())?;
             }
-            None => writer.write_u128::<NetworkEndian>(0)?,
+            None => writer.write_all(&0u128.to_be_bytes())?,
         }
-        writer.write_u32::<NetworkEndian>(self.peer_as())?;
+        writer.write_all(&self.peer_as().to_be_bytes())?;
         writer.write_all(&self.bgp_id().octets())?;
         match self.timestamp() {
-            None => writer.write_u64::<NetworkEndian>(0)?,
+            None => writer.write_all(&0u64.to_be_bytes())?,
             Some(time) => {
-                writer.write_u32::<NetworkEndian>(time.timestamp() as u32)?;
-                writer.write_u32::<NetworkEndian>(time.timestamp_subsec_micros())?;
+                writer.write_all(&(time.timestamp() as u32).to_be_bytes())?;
+                writer.write_all(&time.timestamp_subsec_micros().to_be_bytes())?;
             }
         }
         Ok(())
@@ -265,14 +264,14 @@ impl WritablePdu<RouteMirroringValueWritingError> for RouteMirroringValue {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteMirroringValueWritingError> {
-        writer.write_u16::<NetworkEndian>(self.get_type().into())?;
-        writer.write_u16::<NetworkEndian>((self.len() - Self::BASE_LENGTH) as u16)?;
+        writer.write_all(&u16::from(self.get_type()).to_be_bytes())?;
+        writer.write_all(&((self.len() - Self::BASE_LENGTH) as u16).to_be_bytes())?;
         match self {
             Self::BgpMessage(msg) => match msg {
                 MirroredBgpMessage::Parsed(msg) => msg.write(writer)?,
                 MirroredBgpMessage::Raw(raw) => writer.write_all(raw)?,
             },
-            Self::Information(info) => writer.write_u16::<NetworkEndian>((*info).into())?,
+            Self::Information(info) => writer.write_all(&u16::from(*info).to_be_bytes())?,
             Self::Experimental65531(value) => writer.write_all(value)?,
             Self::Experimental65532(value) => writer.write_all(value)?,
             Self::Experimental65533(value) => writer.write_all(value)?,
@@ -348,47 +347,47 @@ impl WritablePdu<InitiationInformationWritingError> for InitiationInformation {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), InitiationInformationWritingError> {
-        writer.write_u16::<NetworkEndian>(self.get_type().into())?;
+        writer.write_all(&u16::from(self.get_type()).to_be_bytes())?;
         match self {
             Self::String(value) => {
                 let bytes = value.as_bytes();
-                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(&(bytes.len() as u16).to_be_bytes())?;
                 writer.write_all(bytes)?;
             }
             Self::SystemDescription(value) => {
                 let bytes = value.as_bytes();
-                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(&(bytes.len() as u16).to_be_bytes())?;
                 writer.write_all(bytes)?;
             }
             Self::SystemName(value) => {
                 let bytes = value.as_bytes();
-                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(&(bytes.len() as u16).to_be_bytes())?;
                 writer.write_all(bytes)?;
             }
             Self::VrfTableName(value) => {
                 let bytes = value.as_bytes();
-                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(&(bytes.len() as u16).to_be_bytes())?;
                 writer.write_all(bytes)?;
             }
             Self::AdminLabel(value) => {
                 let bytes = value.as_bytes();
-                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(&(bytes.len() as u16).to_be_bytes())?;
                 writer.write_all(bytes)?;
             }
             Self::Experimental65531(value) => {
-                writer.write_u16::<NetworkEndian>(value.len() as u16)?;
+                writer.write_all(&(value.len() as u16).to_be_bytes())?;
                 writer.write_all(value)?;
             }
             Self::Experimental65532(value) => {
-                writer.write_u16::<NetworkEndian>(value.len() as u16)?;
+                writer.write_all(&(value.len() as u16).to_be_bytes())?;
                 writer.write_all(value)?;
             }
             Self::Experimental65533(value) => {
-                writer.write_u16::<NetworkEndian>(value.len() as u16)?;
+                writer.write_all(&(value.len() as u16).to_be_bytes())?;
                 writer.write_all(value)?;
             }
             Self::Experimental65534(value) => {
-                writer.write_u16::<NetworkEndian>(value.len() as u16)?;
+                writer.write_all(&(value.len() as u16).to_be_bytes())?;
                 writer.write_all(value)?;
             }
         }
@@ -420,8 +419,8 @@ impl WritablePdu<PeerUpNotificationMessageWritingError> for PeerUpNotificationMe
         self.peer_header().write(writer)?;
         match self.local_address() {
             Some(IpAddr::V4(addr)) => {
-                writer.write_u64::<NetworkEndian>(0)?;
-                writer.write_u32::<NetworkEndian>(0)?;
+                writer.write_all(&0u64.to_be_bytes())?;
+                writer.write_all(&0u32.to_be_bytes())?;
                 writer.write_all(&addr.octets())?;
             }
             Some(IpAddr::V6(addr)) => writer.write_all(&addr.octets())?,
@@ -429,8 +428,8 @@ impl WritablePdu<PeerUpNotificationMessageWritingError> for PeerUpNotificationMe
                 writer.write_all(&[0x00; 16])?;
             }
         }
-        writer.write_u16::<NetworkEndian>(self.local_port().unwrap_or_default())?;
-        writer.write_u16::<NetworkEndian>(self.remote_port().unwrap_or_default())?;
+        writer.write_all(&self.local_port().unwrap_or_default().to_be_bytes())?;
+        writer.write_all(&self.remote_port().unwrap_or_default().to_be_bytes())?;
 
         self.sent_message().write(writer)?;
         self.received_message().write(writer)?;
@@ -498,11 +497,11 @@ impl WritablePdu<PeerDownNotificationReasonWritingError> for PeerDownNotificatio
         &self,
         writer: &mut T,
     ) -> Result<(), PeerDownNotificationReasonWritingError> {
-        writer.write_u8(self.get_type().into())?;
+        writer.write_all(&[self.get_type().into()])?;
         match self {
             Self::LocalSystemClosedNotificationPduFollows(msg) => msg.write(writer)?,
             Self::LocalSystemClosedFsmEventFollows(value) => {
-                writer.write_u16::<NetworkEndian>(*value)?
+                writer.write_all(&(*value).to_be_bytes())?
             }
             Self::RemoteSystemClosedNotificationPduFollows(msg) => msg.write(writer)?,
             Self::RemoteSystemClosedNoData => {}
@@ -561,11 +560,11 @@ impl WritablePdu<TerminationInformationWritingError> for TerminationInformation 
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), TerminationInformationWritingError> {
-        writer.write_u16::<NetworkEndian>(self.get_type().into())?;
-        writer.write_u16::<NetworkEndian>((self.len() - Self::BASE_LENGTH) as u16)?;
+        writer.write_all(&u16::from(self.get_type()).to_be_bytes())?;
+        writer.write_all(&((self.len() - Self::BASE_LENGTH) as u16).to_be_bytes())?;
         match self {
             Self::String(str) => writer.write_all(str.as_bytes())?,
-            Self::Reason(reason) => writer.write_u16::<NetworkEndian>((*reason).into())?,
+            Self::Reason(reason) => writer.write_all(&u16::from(*reason).to_be_bytes())?,
             Self::Experimental65531(value) => writer.write_all(value)?,
             Self::Experimental65532(value) => writer.write_all(value)?,
             Self::Experimental65533(value) => writer.write_all(value)?,
@@ -594,7 +593,7 @@ impl WritablePdu<StatisticsReportMessageWritingError> for StatisticsReportMessag
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), StatisticsReportMessageWritingError> {
         self.peer_header().write(writer)?;
-        writer.write_u32::<NetworkEndian>(self.counters().len() as u32)?;
+        writer.write_all(&(self.counters().len() as u32).to_be_bytes())?;
         for counter in self.counters() {
             counter.write(writer)?;
         }
@@ -668,203 +667,201 @@ impl WritablePdu<StatisticsCounterMessageWritingError> for StatisticsCounter {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), StatisticsCounterMessageWritingError> {
         match self.get_type() {
-            Ok(code) => writer.write_u16::<NetworkEndian>(code.into())?,
-            Err(code) => writer.write_u16::<NetworkEndian>(code)?,
+            Ok(code) => writer.write_all(&u16::from(code).to_be_bytes())?,
+            Err(code) => writer.write_all(&code.to_be_bytes())?,
         }
-        writer.write_u16::<NetworkEndian>((self.len() - Self::BASE_LENGTH) as u16)?;
+        writer.write_all(&((self.len() - Self::BASE_LENGTH) as u16).to_be_bytes())?;
         match self {
             Self::NumberOfPrefixesRejectedByInboundPolicy(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfDuplicatePrefixAdvertisements(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
-            Self::NumberOfDuplicateWithdraws(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
-            }
+            Self::NumberOfDuplicateWithdraws(value) => writer.write_all(&value.0.to_be_bytes())?,
             Self::NumberOfUpdatesInvalidatedDueToClusterListLoop(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfUpdatesInvalidatedDueToAsPathLoop(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfUpdatesInvalidatedDueToOriginatorId(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
-            Self::NumberOfRoutesInAdjRibIn(value) => writer.write_u64::<NetworkEndian>(value.0)?,
-            Self::NumberOfRoutesInLocRib(value) => writer.write_u64::<NetworkEndian>(value.0)?,
+            Self::NumberOfRoutesInAdjRibIn(value) => writer.write_all(&value.0.to_be_bytes())?,
+            Self::NumberOfRoutesInLocRib(value) => writer.write_all(&value.0.to_be_bytes())?,
             Self::NumberOfRoutesInPerAfiSafiAdjRibIn(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiLocRib(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfUpdatesSubjectedToTreatAsWithdraw(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfPrefixesSubjectedToTreatAsWithdraw(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfDuplicateUpdateMessagesReceived(value) => {
-                writer.write_u32::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfRoutesInPrePolicyAdjRibOut(value) => {
-                writer.write_u64::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfRoutesInPostPolicyAdjRibOut(value) => {
-                writer.write_u64::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPrePolicyAdjRibIn(value) => {
-                writer.write_u64::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPostPolicyAdjRibIn(value) => {
-                writer.write_u64::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiSuppressedByDamping(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiMarkedStaleByGr(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold(value) => {
-                writer.write_u64::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold(
                 address_type,
                 value,
             ) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(value) => {
-                writer.write_u64::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(
                 address_type,
                 value,
             ) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength(value) => {
-                writer.write_u64::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength(
                 address_type,
                 value,
             ) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki(
                 address_type,
                 value,
             ) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki(
                 address_type,
                 value,
             ) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected(address_type, value) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength(value) => {
-                writer.write_u64::<NetworkEndian>(value.0)?
+                writer.write_all(&value.0.to_be_bytes())?
             }
             Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength(
                 address_type,
                 value,
             ) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki(
                 address_type,
                 value,
             ) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki(
                 address_type,
                 value,
             ) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(
                 address_type,
                 value,
             ) => {
-                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
-                writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u64::<NetworkEndian>(value.0)?;
+                writer.write_all(&u16::from(address_type.address_family()).to_be_bytes())?;
+                writer.write_all(&[address_type.subsequent_address_family().into()])?;
+                writer.write_all(&value.0.to_be_bytes())?;
             }
             Self::Experimental65531(value) => writer.write_all(value)?,
             Self::Experimental65532(value) => writer.write_all(value)?,

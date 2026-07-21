@@ -16,7 +16,6 @@
 //! Serializer for BGP Route Refresh message
 
 use crate::BgpRouteRefreshMessage;
-use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
@@ -37,9 +36,9 @@ impl WritablePdu<BgpRouteRefreshMessageWritingError> for BgpRouteRefreshMessage 
         &self,
         writer: &mut T,
     ) -> Result<(), BgpRouteRefreshMessageWritingError> {
-        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
-        writer.write_u8(self.operation_type().into())?;
-        writer.write_u8(self.address_type().subsequent_address_family().into())?;
+        writer.write_all(&u16::from(self.address_type().address_family()).to_be_bytes())?;
+        writer.write_all(&[self.operation_type().into()])?;
+        writer.write_all(&[self.address_type().subsequent_address_family().into()])?;
         Ok(())
     }
 }
