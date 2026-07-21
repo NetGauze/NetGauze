@@ -72,7 +72,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsAttribute {
             let attribute = BgpLsAttributeValue::parse(&mut ls_buf)?;
             attributes.push(attribute);
         }
-        Ok(BgpLsAttribute { attributes })
+        Ok(BgpLsAttribute::new(attributes))
     }
 }
 
@@ -298,7 +298,7 @@ impl<'a> ParseFrom<'a> for SharedRiskLinkGroupValue {
     type Error = BgpLsAttributeParsingError;
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let value = cur.read_u32_be()?;
-        Ok(SharedRiskLinkGroupValue(value))
+        Ok(SharedRiskLinkGroupValue::new(value))
     }
 }
 

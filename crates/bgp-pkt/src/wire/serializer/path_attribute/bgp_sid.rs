@@ -127,8 +127,8 @@ impl WritablePdu<SrgbWritingError> for SegmentRoutingGlobalBlock {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), SrgbWritingError> {
-        self.first_label.write(writer)?;
-        writer.write_all(&self.range_size)?;
+        self.first_label().write(writer)?;
+        writer.write_all(self.range_size())?;
 
         Ok(())
     }

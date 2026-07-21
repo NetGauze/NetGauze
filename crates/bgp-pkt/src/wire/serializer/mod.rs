@@ -232,7 +232,7 @@ impl WritablePdu<MultiTopologyIdWritingError> for MultiTopologyIdData {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError> {
-        for id in &self.0 {
+        for id in self.id() {
             id.write(writer)?;
         }
 

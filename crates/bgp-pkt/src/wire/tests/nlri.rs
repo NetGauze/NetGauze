@@ -243,7 +243,7 @@ fn test_ipv6_mpls_vpn_unicast_add_path() -> Result<(), Ipv6MplsVpnUnicastAddress
 fn test_mac_address() -> Result<(), MacAddressWritingError> {
     let good_wire = [0x00, 0x0c, 0x29, 0xde, 0xe3, 0x64];
 
-    let good = MacAddress([0x00, 0x0c, 0x29, 0xde, 0xe3, 0x64]);
+    let good = MacAddress::new([0x00, 0x0c, 0x29, 0xde, 0xe3, 0x64]);
     test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
@@ -253,7 +253,7 @@ fn test_mac_address() -> Result<(), MacAddressWritingError> {
 fn test_ethernet_tag() -> Result<(), EthernetTagWritingError> {
     let good_wire = [0x01, 0x02, 0x03, 0x04];
 
-    let good = EthernetTag(16909060);
+    let good = EthernetTag::new(16909060);
     test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
@@ -263,8 +263,9 @@ fn test_ethernet_tag() -> Result<(), EthernetTagWritingError> {
 fn test_ethernet_segment_id() -> Result<(), EthernetSegmentIdentifierWritingError> {
     let good_wire = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a];
 
-    let good =
-        EthernetSegmentIdentifier([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a]);
+    let good = EthernetSegmentIdentifier::new([
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+    ]);
     test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
@@ -282,8 +283,10 @@ fn test_ethernet_auto_discovery() -> Result<(), EthernetAutoDiscoveryWritingErro
             ip: Ipv4Addr::new(120, 0, 2, 5),
             number: 100,
         },
-        EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x05]),
-        EthernetTag(0),
+        EthernetSegmentIdentifier::new([
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x05,
+        ]),
+        EthernetTag::new(0),
         MplsLabel::new([0x49, 0x35, 0x01]),
     );
     test_parsed_completely_bytes_reader(&good_wire, &good);
@@ -304,9 +307,11 @@ fn test_mac_ip_advertisement() -> Result<(), MacIpAdvertisementWritingError> {
             ip: Ipv4Addr::new(120, 0, 2, 5),
             number: 100,
         },
-        EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
-        EthernetTag(100),
-        MacAddress([0x00, 0x0c, 0x29, 0x82, 0xc2, 0xa9]),
+        EthernetSegmentIdentifier::new([
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]),
+        EthernetTag::new(100),
+        MacAddress::new([0x00, 0x0c, 0x29, 0x82, 0xc2, 0xa9]),
         None,
         MplsLabel::new([0x49, 0x30, 0x01]),
         None,
@@ -329,7 +334,7 @@ fn test_inclusive_multicast_ethernet_tag_route()
             ip: Ipv4Addr::new(172, 16, 0, 200),
             number: 4,
         },
-        EthernetTag(0),
+        EthernetTag::new(0),
         IpAddr::V4(Ipv4Addr::new(172, 16, 0, 200)),
     );
     test_parsed_completely_bytes_reader(&good_wire, &good);
@@ -349,7 +354,9 @@ fn test_ethernet_segment_route() -> Result<(), EthernetSegmentRouteWritingError>
             ip: Ipv4Addr::new(120, 0, 2, 5),
             number: 0,
         },
-        EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x05]),
+        EthernetSegmentIdentifier::new([
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x05,
+        ]),
         IpAddr::V4(Ipv4Addr::new(120, 0, 2, 5)),
     );
     test_parsed_completely_bytes_reader(&good_wire, &good);
@@ -377,8 +384,10 @@ fn test_l2_evpn_route() -> Result<(), L2EvpnRouteWritingError> {
             ip: Ipv4Addr::new(120, 0, 2, 1),
             number: 100,
         },
-        EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x05]),
-        EthernetTag(0),
+        EthernetSegmentIdentifier::new([
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x05,
+        ]),
+        EthernetTag::new(0),
         MplsLabel::new([0x49, 0x35, 0x01]),
     ));
 
@@ -388,8 +397,10 @@ fn test_l2_evpn_route() -> Result<(), L2EvpnRouteWritingError> {
                 ip: Ipv4Addr::new(10, 0, 10, 1),
                 number: 2,
             },
-            EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
-            EthernetTag(0),
+            EthernetSegmentIdentifier::new([
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ]),
+            EthernetTag::new(0),
             Ipv4Net::from_str("10.0.10.0/24").unwrap(),
             Ipv4Addr::from(0),
             MplsLabel::new([0, 0, 100]),

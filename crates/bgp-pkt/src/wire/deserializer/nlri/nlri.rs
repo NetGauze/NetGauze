@@ -568,7 +568,7 @@ impl<'a> ParseFrom<'a> for MacAddress {
     type Error = MacAddressParsingError;
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let mac_address: [u8; 6] = cur.read_array()?;
-        Ok(MacAddress(mac_address))
+        Ok(MacAddress::new(mac_address))
     }
 }
 
@@ -582,7 +582,7 @@ impl<'a> ParseFrom<'a> for EthernetSegmentIdentifier {
     type Error = EthernetSegmentIdentifierParsingError;
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let segment = cur.read_array()?;
-        Ok(EthernetSegmentIdentifier(segment))
+        Ok(EthernetSegmentIdentifier::new(segment))
     }
 }
 
@@ -596,7 +596,7 @@ impl<'a> ParseFrom<'a> for EthernetTag {
     type Error = EthernetTagParsingError;
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let tag = cur.read_u32_be()?;
-        Ok(EthernetTag(tag))
+        Ok(EthernetTag::new(tag))
     }
 }
 

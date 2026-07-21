@@ -458,7 +458,7 @@ impl WritablePdu<MacAddressWritingError> for MacAddress {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), MacAddressWritingError> {
-        writer.write_all(&self.0)?;
+        writer.write_all(self.value())?;
         Ok(())
     }
 }
@@ -478,7 +478,7 @@ impl WritablePdu<EthernetTagWritingError> for EthernetTag {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), EthernetTagWritingError> {
-        writer.write_all(&self.0.to_be_bytes())?;
+        writer.write_all(&self.value().to_be_bytes())?;
         Ok(())
     }
 }
@@ -498,7 +498,7 @@ impl WritablePdu<EthernetSegmentIdentifierWritingError> for EthernetSegmentIdent
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), EthernetSegmentIdentifierWritingError> {
-        writer.write_all(&self.0)?;
+        writer.write_all(self.value())?;
         Ok(())
     }
 }
