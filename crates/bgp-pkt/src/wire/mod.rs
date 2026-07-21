@@ -40,6 +40,10 @@ pub(crate) const EXTENDED_NEXT_HOP_ENCODING_LENGTH: u8 = 6;
 /// 2-octet NLRI AFI + 1-octet NLRI SAFI + 1-octet flags as per RFC4724
 pub(crate) const GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH: u8 = 4;
 
+/// 2-octet AFI + 1-octet SAFI + 1-octet flags + 3-octet long-lived stale time
+/// as per RFC9494
+pub(crate) const LONG_LIVED_GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH: u8 = 7;
+
 /// 1-octet length as defined by RFC9234
 pub(crate) const BGP_ROLE_CAPABILITY_LENGTH: u8 = 1;
 
