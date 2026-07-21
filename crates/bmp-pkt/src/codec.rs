@@ -22,7 +22,8 @@ use crate::{BmpMessage, BmpPeerType, PeerKey, v3, v4};
 use bytes::{Buf, BufMut, BytesMut};
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::capabilities::BgpCapability;
-use std::collections::HashSet;
+use netgauze_iana::address_family::AddressType;
+use std::collections::{HashMap, HashSet};
 
 use crate::wire::deserializer::BmpParsingContext;
 use netgauze_bgp_pkt::capabilities::{AddPathCapability, MultipleLabel};
@@ -116,18 +117,32 @@ impl BmpParsingContext {
             let (sent_add_path_caps, sent_multiple_labels_caps) = get_caps(send_caps);
             let (received_add_path_caps, received_multiple_labels_caps) = get_caps(received_caps);
 
-            // Only enable the intersection of enabled AddPath and Multi-Label
-            let sent_add_path_caps: HashSet<AddPathCapability> =
-                HashSet::from_iter(sent_add_path_caps);
-            let received_add_path_caps: HashSet<AddPathCapability> =
-                HashSet::from_iter(received_add_path_caps);
+            // ADD-PATH is directional: per [RFC 7911 Section 4](https://datatracker.ietf.org/doc/html/rfc7911#section-4)
+            // a speaker only puts Path Identifiers on the wire for an address
+            // family when it advertised "Send" *and* its peer advertised
+            // "Receive". The two OPEN messages must therefore be matched up
+            // flag-by-flag; intersecting the capabilities and then reading a
+            // single flag is wrong in both directions. It reports ADD-PATH as
+            // enabled when both peers advertise the same receive-only flags
+            // (nobody sends Path Identifiers, yet the parser expects them), and
+            // reports it disabled whenever the flags legitimately differ
+            // between the two sides, which is the normal negotiated case.
+            let add_path_flags =
+                |caps: &[AddPathCapability]| -> HashMap<AddressType, (bool, bool)> {
+                    caps.iter()
+                        .flat_map(|cap| cap.address_families())
+                        .map(|af| (af.address_type(), (af.send(), af.receive())))
+                        .collect()
+                };
+            let local_add_path = add_path_flags(&sent_add_path_caps);
+            let remote_add_path = add_path_flags(&received_add_path_caps);
+
+            // Multi-Label carries a per-family count rather than a direction, so
+            // agreeing on the same value on both sides is the right test here.
             let sent_multiple_labels_caps: HashSet<MultipleLabel> =
                 HashSet::from_iter(sent_multiple_labels_caps.into_iter().flatten());
             let received_multiple_labels_caps: HashSet<MultipleLabel> =
                 HashSet::from_iter(received_multiple_labels_caps.into_iter().flatten());
-
-            let common_add_path_caps: Vec<&AddPathCapability> =
-                Vec::from_iter(sent_add_path_caps.intersection(&received_add_path_caps));
             let common_multiple_labels_caps: Vec<&MultipleLabel> = Vec::from_iter(
                 sent_multiple_labels_caps.intersection(&received_multiple_labels_caps),
             );
@@ -157,9 +172,18 @@ impl BmpParsingContext {
                 _ => false,
             };
 
-            for add_path in &common_add_path_caps {
-                bgp_ctx
-                    .update_capabilities(&BgpCapability::AddPath((*add_path).clone()), adj_rib_out)
+            // adj-rib-out: we send to the peer  -> we must Send, peer must Receive
+            // adj-rib-in : the peer sent to us  -> peer must Send, we must Receive
+            for (address_type, (local_send, local_receive)) in &local_add_path {
+                let Some((remote_send, remote_receive)) = remote_add_path.get(address_type) else {
+                    continue;
+                };
+                let in_use = if adj_rib_out {
+                    *local_send && *remote_receive
+                } else {
+                    *remote_send && *local_receive
+                };
+                bgp_ctx.add_path_mut().insert(*address_type, in_use);
             }
             bgp_ctx.update_capabilities(
                 &BgpCapability::MultipleLabels(
@@ -192,11 +216,17 @@ impl BmpParsingContext {
                     | BmpPeerType::LocalInstancePeer { adj_rib_out, .. } => adj_rib_out,
                     _ => false,
                 };
-                for add_path in &common_add_path_caps {
-                    bgp_ctx.update_capabilities(
-                        &BgpCapability::AddPath((*add_path).clone()),
-                        adj_rib_out,
-                    )
+                for (address_type, (local_send, local_receive)) in &local_add_path {
+                    let Some((remote_send, remote_receive)) = remote_add_path.get(address_type)
+                    else {
+                        continue;
+                    };
+                    let in_use = if adj_rib_out {
+                        *local_send && *remote_receive
+                    } else {
+                        *remote_send && *local_receive
+                    };
+                    bgp_ctx.add_path_mut().insert(*address_type, in_use);
                 }
                 bgp_ctx.update_capabilities(
                     &BgpCapability::MultipleLabels(
@@ -707,5 +737,135 @@ mod tests {
                 (AddressType::Ipv6Unicast, true)
             ])
         );
+    }
+}
+
+#[cfg(test)]
+mod add_path_negotiation_tests {
+    use super::*;
+    use crate::PeerHeader;
+
+    use netgauze_bgp_pkt::capabilities::{AddPathAddressFamily, AddPathCapability};
+    use netgauze_bgp_pkt::open::{BgpOpenMessage, BgpOpenMessageParameter};
+    use netgauze_iana::address_family::AddressType;
+    use std::net::{IpAddr, Ipv4Addr};
+
+    /// Same as [`negotiated_add_path`] but wrapped in a v4 message.
+    fn negotiated_add_path_v4(
+        local: (bool, bool),
+        remote: (bool, bool),
+        adj_rib_out: bool,
+    ) -> bool {
+        let (peer_up, key) = build_peer_up(local, remote, adj_rib_out);
+        let mut ctx = BmpParsingContext::default();
+        ctx.update(&BmpMessage::V4(v4::BmpMessageValue::PeerUpNotification(
+            peer_up,
+        )));
+        ctx.get_peer(&key)
+            .and_then(|c| c.add_path().get(&AddressType::Ipv4Unicast).copied())
+            .unwrap_or(false)
+    }
+
+    /// Reports what the parsing context concludes for a v3 Peer Up.
+    fn negotiated_add_path(local: (bool, bool), remote: (bool, bool), adj_rib_out: bool) -> bool {
+        let (peer_up, key) = build_peer_up(local, remote, adj_rib_out);
+        let mut ctx = BmpParsingContext::default();
+        ctx.update(&BmpMessage::V3(v3::BmpMessageValue::PeerUpNotification(
+            peer_up,
+        )));
+        ctx.get_peer(&key)
+            .and_then(|c| c.add_path().get(&AddressType::Ipv4Unicast).copied())
+            .unwrap_or(false)
+    }
+
+    /// Builds a Peer Up where both OPENs advertise ADD-PATH with the given
+    /// send/receive flags.
+    fn build_peer_up(
+        local: (bool, bool),
+        remote: (bool, bool),
+        adj_rib_out: bool,
+    ) -> (v3::PeerUpNotificationMessage, PeerKey) {
+        let mk = |asn: u32, id: Ipv4Addr, (send, receive): (bool, bool)| {
+            BgpOpenMessage::new(
+                asn as u16,
+                180,
+                id,
+                vec![BgpOpenMessageParameter::Capabilities(vec![
+                    BgpCapability::AddPath(AddPathCapability::new(vec![
+                        AddPathAddressFamily::new(AddressType::Ipv4Unicast, send, receive),
+                    ])),
+                ])],
+            )
+        };
+        let peer_header = PeerHeader::new(
+            BmpPeerType::GlobalInstancePeer {
+                ipv6: false,
+                post_policy: false,
+                asn2: false,
+                adj_rib_out,
+            },
+            None,
+            Some(IpAddr::V4(Ipv4Addr::new(172, 20, 0, 12))),
+            65002,
+            Ipv4Addr::new(2, 2, 2, 2),
+            None,
+        );
+        let peer_up = v3::PeerUpNotificationMessage::build(
+            peer_header,
+            Some(IpAddr::V4(Ipv4Addr::new(172, 20, 0, 11))),
+            Some(179),
+            Some(51652),
+            BgpMessage::Open(mk(65001, Ipv4Addr::new(1, 1, 1, 1), local)),
+            BgpMessage::Open(mk(65002, Ipv4Addr::new(2, 2, 2, 2), remote)),
+            vec![],
+        )
+        .expect("valid peer up");
+
+        let key = PeerKey::from_peer_header(peer_up.peer_header());
+        (peer_up, key)
+    }
+
+    /// v4 Peer Up messages share `handle_peer_up` with v3, so the directional
+    /// negotiation must hold for them too.
+    #[test]
+    fn v4_peer_up_uses_the_same_directional_negotiation() {
+        assert!(
+            !negotiated_add_path_v4((false, true), (false, true), false),
+            "ADD-PATH must be off for a v4 peer that advertised send=false"
+        );
+        assert!(
+            negotiated_add_path_v4((false, true), (true, false), false),
+            "ADD-PATH must be on when the v4 peer sends and we receive"
+        );
+    }
+
+    /// Exactly the FRR case: both routers advertise "I can receive additional
+    /// paths, I cannot send them". Neither side ever puts a Path Identifier on
+    /// the wire, so the parser must NOT expect one.
+    #[test]
+    fn both_receive_only_means_add_path_is_not_in_use() {
+        // adj-rib-in: the UPDATE came *from* the remote peer, which advertised
+        // send=false, so there are no Path Identifiers to parse.
+        assert!(
+            !negotiated_add_path((false, true), (false, true), false),
+            "ADD-PATH must be off for adj-rib-in when the remote peer cannot send"
+        );
+        // adj-rib-out: we send to the peer; we advertised send=false.
+        assert!(
+            !negotiated_add_path((false, true), (false, true), true),
+            "ADD-PATH must be off for adj-rib-out when we cannot send"
+        );
+    }
+
+    #[test]
+    fn add_path_in_use_only_when_sender_can_send_and_receiver_can_receive() {
+        // adj-rib-in: remote sends, we receive -> in use
+        assert!(negotiated_add_path((false, true), (true, false), false));
+        // adj-rib-in: remote sends but we did not ask to receive -> not in use
+        assert!(!negotiated_add_path((false, false), (true, false), false));
+        // adj-rib-out: we send, remote receives -> in use
+        assert!(negotiated_add_path((true, false), (false, true), true));
+        // adj-rib-out: we cannot send -> not in use
+        assert!(!negotiated_add_path((false, true), (false, true), true));
     }
 }
