@@ -561,7 +561,7 @@ pub enum BgpCapabilityCode {
     /// [RFC7313](https://datatracker.ietf.org/doc/html/RFC7313)
     EnhancedRouteRefresh = 70,
 
-    /// [draft-uttaro-idr-bgp-persistence](https://datatracker.ietf.org/doc/html/draft-uttaro-idr-bgp-persistence)
+    /// [RFC9494](https://datatracker.ietf.org/doc/html/rfc9494)
     LongLivedGracefulRestartLLGRCapability = 71,
 
     /// [draft-ietf-idr-rpd](https://datatracker.ietf.org/doc/html/draft-ietf-idr-rpd)
@@ -569,6 +569,9 @@ pub enum BgpCapabilityCode {
 
     /// [draft-ietf-idr-dynamic-cap](https://datatracker.ietf.org/doc/html/draft-ietf-idr-dynamic-cap)
     FQDN = 73,
+
+    /// [draft-abraitis-idr-addpath-paths-limit](https://datatracker.ietf.org/doc/html/draft-abraitis-idr-addpath-paths-limit)
+    PathsLimit = 76,
 
     CiscoRouteRefresh = 128,
 
