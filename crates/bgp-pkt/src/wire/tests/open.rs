@@ -74,9 +74,9 @@ fn test_open_one_params() -> Result<(), BgpOpenMessageWritingError> {
         65033,
         180,
         Ipv4Addr::new(0xc0, 0xa8, 0x00, 0x0f),
-        Box::new([BgpOpenMessageParameter::Capabilities(vec![
+        Box::new([BgpOpenMessageParameter::Capabilities(Box::new([
             BgpCapability::RouteRefresh,
-        ])]),
+        ]))]),
     );
     test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,

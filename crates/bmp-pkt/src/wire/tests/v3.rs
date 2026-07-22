@@ -713,18 +713,20 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                 64512,
                 180,
                 Ipv4Addr::new(10, 0, 0, 3),
-                vec![
-                    BgpOpenMessageParameter::Capabilities(vec![
+                Box::new([
+                    BgpOpenMessageParameter::Capabilities(Box::new([
                         BgpCapability::MultiProtocolExtensions(
                             MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
                         ),
-                    ]),
-                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
-                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
-                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                    ])),
+                    BgpOpenMessageParameter::Capabilities(Box::new([
+                        BgpCapability::CiscoRouteRefresh,
+                    ])),
+                    BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::RouteRefresh])),
+                    BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::FourOctetAs(
                         FourOctetAsCapability::new(64512),
-                    )]),
-                    BgpOpenMessageParameter::Capabilities(vec![
+                    )])),
+                    BgpOpenMessageParameter::Capabilities(Box::new([
                         BgpCapability::ExtendedNextHopEncoding(
                             ExtendedNextHopEncodingCapability::new(vec![
                                 ExtendedNextHopEncoding::new(
@@ -741,26 +743,27 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                                 ),
                             ]),
                         ),
-                    ]),
-                ]
-                .into_boxed_slice(),
+                    ])),
+                ]),
             )),
             BgpMessage::Open(BgpOpenMessage::new(
                 64512,
                 180,
                 Ipv4Addr::new(10, 0, 0, 1),
-                vec![
-                    BgpOpenMessageParameter::Capabilities(vec![
+                Box::new([
+                    BgpOpenMessageParameter::Capabilities(Box::new([
                         BgpCapability::MultiProtocolExtensions(
                             MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
                         ),
-                    ]),
-                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
-                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
-                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                    ])),
+                    BgpOpenMessageParameter::Capabilities(Box::new([
+                        BgpCapability::CiscoRouteRefresh,
+                    ])),
+                    BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::RouteRefresh])),
+                    BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::FourOctetAs(
                         FourOctetAsCapability::new(64512),
-                    )]),
-                    BgpOpenMessageParameter::Capabilities(vec![
+                    )])),
+                    BgpOpenMessageParameter::Capabilities(Box::new([
                         BgpCapability::ExtendedNextHopEncoding(
                             ExtendedNextHopEncodingCapability::new(vec![
                                 ExtendedNextHopEncoding::new(
@@ -777,9 +780,8 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                                 ),
                             ]),
                         ),
-                    ]),
-                ]
-                .into_boxed_slice(),
+                    ])),
+                ]),
             )),
             vec![],
         )
@@ -844,25 +846,23 @@ fn test_bmp_peer_up_loc_rib_notification() -> Result<(), BmpMessageWritingError>
                 23456,
                 180,
                 Ipv4Addr::new(192, 0, 2, 61),
-                vec![BgpOpenMessageParameter::Capabilities(vec![
+                Box::new([BgpOpenMessageParameter::Capabilities(Box::new([
                     BgpCapability::FourOctetAs(FourOctetAsCapability::new(65537)),
                     BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
                         AddressType::Ipv6Unicast,
                     )),
-                ])]
-                .into_boxed_slice(),
+                ]))]),
             )),
             BgpMessage::Open(BgpOpenMessage::new(
                 23456,
                 180,
                 Ipv4Addr::new(192, 0, 2, 61),
-                vec![BgpOpenMessageParameter::Capabilities(vec![
+                Box::new([BgpOpenMessageParameter::Capabilities(Box::new([
                     BgpCapability::FourOctetAs(FourOctetAsCapability::new(65537)),
                     BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
                         AddressType::Ipv6Unicast,
                     )),
-                ])]
-                .into_boxed_slice(),
+                ]))]),
             )),
             vec![],
         )

@@ -383,27 +383,36 @@ fn test_bgp_message_open1() -> Result<(), BgpMessageWritingError> {
         180,
         Ipv4Addr::new(5, 5, 5, 5),
         Box::new([
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
-                MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
-                MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                    AddressType::Ipv4Unicast,
+                )),
+            ])),
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                    AddressType::Ipv4MplsLabeledVpn,
+                )),
+            ])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::CiscoRouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::RouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::FourOctetAs(
                 FourOctetAsCapability::new(100),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::ExtendedNextHopEncoding(
-                ExtendedNextHopEncodingCapability::new(vec![
-                    ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
-                    ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
-                    ExtendedNextHopEncoding::new(
-                        AddressType::Ipv4MplsLabeledVpn,
-                        AddressFamily::IPv6,
-                    ),
-                ]),
-            )]),
+            )])),
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::ExtendedNextHopEncoding(ExtendedNextHopEncodingCapability::new(
+                    vec![
+                        ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
+                        ExtendedNextHopEncoding::new(
+                            AddressType::Ipv4Multicast,
+                            AddressFamily::IPv6,
+                        ),
+                        ExtendedNextHopEncoding::new(
+                            AddressType::Ipv4MplsLabeledVpn,
+                            AddressFamily::IPv6,
+                        ),
+                    ],
+                )),
+            ])),
         ]),
     ));
 
@@ -434,40 +443,58 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
         180,
         Ipv4Addr::new(172, 16, 0, 20),
         Box::new([
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
-                MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
-                MultiProtocolExtensionsCapability::new(AddressType::Ipv4Multicast),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::EnhancedRouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                    AddressType::Ipv4Unicast,
+                )),
+            ])),
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                    AddressType::Ipv4Multicast,
+                )),
+            ])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::CiscoRouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::RouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::EnhancedRouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::FourOctetAs(
                 FourOctetAsCapability::new(200),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::ExtendedMessage]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::AddPath(
+            )])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::ExtendedMessage])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::AddPath(
                 AddPathCapability::new(vec![
                     AddPathAddressFamily::new(AddressType::Ipv4Unicast, false, true),
                     AddPathAddressFamily::new(AddressType::Ipv4Multicast, false, true),
                 ]),
-            )]),
+            )])),
             // FQDN
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Fqdn(FqdnCapability::new(
-                "r2".into(),
-                String::new(),
-            ))]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::GracefulRestartCapability(
-                GracefulRestartCapability::new(true, true, 120, vec![]),
-            )]),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::Fqdn(
+                FqdnCapability::new("r2".into(), String::new()),
+            )])),
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::GracefulRestartCapability(GracefulRestartCapability::new(
+                    true,
+                    true,
+                    120,
+                    vec![],
+                )),
+            ])),
             // Long Lived Graceful Restart
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::LongLivedGracefulRestart(
-                LongLivedGracefulRestartCapability::new(vec![
-                    LongLivedGracefulRestartAddressFamily::new(true, AddressType::Ipv4Unicast, 0),
-                    LongLivedGracefulRestartAddressFamily::new(true, AddressType::Ipv4Multicast, 0),
-                ]),
-            )]),
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::LongLivedGracefulRestart(LongLivedGracefulRestartCapability::new(
+                    vec![
+                        LongLivedGracefulRestartAddressFamily::new(
+                            true,
+                            AddressType::Ipv4Unicast,
+                            0,
+                        ),
+                        LongLivedGracefulRestartAddressFamily::new(
+                            true,
+                            AddressType::Ipv4Multicast,
+                            0,
+                        ),
+                    ],
+                )),
+            ])),
         ]),
     ));
 
@@ -1116,29 +1143,36 @@ fn test_bgp_role_otc_open() -> Result<(), BgpMessageWritingError> {
         180,
         Ipv4Addr::new(192, 168, 10, 17),
         Box::new([
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
-                MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::EnhancedRouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                    AddressType::Ipv4Unicast,
+                )),
+            ])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::CiscoRouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::RouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::EnhancedRouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::FourOctetAs(
                 FourOctetAsCapability::new(65002),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::ExtendedMessage]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::BgpRole(
+            )])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::ExtendedMessage])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::BgpRole(
                 BgpRoleCapability::new(BgpRoleValue::RsClient),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::AddPath(
+            )])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::AddPath(
                 AddPathCapability::new(vec![AddPathAddressFamily::new(
                     AddressType::Ipv4Unicast,
                     false,
                     true,
                 )]),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::GracefulRestartCapability(
-                GracefulRestartCapability::new(false, true, 120, vec![]),
-            )]),
+            )])),
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::GracefulRestartCapability(GracefulRestartCapability::new(
+                    false,
+                    true,
+                    120,
+                    vec![],
+                )),
+            ])),
         ]),
     ));
     test_parsed_completely_with_one_input_bytes_reader(

@@ -180,7 +180,9 @@ fn parse_capability_param<'a>(
             }
         }
     }
-    Ok(BgpOpenMessageParameter::Capabilities(capabilities))
+    Ok(BgpOpenMessageParameter::Capabilities(
+        capabilities.into_boxed_slice(),
+    ))
 }
 
 impl From<BgpParameterParsingError> for OpenMessageError {

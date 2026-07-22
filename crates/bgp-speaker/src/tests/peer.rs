@@ -4581,21 +4581,20 @@ async fn test_connect_echo_policy() -> Result<(), FsmStateError<SocketAddr>> {
         PEER_AS as u16,
         HOLD_TIME,
         PEER_BGP_ID,
-        vec![Capabilities(vec![
+        Box::new([Capabilities(Box::new([
             route_refresh_cap.clone(),
             enhanced_route_refresh_cap.clone(),
             ipv4_unicast_cap.clone(),
             ipv4_multicast_cap.clone(),
             ipv6_multicast_cap.clone(),
-        ])]
-        .into_boxed_slice(),
+        ]))]),
     );
 
     let my_open = BgpOpenMessage::new(
         AS_TRANS,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![
+        Box::new([Capabilities(Box::new([
             // ASN 4 should be added automatically since my_asn > u16::MAX
             BgpCapability::FourOctetAs(FourOctetAsCapability::new(my_asn)),
             // in pushed_caps and learned from peer
@@ -4608,8 +4607,7 @@ async fn test_connect_echo_policy() -> Result<(), FsmStateError<SocketAddr>> {
             ipv4_unicast_cap.clone(),
             // Learned from peer
             ipv4_multicast_cap.clone(),
-        ])]
-        .into_boxed_slice(),
+        ]))]),
     );
 
     let mut io_builder = BgpIoMockBuilder::new();

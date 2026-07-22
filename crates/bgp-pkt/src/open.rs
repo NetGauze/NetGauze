@@ -128,5 +128,5 @@ impl BgpOpenMessage {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpOpenMessageParameter {
     /// Capabilities Advertisement
-    Capabilities(Vec<BgpCapability>),
+    Capabilities(Box<[BgpCapability]>),
 }
