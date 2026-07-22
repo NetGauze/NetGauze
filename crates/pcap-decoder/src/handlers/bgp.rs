@@ -139,7 +139,7 @@ mod tests {
                         1,
                         180,
                         Ipv4Addr::new(1, 2, 3, 4),
-                        Box::new([]),
+                        vec![],
                     )),
                     BgpParsingIgnoredErrors::default()
                 )
@@ -194,7 +194,7 @@ mod tests {
                         1,
                         180,
                         Ipv4Addr::new(1, 2, 3, 4),
-                        Box::new([]),
+                        vec![],
                     )),
                     BgpParsingIgnoredErrors::default()
                 )
@@ -240,7 +240,7 @@ mod tests {
                             1,
                             180,
                             Ipv4Addr::new(1, 2, 3, 4),
-                            Box::new([]),
+                            vec![],
                         )),
                         BgpParsingIgnoredErrors::default()
                     )
@@ -252,7 +252,7 @@ mod tests {
                             1,
                             180,
                             Ipv4Addr::new(5, 6, 7, 8),
-                            Box::new([]),
+                            vec![],
                         )),
                         BgpParsingIgnoredErrors::default()
                     )
@@ -419,7 +419,7 @@ mod tests {
             1,
             180,
             Ipv4Addr::new(1, 1, 1, 1),
-            Box::new([]),
+            vec![],
         ));
         let outcome =
             DecodeOutcome::Success((flow_key, (open_message, BgpParsingIgnoredErrors::default())));

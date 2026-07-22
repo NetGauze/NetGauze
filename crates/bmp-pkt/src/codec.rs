@@ -547,7 +547,7 @@ mod tests {
                     64512,
                     180,
                     Ipv4Addr::new(10, 0, 0, 3),
-                    Box::new([
+                    vec![
                         BgpOpenMessageParameter::Capabilities(Box::new([
                             BgpCapability::MultiProtocolExtensions(
                                 MultiProtocolExtensionsCapability::new(
@@ -576,7 +576,7 @@ mod tests {
                                 ]),
                             ),
                         ])),
-                    ]),
+                    ],
                 )),
                 BgpMessage::Open(BgpOpenMessage::new(
                     64512,
@@ -791,11 +791,11 @@ mod add_path_negotiation_tests {
                 asn as u16,
                 180,
                 id,
-                Box::new([BgpOpenMessageParameter::Capabilities(Box::new([
+                vec![BgpOpenMessageParameter::Capabilities(Box::new([
                     BgpCapability::AddPath(AddPathCapability::new(vec![
                         AddPathAddressFamily::new(AddressType::Ipv4Unicast, send, receive),
                     ])),
-                ]))]),
+                ]))],
             )
         };
         let peer_header = PeerHeader::new(

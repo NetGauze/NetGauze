@@ -57,14 +57,14 @@ impl BgpOpenMessage {
         my_as: u16,
         hold_time: u16,
         bgp_id: Ipv4Addr,
-        params: Box<[BgpOpenMessageParameter]>,
+        params: impl Into<Box<[BgpOpenMessageParameter]>>,
     ) -> BgpOpenMessage {
         BgpOpenMessage {
             version: BGP_VERSION,
             my_as,
             hold_time,
             bgp_id,
-            params,
+            params: params.into(),
         }
     }
 

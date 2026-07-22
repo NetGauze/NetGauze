@@ -52,7 +52,7 @@ pub fn main() {
         100,
         180,
         Ipv4Addr::new(5, 5, 5, 5),
-        Box::new([
+        vec![
             BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
             )])),
@@ -74,7 +74,7 @@ pub fn main() {
                     ),
                 ]),
             )])),
-        ]),
+        ],
     ));
 
     println!("JSON representation of BGP packet: {}", serde_json::to_string(&msg).unwrap());

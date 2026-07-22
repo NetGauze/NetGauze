@@ -46,7 +46,7 @@ async fn test_start_stop()
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            Box::new([]),
+            vec![],
         )))
         .wait(Duration::from_millis(100))
         .write(BgpMessage::Notification(
@@ -176,7 +176,7 @@ async fn test_get_exchanged_capabilities()
         PEER_AS as u16,
         HOLD_TIME,
         PEER_BGP_ID,
-        Box::new([BgpOpenMessageParameter::Capabilities(peer_caps.clone())]),
+        vec![BgpOpenMessageParameter::Capabilities(peer_caps.clone())],
     );
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -293,7 +293,7 @@ async fn test_get_exchanged_capabilities_tracked_connection()
         PEER_AS as u16,
         HOLD_TIME,
         PEER_BGP_ID,
-        Box::new([BgpOpenMessageParameter::Capabilities(peer_caps.clone())]),
+        vec![BgpOpenMessageParameter::Capabilities(peer_caps.clone())],
     );
 
     let policy = EchoCapabilitiesPolicy::new(
