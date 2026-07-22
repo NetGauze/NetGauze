@@ -262,8 +262,7 @@ fn test_bgp_message_undefined_message_type() {
 #[test]
 fn test_bgp_message_open_no_params() -> Result<(), BgpMessageWritingError> {
     let good_no_params_wire = combine(vec![&[BGP_VERSION], MY_AS, HOLD_TIME, BGP_ID, &[0x00u8]]);
-    let good_no_params_msg =
-        BgpOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), Box::new([]));
+    let good_no_params_msg = BgpOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), vec![]);
     test_parsed_completely_with_one_input_bytes_reader(
         &good_no_params_wire,
         &mut BgpParsingContext::default(),
@@ -382,7 +381,7 @@ fn test_bgp_message_open1() -> Result<(), BgpMessageWritingError> {
         100,
         180,
         Ipv4Addr::new(5, 5, 5, 5),
-        Box::new([
+        vec![
             BgpOpenMessageParameter::Capabilities(Box::new([
                 BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
                     AddressType::Ipv4Unicast,
@@ -413,7 +412,7 @@ fn test_bgp_message_open1() -> Result<(), BgpMessageWritingError> {
                     ],
                 )),
             ])),
-        ]),
+        ],
     ));
 
     test_parsed_completely_with_one_input_bytes_reader(
@@ -442,7 +441,7 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
         200,
         180,
         Ipv4Addr::new(172, 16, 0, 20),
-        Box::new([
+        vec![
             BgpOpenMessageParameter::Capabilities(Box::new([
                 BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
                     AddressType::Ipv4Unicast,
@@ -495,7 +494,7 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
                     ],
                 )),
             ])),
-        ]),
+        ],
     ));
 
     test_parsed_completely_with_one_input_bytes_reader(
@@ -1142,7 +1141,7 @@ fn test_bgp_role_otc_open() -> Result<(), BgpMessageWritingError> {
         65002,
         180,
         Ipv4Addr::new(192, 168, 10, 17),
-        Box::new([
+        vec![
             BgpOpenMessageParameter::Capabilities(Box::new([
                 BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
                     AddressType::Ipv4Unicast,
@@ -1173,7 +1172,7 @@ fn test_bgp_role_otc_open() -> Result<(), BgpMessageWritingError> {
                     vec![],
                 )),
             ])),
-        ]),
+        ],
     ));
     test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,

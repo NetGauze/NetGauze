@@ -713,7 +713,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                 64512,
                 180,
                 Ipv4Addr::new(10, 0, 0, 3),
-                Box::new([
+                vec![
                     BgpOpenMessageParameter::Capabilities(Box::new([
                         BgpCapability::MultiProtocolExtensions(
                             MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
@@ -744,13 +744,13 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                             ]),
                         ),
                     ])),
-                ]),
+                ],
             )),
             BgpMessage::Open(BgpOpenMessage::new(
                 64512,
                 180,
                 Ipv4Addr::new(10, 0, 0, 1),
-                Box::new([
+                vec![
                     BgpOpenMessageParameter::Capabilities(Box::new([
                         BgpCapability::MultiProtocolExtensions(
                             MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
@@ -781,7 +781,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                             ]),
                         ),
                     ])),
-                ]),
+                ],
             )),
             vec![],
         )
@@ -846,23 +846,23 @@ fn test_bmp_peer_up_loc_rib_notification() -> Result<(), BmpMessageWritingError>
                 23456,
                 180,
                 Ipv4Addr::new(192, 0, 2, 61),
-                Box::new([BgpOpenMessageParameter::Capabilities(Box::new([
+                vec![BgpOpenMessageParameter::Capabilities(Box::new([
                     BgpCapability::FourOctetAs(FourOctetAsCapability::new(65537)),
                     BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
                         AddressType::Ipv6Unicast,
                     )),
-                ]))]),
+                ]))],
             )),
             BgpMessage::Open(BgpOpenMessage::new(
                 23456,
                 180,
                 Ipv4Addr::new(192, 0, 2, 61),
-                Box::new([BgpOpenMessageParameter::Capabilities(Box::new([
+                vec![BgpOpenMessageParameter::Capabilities(Box::new([
                     BgpCapability::FourOctetAs(FourOctetAsCapability::new(65537)),
                     BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
                         AddressType::Ipv6Unicast,
                     )),
-                ]))]),
+                ]))],
             )),
             vec![],
         )
