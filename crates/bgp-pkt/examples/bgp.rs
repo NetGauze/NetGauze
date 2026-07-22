@@ -18,7 +18,7 @@ pub fn main() {
         100,
         180,
         Ipv4Addr::new(5, 5, 5, 5),
-        vec![
+        Box::new([
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
             )]),
@@ -40,7 +40,7 @@ pub fn main() {
                     ),
                 ]),
             )]),
-        ],
+        ]),
     ));
 
     println!(

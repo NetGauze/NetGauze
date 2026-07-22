@@ -169,12 +169,12 @@ impl<
             }
         }
 
-        let params = if capabilities.is_empty() {
-            vec![]
+        let params: Box<[BgpOpenMessageParameter]> = if capabilities.is_empty() {
+            Box::new([])
         } else {
             // TODO check for param size and spread capabilities across multiple params or
             // use extended params RFC 9072
-            vec![BgpOpenMessageParameter::Capabilities(capabilities)]
+            Box::new([BgpOpenMessageParameter::Capabilities(capabilities)])
         };
 
         BgpOpenMessage::new(my_asn, self.hold_timer_duration, self.my_bgp_id, params)

@@ -53,7 +53,8 @@ fn test_parse_bgp_open_with_wrong_bpg_version() {
 #[test]
 fn test_bgp_open_no_params() -> Result<(), BgpOpenMessageWritingError> {
     let good_no_params_wire = combine(vec![&[BGP_VERSION], MY_AS, HOLD_TIME, BGP_ID, &[0x00u8]]);
-    let good_no_params_msg = BgpOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), vec![]);
+    let good_no_params_msg =
+        BgpOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), Box::new([]));
     test_parsed_completely_with_one_input_bytes_reader(
         &good_no_params_wire,
         &mut BgpParsingContext::default(),
@@ -73,9 +74,9 @@ fn test_open_one_params() -> Result<(), BgpOpenMessageWritingError> {
         65033,
         180,
         Ipv4Addr::new(0xc0, 0xa8, 0x00, 0x0f),
-        vec![BgpOpenMessageParameter::Capabilities(vec![
+        Box::new([BgpOpenMessageParameter::Capabilities(vec![
             BgpCapability::RouteRefresh,
-        ])],
+        ])]),
     );
     test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
@@ -94,8 +95,12 @@ fn test_open_bad_capability_params() -> Result<(), BgpOpenMessageWritingError> {
     ];
     let cap_ignored_wire = [0x04, 0xfe, 0x09, 0x00, 0xb4, 0xc0, 0xa8, 0x00, 0x0f, 0x00];
 
-    let cap_ignored =
-        BgpOpenMessage::new(65033, 180, Ipv4Addr::new(0xc0, 0xa8, 0x00, 0x0f), vec![]);
+    let cap_ignored = BgpOpenMessage::new(
+        65033,
+        180,
+        Ipv4Addr::new(0xc0, 0xa8, 0x00, 0x0f),
+        Box::new([]),
+    );
 
     let bad =
         BgpOpenMessageParsingError::ParameterError(BgpParameterParsingError::CapabilityError(

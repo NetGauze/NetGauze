@@ -49,7 +49,7 @@ pub struct BgpOpenMessage {
     hold_time: u16,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
     bgp_id: Ipv4Addr,
-    params: Vec<BgpOpenMessageParameter>, // TODO (AH): rfc5492
+    params: Box<[BgpOpenMessageParameter]>,
 }
 
 impl BgpOpenMessage {
@@ -57,7 +57,7 @@ impl BgpOpenMessage {
         my_as: u16,
         hold_time: u16,
         bgp_id: Ipv4Addr,
-        params: Vec<BgpOpenMessageParameter>,
+        params: Box<[BgpOpenMessageParameter]>,
     ) -> BgpOpenMessage {
         BgpOpenMessage {
             version: BGP_VERSION,
@@ -84,7 +84,7 @@ impl BgpOpenMessage {
         self.bgp_id
     }
 
-    pub const fn params(&self) -> &Vec<BgpOpenMessageParameter> {
+    pub const fn params(&self) -> &[BgpOpenMessageParameter] {
         &self.params
     }
 

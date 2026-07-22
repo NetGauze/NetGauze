@@ -111,7 +111,7 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessage {
         let len = cur.read_u8()?;
         // shortcut for speed when there are no parameters
         if len == 0 {
-            return Ok(BgpOpenMessage::new(my_as, hold_time, bgp_id, vec![]));
+            return Ok(BgpOpenMessage::new(my_as, hold_time, bgp_id, Box::new([])));
         }
         let mut params_buf = cur.take_slice(len as usize)?;
         let mut params = Vec::with_capacity(deserializer::count_t8_l8_tlvs(params_buf));
@@ -119,7 +119,12 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessage {
             let element = BgpOpenMessageParameter::parse(&mut params_buf, ctx)?;
             params.push(element);
         }
-        Ok(BgpOpenMessage::new(my_as, hold_time, bgp_id, params))
+        Ok(BgpOpenMessage::new(
+            my_as,
+            hold_time,
+            bgp_id,
+            params.into_boxed_slice(),
+        ))
     }
 }
 

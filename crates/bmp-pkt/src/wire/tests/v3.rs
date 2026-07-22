@@ -742,7 +742,8 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                             ]),
                         ),
                     ]),
-                ],
+                ]
+                .into_boxed_slice(),
             )),
             BgpMessage::Open(BgpOpenMessage::new(
                 64512,
@@ -777,7 +778,8 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                             ]),
                         ),
                     ]),
-                ],
+                ]
+                .into_boxed_slice(),
             )),
             vec![],
         )
@@ -847,7 +849,8 @@ fn test_bmp_peer_up_loc_rib_notification() -> Result<(), BmpMessageWritingError>
                     BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
                         AddressType::Ipv6Unicast,
                     )),
-                ])],
+                ])]
+                .into_boxed_slice(),
             )),
             BgpMessage::Open(BgpOpenMessage::new(
                 23456,
@@ -858,7 +861,8 @@ fn test_bmp_peer_up_loc_rib_notification() -> Result<(), BmpMessageWritingError>
                     BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
                         AddressType::Ipv6Unicast,
                     )),
-                ])],
+                ])]
+                .into_boxed_slice(),
             )),
             vec![],
         )
