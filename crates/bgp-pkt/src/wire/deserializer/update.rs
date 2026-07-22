@@ -94,7 +94,7 @@ fn parse_nlri<'a>(
     add_path: bool,
     is_update: bool,
     ctx: &mut BgpParsingContext,
-) -> Result<Vec<Ipv4UnicastAddress>, BgpUpdateMessageParsingError> {
+) -> Result<Box<[Ipv4UnicastAddress]>, BgpUpdateMessageParsingError> {
     let mut nlri_vec = Vec::with_capacity(count_nlri(*cur, add_path));
     while !cur.is_empty() {
         let path_id = if add_path {
@@ -129,7 +129,7 @@ fn parse_nlri<'a>(
             }
         };
     }
-    Ok(nlri_vec)
+    Ok(nlri_vec.into_boxed_slice())
 }
 
 /// Counts path attributes in a buffer without parsing their values,
@@ -250,7 +250,7 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpUpdateMessage 
         let nlri_vec = parse_nlri(cur, add_path, true, ctx)?;
         Ok(BgpUpdateMessage::new(
             withdrawn_routes,
-            path_attributes,
+            path_attributes.into_boxed_slice(),
             nlri_vec,
         ))
     }
