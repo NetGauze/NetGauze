@@ -52,19 +52,19 @@ pub fn main() {
         100,
         180,
         Ipv4Addr::new(5, 5, 5, 5),
-        vec![
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
+        Box::new([
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
+            )])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+            )])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::CiscoRouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::RouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::FourOctetAs(
                 FourOctetAsCapability::new(100),
-            )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::ExtendedNextHopEncoding(
+            )])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::ExtendedNextHopEncoding(
                 ExtendedNextHopEncodingCapability::new(vec![
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
@@ -73,8 +73,8 @@ pub fn main() {
                         AddressFamily::IPv6,
                     ),
                 ]),
-            )]),
-        ],
+            )])),
+        ]),
     ));
 
     println!("JSON representation of BGP packet: {}", serde_json::to_string(&msg).unwrap());

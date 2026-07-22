@@ -174,7 +174,9 @@ impl<
         } else {
             // TODO check for param size and spread capabilities across multiple params or
             // use extended params RFC 9072
-            Box::new([BgpOpenMessageParameter::Capabilities(capabilities)])
+            Box::new([BgpOpenMessageParameter::Capabilities(
+                capabilities.into_boxed_slice(),
+            )])
         };
 
         BgpOpenMessage::new(my_asn, self.hold_timer_duration, self.my_bgp_id, params)

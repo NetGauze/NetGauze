@@ -158,25 +158,25 @@ async fn test_get_exchanged_capabilities()
         rejected_caps.clone(),
     );
 
-    let my_caps = vec![
+    let my_caps = Box::new([
         BgpCapability::FourOctetAs(FourOctetAsCapability::new(my_asn)),
         route_refresh_cap.clone(),
         extended_msg_cap,
         ipv6_unicast_cap,
-    ];
+    ]);
 
-    let peer_caps = vec![
+    let peer_caps = Box::new([
         BgpCapability::FourOctetAs(FourOctetAsCapability::new(PEER_AS)),
         route_refresh_cap.clone(),
         enhanced_route_refresh_cap,
         ipv4_unicast_cap,
         ipv4_multicast_cap,
-    ];
+    ]);
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
         PEER_BGP_ID,
-        vec![BgpOpenMessageParameter::Capabilities(peer_caps.clone())].into_boxed_slice(),
+        Box::new([BgpOpenMessageParameter::Capabilities(peer_caps.clone())]),
     );
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -228,7 +228,7 @@ async fn test_get_exchanged_capabilities()
 
     let sent_caps = handle.connection_sent_capabilities().await.unwrap();
     let recv_caps = handle.connection_received_capabilities().await.unwrap();
-    assert_eq!(sent_caps, Some(my_caps.clone()));
+    assert_eq!(sent_caps, Some(my_caps.clone().to_vec()));
     assert_eq!(recv_caps, None);
 
     assert_eq!(
@@ -238,8 +238,8 @@ async fn test_get_exchanged_capabilities()
 
     let sent_caps = handle.connection_sent_capabilities().await.unwrap();
     let recv_caps = handle.connection_received_capabilities().await.unwrap();
-    assert_eq!(sent_caps, Some(my_caps));
-    assert_eq!(recv_caps, Some(peer_caps));
+    assert_eq!(sent_caps, Some(my_caps.to_vec()));
+    assert_eq!(recv_caps, Some(peer_caps.to_vec()));
 
     Ok(())
 }
@@ -275,25 +275,25 @@ async fn test_get_exchanged_capabilities_tracked_connection()
         enhanced_route_refresh_cap.clone(),
         ipv6_multicast_cap.clone(),
     ];
-    let my_caps = vec![
+    let my_caps = Box::new([
         BgpCapability::FourOctetAs(FourOctetAsCapability::new(my_asn)),
         route_refresh_cap.clone(),
         extended_msg_cap,
         ipv6_unicast_cap,
-    ];
+    ]);
 
-    let peer_caps = vec![
+    let peer_caps = Box::new([
         BgpCapability::FourOctetAs(FourOctetAsCapability::new(PEER_AS)),
         route_refresh_cap.clone(),
         enhanced_route_refresh_cap,
         ipv4_unicast_cap,
         ipv4_multicast_cap,
-    ];
+    ]);
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
         PEER_BGP_ID,
-        vec![BgpOpenMessageParameter::Capabilities(peer_caps.clone())].into_boxed_slice(),
+        Box::new([BgpOpenMessageParameter::Capabilities(peer_caps.clone())]),
     );
 
     let policy = EchoCapabilitiesPolicy::new(
@@ -389,8 +389,8 @@ async fn test_get_exchanged_capabilities_tracked_connection()
         .tracked_connection_received_capabilities()
         .await
         .unwrap();
-    assert_eq!(sent_caps, Some(my_caps.clone()));
-    assert_eq!(recv_caps, Some(peer_caps.clone()));
+    assert_eq!(sent_caps, Some(my_caps.clone().to_vec()));
+    assert_eq!(recv_caps, Some(peer_caps.clone().to_vec()));
 
     assert_eq!(
         rx.recv().await,

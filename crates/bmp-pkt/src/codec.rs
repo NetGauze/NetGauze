@@ -547,18 +547,18 @@ mod tests {
                     64512,
                     180,
                     Ipv4Addr::new(10, 0, 0, 3),
-                    vec![
-                        BgpOpenMessageParameter::Capabilities(vec![
+                    Box::new([
+                        BgpOpenMessageParameter::Capabilities(Box::new([
                             BgpCapability::MultiProtocolExtensions(
                                 MultiProtocolExtensionsCapability::new(
                                     AddressType::Ipv4MplsLabeledVpn,
                                 ),
                             ),
-                        ]),
-                        BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
-                            FourOctetAsCapability::new(64512),
-                        )]),
-                        BgpOpenMessageParameter::Capabilities(vec![
+                        ])),
+                        BgpOpenMessageParameter::Capabilities(Box::new([
+                            BgpCapability::FourOctetAs(FourOctetAsCapability::new(64512)),
+                        ])),
+                        BgpOpenMessageParameter::Capabilities(Box::new([
                             BgpCapability::ExtendedNextHopEncoding(
                                 ExtendedNextHopEncodingCapability::new(vec![
                                     ExtendedNextHopEncoding::new(
@@ -575,26 +575,25 @@ mod tests {
                                     ),
                                 ]),
                             ),
-                        ]),
-                    ]
-                    .into_boxed_slice(),
+                        ])),
+                    ]),
                 )),
                 BgpMessage::Open(BgpOpenMessage::new(
                     64512,
                     180,
                     Ipv4Addr::new(10, 0, 0, 1),
                     vec![
-                        BgpOpenMessageParameter::Capabilities(vec![
+                        BgpOpenMessageParameter::Capabilities(Box::new([
                             BgpCapability::MultiProtocolExtensions(
                                 MultiProtocolExtensionsCapability::new(
                                     AddressType::Ipv4MplsLabeledVpn,
                                 ),
                             ),
-                        ]),
-                        BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
-                            FourOctetAsCapability::new(64512),
-                        )]),
-                        BgpOpenMessageParameter::Capabilities(vec![
+                        ])),
+                        BgpOpenMessageParameter::Capabilities(Box::new([
+                            BgpCapability::FourOctetAs(FourOctetAsCapability::new(64512)),
+                        ])),
+                        BgpOpenMessageParameter::Capabilities(Box::new([
                             BgpCapability::ExtendedNextHopEncoding(
                                 ExtendedNextHopEncodingCapability::new(vec![
                                     ExtendedNextHopEncoding::new(
@@ -611,7 +610,7 @@ mod tests {
                                     ),
                                 ]),
                             ),
-                        ]),
+                        ])),
                     ]
                     .into_boxed_slice(),
                 )),
@@ -792,12 +791,11 @@ mod add_path_negotiation_tests {
                 asn as u16,
                 180,
                 id,
-                vec![BgpOpenMessageParameter::Capabilities(vec![
+                Box::new([BgpOpenMessageParameter::Capabilities(Box::new([
                     BgpCapability::AddPath(AddPathCapability::new(vec![
                         AddPathAddressFamily::new(AddressType::Ipv4Unicast, send, receive),
                     ])),
-                ])]
-                .into_boxed_slice(),
+                ]))]),
             )
         };
         let peer_header = PeerHeader::new(
