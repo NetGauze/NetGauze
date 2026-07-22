@@ -41,34 +41,34 @@ use crate::path_attribute::{MpUnreach, PathAttribute, PathAttributeValue};
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpUpdateMessage {
-    withdrawn_routes: Vec<Ipv4UnicastAddress>,
-    path_attributes: Vec<PathAttribute>,
-    nlri: Vec<Ipv4UnicastAddress>,
+    withdrawn_routes: Box<[Ipv4UnicastAddress]>,
+    path_attributes: Box<[PathAttribute]>,
+    nlri: Box<[Ipv4UnicastAddress]>,
 }
 
 impl BgpUpdateMessage {
     #[inline]
     pub fn new(
-        withdrawn_routes: Vec<Ipv4UnicastAddress>,
-        path_attributes: Vec<PathAttribute>,
-        nlri: Vec<Ipv4UnicastAddress>,
+        withdrawn_routes: impl Into<Box<[Ipv4UnicastAddress]>>,
+        path_attributes: impl Into<Box<[PathAttribute]>>,
+        nlri: impl Into<Box<[Ipv4UnicastAddress]>>,
     ) -> Self {
         BgpUpdateMessage {
-            withdrawn_routes,
-            path_attributes,
-            nlri,
+            withdrawn_routes: withdrawn_routes.into(),
+            path_attributes: path_attributes.into(),
+            nlri: nlri.into(),
         }
     }
-    pub const fn withdraw_routes(&self) -> &Vec<Ipv4UnicastAddress> {
+    pub const fn withdraw_routes(&self) -> &[Ipv4UnicastAddress] {
         &self.withdrawn_routes
     }
 
-    pub const fn path_attributes(&self) -> &Vec<PathAttribute> {
+    pub const fn path_attributes(&self) -> &[PathAttribute] {
         &self.path_attributes
     }
 
     #[inline]
-    pub const fn nlri(&self) -> &Vec<Ipv4UnicastAddress> {
+    pub const fn nlri(&self) -> &[Ipv4UnicastAddress] {
         &self.nlri
     }
 
@@ -288,7 +288,7 @@ mod tests {
 
         let with_more_than_one_mp_unreach = BgpUpdateMessage::new(
             vec![],
-            vec![
+            *Box::new([
                 PathAttribute::from(
                     true,
                     false,
@@ -305,7 +305,7 @@ mod tests {
                     PathAttributeValue::MpUnreach(MpUnreach::Ipv6Multicast { nlri: vec![] }),
                 )
                 .unwrap(),
-            ],
+            ]),
             vec![],
         );
 
