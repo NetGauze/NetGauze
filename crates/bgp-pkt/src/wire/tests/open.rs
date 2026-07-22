@@ -20,8 +20,12 @@ use netgauze_parse_utils::test_helpers::{
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
 
+use netgauze_iana::address_family::AddressType;
+
 use crate::BgpOpenMessage;
-use crate::capabilities::BgpCapability;
+use crate::capabilities::{
+    BgpCapability, FourOctetAsCapability, MultiProtocolExtensionsCapability,
+};
 use crate::open::{BGP_VERSION, BgpOpenMessageParameter};
 use crate::wire::deserializer::BgpParsingContext;
 use crate::wire::deserializer::capabilities::BgpCapabilityParsingError;
@@ -77,6 +81,88 @@ fn test_open_one_params() -> Result<(), BgpOpenMessageWritingError> {
         Box::new([BgpOpenMessageParameter::Capabilities(Box::new([
             BgpCapability::RouteRefresh,
         ]))]),
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire,
+        &mut BgpParsingContext::default(),
+        &good,
+    );
+    test_write(&good, &good_wire)?;
+
+    Ok(())
+}
+
+/// [RFC5492](https://datatracker.ietf.org/doc/html/rfc5492) Section 4 allows a
+/// single Capabilities Optional Parameter to carry more than one
+/// <Capability Code, Capability Length, Capability Value> triple.
+#[test]
+fn test_open_multiple_capabilities_in_one_param() -> Result<(), BgpOpenMessageWritingError> {
+    let good_wire = [
+        0x04, 0xfe, 0x09, 0x00, 0xb4, 0xc0, 0xa8, 0x00, 0x0f, // header
+        0x12, // optional parameters length
+        0x02, 0x10, // capabilities parameter, 16 bytes of capabilities
+        0x01, 0x04, 0x00, 0x01, 0x00, 0x01, // multi-protocol extensions: ipv4 unicast
+        0x02, 0x00, // route refresh
+        0x41, 0x04, 0x00, 0x00, 0xfe, 0x09, // four-octet AS: 65033
+        0x46, 0x00, // enhanced route refresh
+    ];
+
+    let good = BgpOpenMessage::new(
+        65033,
+        180,
+        Ipv4Addr::new(0xc0, 0xa8, 0x00, 0x0f),
+        Box::new([BgpOpenMessageParameter::Capabilities(Box::new([
+            BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                AddressType::Ipv4Unicast,
+            )),
+            BgpCapability::RouteRefresh,
+            BgpCapability::FourOctetAs(FourOctetAsCapability::new(65033)),
+            BgpCapability::EnhancedRouteRefresh,
+        ]))]),
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_wire,
+        &mut BgpParsingContext::default(),
+        &good,
+    );
+    test_write(&good, &good_wire)?;
+
+    Ok(())
+}
+
+/// [RFC5492](https://datatracker.ietf.org/doc/html/rfc5492) Section 4 also
+/// allows a BGP speaker to send more than one Capabilities Optional Parameter
+/// in the same OPEN message, and the same capability to appear more than once.
+#[test]
+fn test_open_multiple_capability_params() -> Result<(), BgpOpenMessageWritingError> {
+    let good_wire = [
+        0x04, 0xfe, 0x09, 0x00, 0xb4, 0xc0, 0xa8, 0x00, 0x0f, // header
+        0x14, // optional parameters length
+        0x02, 0x06, // first capabilities parameter
+        0x01, 0x04, 0x00, 0x01, 0x00, 0x01, // multi-protocol extensions: ipv4 unicast
+        0x02, 0x02, // second capabilities parameter
+        0x02, 0x00, // route refresh
+        0x02, 0x06, // third capabilities parameter
+        0x01, 0x04, 0x00, 0x02, 0x00, 0x01, // multi-protocol extensions: ipv6 unicast
+    ];
+
+    let good = BgpOpenMessage::new(
+        65033,
+        180,
+        Ipv4Addr::new(0xc0, 0xa8, 0x00, 0x0f),
+        Box::new([
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                    AddressType::Ipv4Unicast,
+                )),
+            ])),
+            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::RouteRefresh])),
+            BgpOpenMessageParameter::Capabilities(Box::new([
+                BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                    AddressType::Ipv6Unicast,
+                )),
+            ])),
+        ]),
     );
     test_parsed_completely_with_one_input_bytes_reader(
         &good_wire,
