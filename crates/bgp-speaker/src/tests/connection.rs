@@ -64,7 +64,7 @@ async fn test_connected_delay_open_timer_expires() -> io::Result<()> {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![],
+            Box::new([]),
         )))
         .build();
     let config = ConnectionConfigBuilder::new()
@@ -94,13 +94,13 @@ async fn test_connected_open_with_delay_open_timer() -> io::Result<()> {
             PEER_AS as u16,
             HOLD_TIME,
             PEER_BGP_ID,
-            vec![],
+            Box::new([]),
         )))
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![],
+            Box::new([]),
         )))
         .write(BgpMessage::KeepAlive)
         .build();
@@ -184,7 +184,7 @@ async fn test_connected_open_sent() -> io::Result<()> {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![],
+            Box::new([]),
         )))
         .build();
 
@@ -210,7 +210,7 @@ async fn test_open_sent_hold_timer_expires() -> io::Result<()> {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![],
+            Box::new([]),
         )))
         .wait(Duration::from_secs(hold_time_seconds * 2))
         .write(BgpMessage::Notification(
@@ -255,13 +255,13 @@ async fn test_open_sent_bgp_open() -> io::Result<()> {
         Vec::new(),
         Vec::new(),
     );
-    let peer_open = BgpOpenMessage::new(PEER_AS as u16, peer_hold_time, PEER_BGP_ID, vec![]);
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, peer_hold_time, PEER_BGP_ID, Box::new([]));
     let io = BgpIoMockBuilder::new()
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             our_hold_time,
             MY_BGP_ID,
-            vec![],
+            Box::new([]),
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -307,7 +307,7 @@ async fn test_open_sent_tcp_connection_fails() -> io::Result<()> {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![],
+            Box::new([]),
         )))
         .build();
 
@@ -347,14 +347,14 @@ async fn test_open_confirm_hold_timer_expires() -> io::Result<()> {
         PEER_AS as u16,
         hold_time_seconds as u16,
         PEER_BGP_ID,
-        vec![],
+        Box::new([]),
     );
     let io = BgpIoMockBuilder::new()
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time_seconds as u16,
             MY_BGP_ID,
-            vec![],
+            Box::new([]),
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)

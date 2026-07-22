@@ -46,7 +46,7 @@ async fn test_start_stop()
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![],
+            Box::new([]),
         )))
         .wait(Duration::from_millis(100))
         .write(BgpMessage::Notification(
@@ -176,7 +176,7 @@ async fn test_get_exchanged_capabilities()
         PEER_AS as u16,
         HOLD_TIME,
         PEER_BGP_ID,
-        vec![BgpOpenMessageParameter::Capabilities(peer_caps.clone())],
+        vec![BgpOpenMessageParameter::Capabilities(peer_caps.clone())].into_boxed_slice(),
     );
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -184,7 +184,7 @@ async fn test_get_exchanged_capabilities()
             AS_TRANS,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![BgpOpenMessageParameter::Capabilities(my_caps.clone())],
+            vec![BgpOpenMessageParameter::Capabilities(my_caps.clone())].into_boxed_slice(),
         )))
         .wait(Duration::from_millis(10))
         .read(BgpMessage::Open(peer_open.clone()))
@@ -293,7 +293,7 @@ async fn test_get_exchanged_capabilities_tracked_connection()
         PEER_AS as u16,
         HOLD_TIME,
         PEER_BGP_ID,
-        vec![BgpOpenMessageParameter::Capabilities(peer_caps.clone())],
+        vec![BgpOpenMessageParameter::Capabilities(peer_caps.clone())].into_boxed_slice(),
     );
 
     let policy = EchoCapabilitiesPolicy::new(
@@ -312,7 +312,7 @@ async fn test_get_exchanged_capabilities_tracked_connection()
             AS_TRANS,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![BgpOpenMessageParameter::Capabilities(my_caps.clone())],
+            vec![BgpOpenMessageParameter::Capabilities(my_caps.clone())].into_boxed_slice(),
         )))
         .wait(Duration::from_millis(100))
         .read(BgpMessage::Open(peer_open.clone()))
@@ -332,7 +332,7 @@ async fn test_get_exchanged_capabilities_tracked_connection()
             AS_TRANS,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![BgpOpenMessageParameter::Capabilities(my_caps.clone())],
+            vec![BgpOpenMessageParameter::Capabilities(my_caps.clone())].into_boxed_slice(),
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)

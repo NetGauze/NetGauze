@@ -576,7 +576,8 @@ mod tests {
                                 ]),
                             ),
                         ]),
-                    ],
+                    ]
+                    .into_boxed_slice(),
                 )),
                 BgpMessage::Open(BgpOpenMessage::new(
                     64512,
@@ -611,7 +612,8 @@ mod tests {
                                 ]),
                             ),
                         ]),
-                    ],
+                    ]
+                    .into_boxed_slice(),
                 )),
                 vec![],
             )
@@ -794,7 +796,8 @@ mod add_path_negotiation_tests {
                     BgpCapability::AddPath(AddPathCapability::new(vec![
                         AddPathAddressFamily::new(AddressType::Ipv4Unicast, send, receive),
                     ])),
-                ])],
+                ])]
+                .into_boxed_slice(),
             )
         };
         let peer_header = PeerHeader::new(
