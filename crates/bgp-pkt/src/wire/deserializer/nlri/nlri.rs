@@ -1208,13 +1208,40 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv6NlriMplsLabelsAddr
     }
 }
 
+/// Counts how many labels a label stack contains, without allocating,
+/// mirroring [`parse_mpls_label_stack`]'s own stop condition (a
+/// bottom-of-stack bit, the RFC 8277 "unreach compatibility" label for
+/// withdrawals, or the multiple-labels limit). `MplsLabel` is a bare
+/// 3-byte record, so peeking it costs nothing.
+///
+/// Purely advisory: a truncated buffer just stops the count early rather
+/// than returning an error, so it never changes what error the real
+/// parsing loop reports — only the capacity hint.
+#[inline]
+fn count_mpls_labels(mut cur: SliceReader<'_>, is_unreach: bool, mut labels_limit: u8) -> usize {
+    let mut count = 0usize;
+    let mut is_bottom = false;
+    while !is_bottom && labels_limit > 0 {
+        let Ok(label) = MplsLabel::parse(&mut cur) else {
+            break;
+        };
+        if labels_limit != u8::MAX {
+            labels_limit -= 1;
+        }
+        is_bottom = label.is_bottom() || (is_unreach && label.is_unreach_compatibility());
+        count += 1;
+    }
+    count
+}
+
 #[inline]
 fn parse_mpls_label_stack(
     cur: &mut SliceReader<'_>,
     is_unreach: bool,
     mut multiple_labels_limit: u8,
 ) -> Result<Vec<MplsLabel>, MplsLabelParsingError> {
-    let mut label_stack = Vec::<MplsLabel>::new();
+    let mut label_stack =
+        Vec::with_capacity(count_mpls_labels(*cur, is_unreach, multiple_labels_limit));
     let mut is_bottom = false;
     while !is_bottom && multiple_labels_limit > 0 {
         let label = MplsLabel::parse(cur)?;
