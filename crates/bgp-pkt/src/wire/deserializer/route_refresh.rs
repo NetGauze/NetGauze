@@ -96,6 +96,8 @@ impl From<BgpRouteRefreshMessageParsingError> for RouteRefreshError {
         // message with the Error Code of "ROUTE-REFRESH Message Error" and the subcode
         // of "Invalid Message Length". The Data field of the NOTIFICATION message MUST
         // obtain the complete ROUTE-REFRESH message.
-        RouteRefreshError::InvalidMessageLength { value: vec![] }
+        RouteRefreshError::InvalidMessageLength {
+            value: vec![].into(),
+        }
     }
 }

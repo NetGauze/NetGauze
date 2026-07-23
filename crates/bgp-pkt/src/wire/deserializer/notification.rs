@@ -128,7 +128,7 @@ impl<'a> ParseFrom<'a> for MessageHeaderError {
             }
         })?;
         let _ = cur.read_u8()?;
-        let value = cur.read_bytes(cur.remaining())?.to_vec();
+        let value = cur.read_bytes(cur.remaining())?.into();
 
         match sub_code {
             MessageHeaderErrorSubCode::Unspecific => Ok(MessageHeaderError::Unspecific { value }),
@@ -167,7 +167,7 @@ impl<'a> ParseFrom<'a> for OpenMessageError {
         })?;
         let _code = cur.read_u8()?;
 
-        let value = cur.read_bytes(cur.remaining())?.to_vec();
+        let value = cur.read_bytes(cur.remaining())?.into();
 
         match sub_code {
             OpenMessageErrorSubCode::Unspecific => Ok(OpenMessageError::Unspecific { value }),
@@ -213,7 +213,7 @@ impl<'a> ParseFrom<'a> for UpdateMessageError {
         })?;
         let _code = cur.read_u8()?;
 
-        let value = cur.read_bytes(cur.remaining())?.to_vec();
+        let value = cur.read_bytes(cur.remaining())?.into();
 
         match sub_code {
             UpdateMessageErrorSubCode::Unspecific => Ok(Self::Unspecific { value }),
@@ -259,7 +259,7 @@ impl<'a> ParseFrom<'a> for HoldTimerExpiredError {
     type Error = HoldTimerExpiredErrorParsingError;
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_code = cur.read_u8()?;
-        let value = cur.read_bytes(cur.remaining())?.to_vec();
+        let value = cur.read_bytes(cur.remaining())?.into();
 
         Ok(HoldTimerExpiredError::Unspecific { sub_code, value })
     }
@@ -286,7 +286,7 @@ impl<'a> ParseFrom<'a> for FiniteStateMachineError {
         })?;
         let _code = cur.read_u8()?;
 
-        let value = cur.read_bytes(cur.remaining())?.to_vec();
+        let value = cur.read_bytes(cur.remaining())?.into();
 
         match sub_code {
             FiniteStateMachineErrorSubCode::UnspecifiedError => {
@@ -325,7 +325,7 @@ impl<'a> ParseFrom<'a> for CeaseError {
             })?;
         let _code = cur.read_u8()?;
 
-        let value = cur.read_bytes(cur.remaining())?.to_vec();
+        let value = cur.read_bytes(cur.remaining())?.into();
         match sub_code {
             CeaseErrorSubCode::MaximumNumberOfPrefixesReached => {
                 Ok(CeaseError::MaximumNumberOfPrefixesReached { value })
@@ -375,7 +375,7 @@ impl<'a> ParseFrom<'a> for RouteRefreshError {
         match sub_code {
             RouteRefreshMessageErrorSubCode::InvalidMessageLength => {
                 Ok(RouteRefreshError::InvalidMessageLength {
-                    value: value.to_vec(),
+                    value: value.into(),
                 })
             }
         }

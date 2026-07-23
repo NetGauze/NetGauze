@@ -153,7 +153,7 @@ async fn test_connected_bgp_header_err() -> io::Result<()> {
         ])
         .write(BgpMessage::Notification(
             BgpNotificationMessage::MessageHeaderError(MessageHeaderError::BadMessageType {
-                value: vec![0xff],
+                value: vec![0xff].into(),
             }),
         ))
         .build();
@@ -216,7 +216,7 @@ async fn test_open_sent_hold_timer_expires() -> io::Result<()> {
         .write(BgpMessage::Notification(
             BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
                 sub_code: 0,
-                value: vec![],
+                value: vec![].into(),
             }),
         ))
         .build();
@@ -364,7 +364,7 @@ async fn test_open_confirm_hold_timer_expires() -> io::Result<()> {
         .write(BgpMessage::Notification(
             BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
                 sub_code: 0,
-                value: vec![],
+                value: vec![].into(),
             }),
         ))
         .wait(Duration::from_secs(hold_time_seconds))

@@ -184,7 +184,9 @@ async fn test_connect_automatic_start() {
 async fn test_connect_manual_stop() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Notification(
-        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] }),
+        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
+            value: vec![].into(),
+        }),
     ));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -234,7 +236,9 @@ async fn test_connect_manual_stop() {
 async fn test_connect_retry_timer_expires() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Notification(
-        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] }),
+        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
+            value: vec![].into(),
+        }),
     ));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -556,7 +560,7 @@ async fn test_connect_bgp_header_err() {
         .write(BgpMessage::Notification(
             BgpNotificationMessage::MessageHeaderError(
                 MessageHeaderError::ConnectionNotSynchronized {
-                    value: Vec::from(&bad_header),
+                    value: Box::from(&bad_header[..]),
                 },
             ),
         ));
@@ -581,7 +585,7 @@ async fn test_connect_bgp_header_err() {
         event,
         Ok(BgpEvent::BGPHeaderErr(
             MessageHeaderError::ConnectionNotSynchronized {
-                value: Vec::from(&bad_header)
+                value: Box::from(&bad_header[..])
             }
         ))
     );
@@ -603,7 +607,7 @@ async fn test_connect_bgp_open_err_unsupported_version() {
         .read_u8(&[bgp_version])
         .write(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![0x00, 0x04],
+                value: vec![0x00, 0x04].into(),
             }),
         ));
     let active_connect = MockActiveConnect {
@@ -628,7 +632,7 @@ async fn test_connect_bgp_open_err_unsupported_version() {
         event,
         Ok(BgpEvent::BGPOpenMsgErr(
             OpenMessageError::UnsupportedVersionNumber {
-                value: vec![0x00, 0x04]
+                value: vec![0x00, 0x04].into()
             }
         ))
     );
@@ -649,7 +653,7 @@ async fn test_connect_bgp_open_err_unacceptable_hold_time() {
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnacceptableHoldTime {
-                value: hold_time.to_be_bytes().to_vec(),
+                value: hold_time.to_be_bytes().into(),
             }),
         ));
     let active_connect = MockActiveConnect {
@@ -674,7 +678,7 @@ async fn test_connect_bgp_open_err_unacceptable_hold_time() {
         event,
         Ok(BgpEvent::BGPOpenMsgErr(
             OpenMessageError::UnacceptableHoldTime {
-                value: hold_time.to_be_bytes().to_vec(),
+                value: hold_time.to_be_bytes().into(),
             }
         ))
     );
@@ -698,7 +702,7 @@ async fn test_connect_notif_version_err_with_open_delay() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.read(BgpMessage::Notification(
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![3],
+            value: vec![3].into(),
         }),
     ));
     let active_connect = MockActiveConnect {
@@ -732,7 +736,9 @@ async fn test_connect_notif_version_err_with_open_delay() {
 async fn test_connect_automatic_stop() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Notification(
-        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] }),
+        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
+            value: vec![].into(),
+        }),
     ));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -774,8 +780,9 @@ async fn test_connect_hold_timer_expires() {
 #[tracing_test::traced_test]
 async fn test_connect_notif_msg() {
     let mut io_builder = BgpIoMockBuilder::new();
-    let notif =
-        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
+    let notif = BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
+        value: vec![].into(),
+    });
     io_builder.read(BgpMessage::Notification(notif.clone()));
 
     let active_connect = MockActiveConnect {
@@ -904,7 +911,9 @@ async fn test_connect_update_err_msg() {
     assert_eq!(
         event,
         Ok(BgpEvent::UpdateMsgErr(
-            UpdateMessageError::MalformedAttributeList { value: vec![] }
+            UpdateMessageError::MalformedAttributeList {
+                value: vec![].into()
+            }
         ))
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
@@ -1328,7 +1337,7 @@ async fn test_active_bgp_header_err() {
         .write(BgpMessage::Notification(
             BgpNotificationMessage::MessageHeaderError(
                 MessageHeaderError::ConnectionNotSynchronized {
-                    value: Vec::from(&bad_header),
+                    value: Box::from(&bad_header[..]),
                 },
             ),
         ));
@@ -1365,7 +1374,7 @@ async fn test_active_bgp_header_err() {
         event,
         Ok(BgpEvent::BGPHeaderErr(
             MessageHeaderError::ConnectionNotSynchronized {
-                value: Vec::from(&bad_header)
+                value: Box::from(&bad_header[..])
             }
         ))
     );
@@ -1390,7 +1399,7 @@ async fn test_active_bgp_open_err() {
         .read_u8(&[bgp_version])
         .write(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![0x00, 0x04],
+                value: vec![0x00, 0x04].into(),
             }),
         ));
 
@@ -1426,7 +1435,7 @@ async fn test_active_bgp_open_err() {
         event,
         Ok(BgpEvent::BGPOpenMsgErr(
             OpenMessageError::UnsupportedVersionNumber {
-                value: vec![0x00, 0x04]
+                value: vec![0x00, 0x04].into()
             }
         ))
     );
@@ -1453,7 +1462,7 @@ async fn test_active_notif_version_err_with_open_delay() {
     let mut passive_io_builder = BgpIoMockBuilder::new();
     passive_io_builder.read(BgpMessage::Notification(
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![0x00, 0x04],
+            value: vec![0x00, 0x04].into(),
         }),
     ));
 
@@ -1499,7 +1508,9 @@ async fn test_active_automatic_stop() {
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
     passive_io_builder.write(BgpMessage::Notification(
-        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] }),
+        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
+            value: vec![].into(),
+        }),
     ));
 
     let active_connect = MockActiveConnect {
@@ -1544,8 +1555,9 @@ async fn test_active_automatic_stop() {
 async fn test_active_notif_msg() {
     let delay_open_duration = 1;
     let active_io_builder = BgpIoMockBuilder::new();
-    let notif =
-        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
+    let notif = BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
+        value: vec![].into(),
+    });
     let mut passive_io_builder = BgpIoMockBuilder::new();
     passive_io_builder.read(BgpMessage::Notification(notif.clone()));
 
@@ -1720,7 +1732,9 @@ async fn test_active_update_err_msg() -> Result<(), FsmStateError<SocketAddr>> {
 
     assert_eq!(
         event,
-        BgpEvent::UpdateMsgErr(UpdateMessageError::MalformedAttributeList { value: vec![] })
+        BgpEvent::UpdateMsgErr(UpdateMessageError::MalformedAttributeList {
+            value: vec![].into()
+        })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
@@ -1791,7 +1805,7 @@ async fn test_open_sent_manual_stop() {
         )))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
     let active_connect = MockActiveConnect {
@@ -1838,7 +1852,7 @@ async fn test_open_sent_automatic_stop() {
         )))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
     let active_connect = MockActiveConnect {
@@ -1889,7 +1903,7 @@ async fn test_open_sent_hold_timer_expires() {
         .write(BgpMessage::Notification(
             BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
                 sub_code: 0,
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
     let active_connect = MockActiveConnect {
@@ -2106,7 +2120,7 @@ async fn test_open_sent_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>
         .write(BgpMessage::Notification(
             BgpNotificationMessage::MessageHeaderError(
                 MessageHeaderError::ConnectionNotSynchronized {
-                    value: Vec::from(&bad_header),
+                    value: Box::from(&bad_header[..]),
                 },
             ),
         ));
@@ -2140,7 +2154,7 @@ async fn test_open_sent_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>
     assert_eq!(
         event,
         BgpEvent::BGPHeaderErr(MessageHeaderError::ConnectionNotSynchronized {
-            value: Vec::from(&bad_header)
+            value: Box::from(&bad_header[..])
         })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
@@ -2169,7 +2183,7 @@ async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> 
         .read_u8(&[bgp_version])
         .write(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![0x00, 0x04],
+                value: vec![0x00, 0x04].into(),
             }),
         ));
 
@@ -2201,7 +2215,7 @@ async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> 
     assert_eq!(
         event,
         BgpEvent::BGPOpenMsgErr(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![0x00, 0x04]
+            value: vec![0x00, 0x04].into()
         })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
@@ -2225,7 +2239,7 @@ async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAd
         )))
         .read(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![0x00, 0x04],
+                value: vec![0x00, 0x04].into(),
             }),
         ));
 
@@ -2266,8 +2280,9 @@ async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAd
 #[tokio::test]
 #[tracing_test::traced_test]
 async fn test_open_sent_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
-    let notif =
-        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
+    let notif = BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
+        value: vec![].into(),
+    });
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -2279,7 +2294,9 @@ async fn test_open_sent_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
         .read(BgpMessage::Notification(notif.clone()))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::FiniteStateMachineError(
-                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState { value: vec![] },
+                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
+                    value: vec![].into(),
+                },
             ),
         ));
 
@@ -2331,7 +2348,9 @@ async fn test_open_sent_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>
         .read(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::FiniteStateMachineError(
-                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState { value: vec![] },
+                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
+                    value: vec![].into(),
+                },
             ),
         ));
 
@@ -2384,7 +2403,9 @@ async fn test_open_sent_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
         .read(BgpMessage::Update(update.clone()))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::FiniteStateMachineError(
-                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState { value: vec![] },
+                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
+                    value: vec![].into(),
+                },
             ),
         ));
 
@@ -2440,7 +2461,9 @@ async fn test_open_sent_update_err() -> Result<(), FsmStateError<SocketAddr>> {
         .read_u8(&update)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::FiniteStateMachineError(
-                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState { value: vec![] },
+                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
+                    value: vec![].into(),
+                },
             ),
         ));
 
@@ -2471,7 +2494,9 @@ async fn test_open_sent_update_err() -> Result<(), FsmStateError<SocketAddr>> {
     let event = peer.run().await?;
     assert_eq!(
         event,
-        BgpEvent::UpdateMsgErr(UpdateMessageError::MalformedAttributeList { value: vec![] })
+        BgpEvent::UpdateMsgErr(UpdateMessageError::MalformedAttributeList {
+            value: vec![].into()
+        })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
@@ -2499,7 +2524,9 @@ async fn test_open_sent_route_refresh_msg() -> Result<(), FsmStateError<SocketAd
         .read(BgpMessage::RouteRefresh(route_refresh.clone()))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::FiniteStateMachineError(
-                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState { value: vec![] },
+                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
+                    value: vec![].into(),
+                },
             ),
         ));
 
@@ -2613,7 +2640,7 @@ async fn test_open_confirm_manual_stop() -> Result<(), FsmStateError<SocketAddr>
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
 
@@ -2672,7 +2699,7 @@ async fn test_open_confirm_automatic_stop() -> Result<(), FsmStateError<SocketAd
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
 
@@ -2738,7 +2765,7 @@ async fn test_open_confirm_hold_timer_expires() -> Result<(), FsmStateError<Sock
         .write(BgpMessage::Notification(
             BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
                 sub_code: 0,
-                value: vec![],
+                value: vec![].into(),
             }),
         ))
         .wait(Duration::from_secs(hold_time as u64 + 1));
@@ -2855,8 +2882,9 @@ async fn test_open_confirm_notif_msg() -> Result<(), FsmStateError<SocketAddr>> 
     let hold_time = 3;
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
-    let notif =
-        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
+    let notif = BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
+        value: vec![].into(),
+    });
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -2928,7 +2956,7 @@ async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<Socke
         .write(BgpMessage::KeepAlive)
         .read(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![0x00, 0x04],
+                value: vec![0x00, 0x04].into(),
             }),
         ));
 
@@ -2993,7 +3021,7 @@ async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmSta
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::ConnectionCollisionResolution {
-                value: vec![],
+                value: vec![].into(),
             }),
         ))
         .wait(Duration::from_secs(1));
@@ -3105,7 +3133,7 @@ async fn test_open_confirm_collision_dump_tracked_connection()
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::ConnectionCollisionResolution {
-                value: vec![],
+                value: vec![].into(),
             }),
         ))
         .wait(Duration::from_secs(1));
@@ -3164,7 +3192,9 @@ async fn test_open_confirm_open_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
     let notif = BgpNotificationMessage::FiniteStateMachineError(
-        FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState { value: vec![] },
+        FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState {
+            value: vec![].into(),
+        },
     );
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -3228,7 +3258,7 @@ async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr
     let bgp_version = 0x03;
     let notif =
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![0x00, 0x04],
+            value: vec![0x00, 0x04].into(),
         });
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -3280,7 +3310,7 @@ async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr
     assert_eq!(
         event,
         BgpEvent::BGPOpenMsgErr(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![0x00, 0x04]
+            value: vec![0x00, 0x04].into()
         })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
@@ -3300,7 +3330,7 @@ async fn test_open_confirm_bgp_header_err() -> Result<(), FsmStateError<SocketAd
     let bad_header = [0xee; 16];
     let notif =
         BgpNotificationMessage::MessageHeaderError(MessageHeaderError::ConnectionNotSynchronized {
-            value: Vec::from(&bad_header),
+            value: Box::from(&bad_header[..]),
         });
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -3350,7 +3380,7 @@ async fn test_open_confirm_bgp_header_err() -> Result<(), FsmStateError<SocketAd
     assert_eq!(
         event,
         BgpEvent::BGPHeaderErr(MessageHeaderError::ConnectionNotSynchronized {
-            value: Vec::from(&bad_header)
+            value: Box::from(&bad_header[..])
         })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
@@ -3432,7 +3462,7 @@ async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>>
         .write(BgpMessage::Notification(
             BgpNotificationMessage::FiniteStateMachineError(
                 FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState {
-                    value: vec![],
+                    value: vec![].into(),
                 },
             ),
         ));
@@ -3497,7 +3527,7 @@ async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>>
         .write(BgpMessage::Notification(
             BgpNotificationMessage::FiniteStateMachineError(
                 FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState {
-                    value: vec![],
+                    value: vec![].into(),
                 },
             ),
         ));
@@ -3533,7 +3563,9 @@ async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>>
     let event = peer.run().await?;
     assert_eq!(
         event,
-        BgpEvent::UpdateMsgErr(UpdateMessageError::MalformedAttributeList { value: vec![] })
+        BgpEvent::UpdateMsgErr(UpdateMessageError::MalformedAttributeList {
+            value: vec![].into()
+        })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
@@ -3565,7 +3597,7 @@ async fn test_open_confirm_route_refresh_msg() -> Result<(), FsmStateError<Socke
         .write(BgpMessage::Notification(
             BgpNotificationMessage::FiniteStateMachineError(
                 FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState {
-                    value: vec![],
+                    value: vec![].into(),
                 },
             ),
         ));
@@ -3690,7 +3722,7 @@ async fn test_established_manual_stop() -> Result<(), FsmStateError<SocketAddr>>
         .read(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
 
@@ -3754,7 +3786,7 @@ async fn test_established_automatic_stop() -> Result<(), FsmStateError<SocketAdd
         .read(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
 
@@ -3825,7 +3857,7 @@ async fn test_established_hold_timer_expires() -> Result<(), FsmStateError<Socke
         .write(BgpMessage::Notification(
             BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
                 sub_code: 0,
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
 
@@ -3971,7 +4003,7 @@ async fn test_established_collision_dump_main_connection() -> Result<(), FsmStat
         .read(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::ConnectionCollisionResolution {
-                value: vec![],
+                value: vec![].into(),
             }),
         ))
         .wait(Duration::from_secs(1));
@@ -4089,7 +4121,7 @@ async fn test_established_collision_dump_tracked_connection()
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::ConnectionCollisionResolution {
-                value: vec![],
+                value: vec![].into(),
             }),
         ))
         .wait(Duration::from_secs(1));
@@ -4177,7 +4209,9 @@ async fn test_established_reject_connection_tracking_disabled()
 
     let mut passive_io_builder = BgpIoMockBuilder::new();
     passive_io_builder.write(BgpMessage::Notification(
-        BgpNotificationMessage::CeaseError(CeaseError::ConnectionRejected { value: vec![] }),
+        BgpNotificationMessage::CeaseError(CeaseError::ConnectionRejected {
+            value: vec![].into(),
+        }),
     ));
 
     let config = PeerConfigBuilder::new()
@@ -4225,8 +4259,9 @@ async fn test_established_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
-    let notif =
-        BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
+    let notif = BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
+        value: vec![].into(),
+    });
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -4291,7 +4326,7 @@ async fn test_established_notif_version_error() -> Result<(), FsmStateError<Sock
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let notif =
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![0x00, 0x04],
+            value: vec![0x00, 0x04].into(),
         });
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder

@@ -397,30 +397,30 @@ impl From<BgpMessageParsingError> for BgpNotificationMessage {
             BgpMessageParsingError::Parse(_) => {
                 // TODO: more detailed error
                 BgpNotificationMessage::MessageHeaderError(MessageHeaderError::Unspecific {
-                    value: vec![],
+                    value: vec![].into(),
                 })
             }
             BgpMessageParsingError::ConnectionNotSynchronized { header, .. } => {
                 BgpNotificationMessage::MessageHeaderError(
                     MessageHeaderError::ConnectionNotSynchronized {
-                        value: header.to_be_bytes().to_vec(),
+                        value: header.to_be_bytes().into(),
                     },
                 )
             }
             BgpMessageParsingError::UndefinedBgpMessageType { code: msg_type, .. } => {
                 BgpNotificationMessage::MessageHeaderError(MessageHeaderError::BadMessageType {
-                    value: msg_type.to_be_bytes().to_vec(),
+                    value: msg_type.to_be_bytes().into(),
                 })
             }
             BgpMessageParsingError::BadMessageLength {
                 length: bad_length, ..
             } => BgpNotificationMessage::MessageHeaderError(MessageHeaderError::BadMessageLength {
-                value: bad_length.to_be_bytes().to_vec(),
+                value: bad_length.to_be_bytes().into(),
             }),
             BgpMessageParsingError::UnparseableBytes {
                 length: bad_length, ..
             } => BgpNotificationMessage::MessageHeaderError(MessageHeaderError::BadMessageLength {
-                value: bad_length.to_be_bytes().to_vec(),
+                value: bad_length.to_be_bytes().into(),
             }),
             BgpMessageParsingError::BgpOpenMessageParsingError(open_err) => {
                 BgpNotificationMessage::OpenMessageError(open_err.into())
@@ -432,7 +432,9 @@ impl From<BgpMessageParsingError> for BgpNotificationMessage {
                 // Notification messages parsing should be ignored and consider a session
                 // closed.
                 BgpNotificationMessage::FiniteStateMachineError(
-                    FiniteStateMachineError::Unspecific { value: vec![] },
+                    FiniteStateMachineError::Unspecific {
+                        value: vec![].into(),
+                    },
                 )
             }
             BgpMessageParsingError::BgpRouteRefreshMessageParsingError(route_refresh_error) => {

@@ -43,10 +43,10 @@ pub enum BgpNotificationMessage {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum MessageHeaderError {
-    Unspecific { value: Vec<u8> },
-    ConnectionNotSynchronized { value: Vec<u8> },
-    BadMessageLength { value: Vec<u8> },
-    BadMessageType { value: Vec<u8> },
+    Unspecific { value: Box<[u8]> },
+    ConnectionNotSynchronized { value: Box<[u8]> },
+    BadMessageLength { value: Box<[u8]> },
+    BadMessageType { value: Box<[u8]> },
 }
 
 /// See [`crate::iana::OpenMessageErrorSubCode`] for full documentation
@@ -54,14 +54,14 @@ pub enum MessageHeaderError {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum OpenMessageError {
-    Unspecific { value: Vec<u8> },
-    UnsupportedVersionNumber { value: Vec<u8> },
-    BadPeerAs { value: Vec<u8> },
-    BadBgpIdentifier { value: Vec<u8> },
-    UnsupportedOptionalParameter { value: Vec<u8> },
-    UnacceptableHoldTime { value: Vec<u8> },
-    UnsupportedCapability { value: Vec<u8> },
-    RoleMismatch { value: Vec<u8> },
+    Unspecific { value: Box<[u8]> },
+    UnsupportedVersionNumber { value: Box<[u8]> },
+    BadPeerAs { value: Box<[u8]> },
+    BadBgpIdentifier { value: Box<[u8]> },
+    UnsupportedOptionalParameter { value: Box<[u8]> },
+    UnacceptableHoldTime { value: Box<[u8]> },
+    UnsupportedCapability { value: Box<[u8]> },
+    RoleMismatch { value: Box<[u8]> },
 }
 
 /// See [`crate::iana::UpdateMessageErrorSubCode`] for full documentation
@@ -69,24 +69,24 @@ pub enum OpenMessageError {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum UpdateMessageError {
-    Unspecific { value: Vec<u8> },
-    MalformedAttributeList { value: Vec<u8> },
-    UnrecognizedWellKnownAttribute { value: Vec<u8> },
-    MissingWellKnownAttribute { value: Vec<u8> },
-    AttributeFlagsError { value: Vec<u8> },
-    AttributeLengthError { value: Vec<u8> },
-    InvalidOriginAttribute { value: Vec<u8> },
-    InvalidNextHopAttribute { value: Vec<u8> },
-    OptionalAttributeError { value: Vec<u8> },
-    InvalidNetworkField { value: Vec<u8> },
-    MalformedAsPath { value: Vec<u8> },
+    Unspecific { value: Box<[u8]> },
+    MalformedAttributeList { value: Box<[u8]> },
+    UnrecognizedWellKnownAttribute { value: Box<[u8]> },
+    MissingWellKnownAttribute { value: Box<[u8]> },
+    AttributeFlagsError { value: Box<[u8]> },
+    AttributeLengthError { value: Box<[u8]> },
+    InvalidOriginAttribute { value: Box<[u8]> },
+    InvalidNextHopAttribute { value: Box<[u8]> },
+    OptionalAttributeError { value: Box<[u8]> },
+    InvalidNetworkField { value: Box<[u8]> },
+    MalformedAsPath { value: Box<[u8]> },
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum HoldTimerExpiredError {
-    Unspecific { sub_code: u8, value: Vec<u8> },
+    Unspecific { sub_code: u8, value: Box<[u8]> },
 }
 
 /// See [`crate::iana::FiniteStateMachineErrorSubCode`] for full documentation
@@ -94,10 +94,10 @@ pub enum HoldTimerExpiredError {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum FiniteStateMachineError {
-    Unspecific { value: Vec<u8> },
-    ReceiveUnexpectedMessageInOpenSentState { value: Vec<u8> },
-    ReceiveUnexpectedMessageInOpenConfirmState { value: Vec<u8> },
-    ReceiveUnexpectedMessageInEstablishedState { value: Vec<u8> },
+    Unspecific { value: Box<[u8]> },
+    ReceiveUnexpectedMessageInOpenSentState { value: Box<[u8]> },
+    ReceiveUnexpectedMessageInOpenConfirmState { value: Box<[u8]> },
+    ReceiveUnexpectedMessageInEstablishedState { value: Box<[u8]> },
 }
 
 /// See [`crate::iana::CeaseErrorSubCode`] for full documentation
@@ -105,16 +105,16 @@ pub enum FiniteStateMachineError {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum CeaseError {
-    MaximumNumberOfPrefixesReached { value: Vec<u8> },
-    AdministrativeShutdown { value: Vec<u8> },
-    PeerDeConfigured { value: Vec<u8> },
-    AdministrativeReset { value: Vec<u8> },
-    ConnectionRejected { value: Vec<u8> },
-    OtherConfigurationChange { value: Vec<u8> },
-    ConnectionCollisionResolution { value: Vec<u8> },
-    OutOfResources { value: Vec<u8> },
-    HardReset { value: Vec<u8> },
-    BfdDown { value: Vec<u8> },
+    MaximumNumberOfPrefixesReached { value: Box<[u8]> },
+    AdministrativeShutdown { value: Box<[u8]> },
+    PeerDeConfigured { value: Box<[u8]> },
+    AdministrativeReset { value: Box<[u8]> },
+    ConnectionRejected { value: Box<[u8]> },
+    OtherConfigurationChange { value: Box<[u8]> },
+    ConnectionCollisionResolution { value: Box<[u8]> },
+    OutOfResources { value: Box<[u8]> },
+    HardReset { value: Box<[u8]> },
+    BfdDown { value: Box<[u8]> },
 }
 
 /// See [`crate::iana::RouteRefreshMessageErrorSubCode`] for full documentation
@@ -122,5 +122,5 @@ pub enum CeaseError {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteRefreshError {
-    InvalidMessageLength { value: Vec<u8> },
+    InvalidMessageLength { value: Box<[u8]> },
 }

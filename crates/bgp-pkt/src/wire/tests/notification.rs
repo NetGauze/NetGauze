@@ -35,16 +35,16 @@ fn test_message_header_error() -> Result<(), MessageHeaderErrorWritingError> {
     let bad_incomplete_wire = [];
 
     let good_unspecific = MessageHeaderError::Unspecific {
-        value: good_synchronized_wire[1..].to_vec(),
+        value: good_synchronized_wire[1..].into(),
     };
     let good_synchronized = MessageHeaderError::ConnectionNotSynchronized {
-        value: good_synchronized_wire[1..].to_vec(),
+        value: good_synchronized_wire[1..].into(),
     };
     let good_length = MessageHeaderError::BadMessageLength {
-        value: good_length_wire[1..].to_vec(),
+        value: good_length_wire[1..].into(),
     };
     let good_type = MessageHeaderError::BadMessageType {
-        value: good_type_wire[1..].to_vec(),
+        value: good_type_wire[1..].into(),
     };
     let bad_undefined = MessageHeaderErrorParsingError::UndefinedMessageHeaderErrorType {
         offset: 0,
@@ -85,7 +85,7 @@ fn test_bgp_notification_message_header() -> Result<(), BgpNotificationMessageWr
 
     let good_header =
         BgpNotificationMessage::MessageHeaderError(MessageHeaderError::ConnectionNotSynchronized {
-            value: good_header_wire[2..].to_vec(),
+            value: good_header_wire[2..].into(),
         });
     let bad_undefined_code =
         BgpNotificationMessageParsingError::UndefinedBgpErrorNotificationCode {
@@ -138,28 +138,28 @@ fn test_open_message_error() -> Result<(), OpenMessageErrorWritingError> {
     let bad_incomplete_wire = [];
 
     let good_unspecific = OpenMessageError::Unspecific {
-        value: good_unspecific_wire[1..].to_vec(),
+        value: good_unspecific_wire[1..].into(),
     };
     let good_version = OpenMessageError::UnsupportedVersionNumber {
-        value: good_version_wire[1..].to_vec(),
+        value: good_version_wire[1..].into(),
     };
     let good_peer = OpenMessageError::BadPeerAs {
-        value: good_peer_wire[1..].to_vec(),
+        value: good_peer_wire[1..].into(),
     };
     let good_bgp_id = OpenMessageError::BadBgpIdentifier {
-        value: good_bgp_id_wire[1..].to_vec(),
+        value: good_bgp_id_wire[1..].into(),
     };
     let good_optional = OpenMessageError::UnsupportedOptionalParameter {
-        value: good_optional_wire[1..].to_vec(),
+        value: good_optional_wire[1..].into(),
     };
     let good_hold_time = OpenMessageError::UnacceptableHoldTime {
-        value: good_hold_time_wire[1..].to_vec(),
+        value: good_hold_time_wire[1..].into(),
     };
     let good_capability = OpenMessageError::UnsupportedCapability {
-        value: good_capability_wire[1..].to_vec(),
+        value: good_capability_wire[1..].into(),
     };
     let good_role_mismatch = OpenMessageError::RoleMismatch {
-        value: good_role_mismatch_wire[1..].to_vec(),
+        value: good_role_mismatch_wire[1..].into(),
     };
 
     let bad_undefined = OpenMessageErrorParsingError::UndefinedOpenMessageErrorSubCode {
@@ -207,7 +207,7 @@ fn test_bgp_notification_open_message() -> Result<(), BgpNotificationMessageWrit
 
     let good =
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-            value: good_wire[2..].to_vec(),
+            value: good_wire[2..].into(),
         });
     let bad_undefined = BgpNotificationMessageParsingError::OpenMessageError(
         OpenMessageErrorParsingError::UndefinedOpenMessageErrorSubCode {
@@ -254,38 +254,38 @@ fn test_update_message_error() -> Result<(), UpdateMessageErrorWritingError> {
     let bad_incomplete_wire = [];
 
     let good_unspecific = UpdateMessageError::Unspecific {
-        value: good_unspecific_wire[1..].to_vec(),
+        value: good_unspecific_wire[1..].into(),
     };
     let good_malformed_attributes = UpdateMessageError::MalformedAttributeList {
-        value: good_malformed_attributes_wire[1..].to_vec(),
+        value: good_malformed_attributes_wire[1..].into(),
     };
     let good_unrecognized_well_known_attribute =
         UpdateMessageError::UnrecognizedWellKnownAttribute {
-            value: good_unrecognized_well_known_attribute_wire[1..].to_vec(),
+            value: good_unrecognized_well_known_attribute_wire[1..].into(),
         };
     let good_missing_well_know_attribute = UpdateMessageError::MissingWellKnownAttribute {
-        value: good_missing_well_know_attribute_wire[1..].to_vec(),
+        value: good_missing_well_know_attribute_wire[1..].into(),
     };
     let good_attribute_flags = UpdateMessageError::AttributeFlagsError {
-        value: good_attribute_flags_wire[1..].to_vec(),
+        value: good_attribute_flags_wire[1..].into(),
     };
     let good_attribute_length = UpdateMessageError::AttributeLengthError {
-        value: good_attribute_length_wire[1..].to_vec(),
+        value: good_attribute_length_wire[1..].into(),
     };
     let good_invalid_origin = UpdateMessageError::InvalidOriginAttribute {
-        value: good_invalid_origin_wire[1..].to_vec(),
+        value: good_invalid_origin_wire[1..].into(),
     };
     let good_next_hop = UpdateMessageError::InvalidNextHopAttribute {
-        value: good_next_hop_wire[1..].to_vec(),
+        value: good_next_hop_wire[1..].into(),
     };
     let good_optional_attribute = UpdateMessageError::OptionalAttributeError {
-        value: good_optional_attribute_wire[1..].to_vec(),
+        value: good_optional_attribute_wire[1..].into(),
     };
     let good_network_field = UpdateMessageError::InvalidNetworkField {
-        value: good_network_field_wire[1..].to_vec(),
+        value: good_network_field_wire[1..].into(),
     };
     let good_malformed_as_path = UpdateMessageError::MalformedAsPath {
-        value: good_malformed_as_path_wire[1..].to_vec(),
+        value: good_malformed_as_path_wire[1..].into(),
     };
 
     let bad_undefined = UpdateMessageErrorParsingError::UndefinedUpdateMessageErrorSubCode {
@@ -355,7 +355,7 @@ fn test_bgp_notification_update_message() -> Result<(), BgpNotificationMessageWr
 
     let good =
         BgpNotificationMessage::UpdateMessageError(UpdateMessageError::MalformedAttributeList {
-            value: good_wire[2..].to_vec(),
+            value: good_wire[2..].into(),
         });
 
     let bad_undefined = BgpNotificationMessageParsingError::UpdateMessageError(
@@ -393,7 +393,7 @@ fn test_hold_timer_expired_error() -> Result<(), HoldTimerExpiredErrorWritingErr
 
     let good = HoldTimerExpiredError::Unspecific {
         sub_code: good_wire[0],
-        value: good_wire[1..].to_vec(),
+        value: good_wire[1..].into(),
     };
     let bad_incomplete = HoldTimerExpiredErrorParsingError::Parse(ParseError::UnexpectedEof {
         offset: 0,
@@ -418,7 +418,7 @@ fn test_bgp_notification_hold_timer_expired() -> Result<(), BgpNotificationMessa
 
     let good = BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
         sub_code: good_wire[1],
-        value: good_wire[2..].to_vec(),
+        value: good_wire[2..].into(),
     });
 
     let bad_incomplete = BgpNotificationMessageParsingError::HoldTimerExpiredError(
@@ -449,17 +449,17 @@ fn test_finite_state_machine_error() -> Result<(), FiniteStateMachineErrorWritin
     let bad_incomplete_wire = [];
 
     let good_unspecified = FiniteStateMachineError::Unspecific {
-        value: good_unspecified_wire[1..].to_vec(),
+        value: good_unspecified_wire[1..].into(),
     };
     let good_in_open = FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
-        value: good_in_open_wire[1..].to_vec(),
+        value: good_in_open_wire[1..].into(),
     };
     let good_in_open_confirm =
         FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState {
-            value: good_in_open_confirm_wire[1..].to_vec(),
+            value: good_in_open_confirm_wire[1..].into(),
         };
     let good_in_establish = FiniteStateMachineError::ReceiveUnexpectedMessageInEstablishedState {
-        value: good_in_establish_wire[1..].to_vec(),
+        value: good_in_establish_wire[1..].into(),
     };
 
     let bad_undefined = FiniteStateMachineErrorParsingError::Undefined {
@@ -500,7 +500,7 @@ fn test_bgp_notification_finite_state_machine() -> Result<(), BgpNotificationMes
 
     let good = BgpNotificationMessage::FiniteStateMachineError(
         FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
-            value: good_wire[2..].to_vec(),
+            value: good_wire[2..].into(),
         },
     );
 
@@ -548,34 +548,34 @@ fn test_cease_error() -> Result<(), CeaseErrorWritingError> {
     let bad_incomplete_wire = [];
 
     let good_max_prefix = CeaseError::MaximumNumberOfPrefixesReached {
-        value: good_max_prefix_wire[1..].to_vec(),
+        value: good_max_prefix_wire[1..].into(),
     };
     let good_admin_down = CeaseError::AdministrativeShutdown {
-        value: good_admin_down_wire[1..].to_vec(),
+        value: good_admin_down_wire[1..].into(),
     };
     let good_deconfig = CeaseError::PeerDeConfigured {
-        value: good_deconfig_wire[1..].to_vec(),
+        value: good_deconfig_wire[1..].into(),
     };
     let good_admin_reset = CeaseError::AdministrativeReset {
-        value: good_admin_reset_wire[1..].to_vec(),
+        value: good_admin_reset_wire[1..].into(),
     };
     let good_conn_reject = CeaseError::ConnectionRejected {
-        value: good_conn_reject_wire[1..].to_vec(),
+        value: good_conn_reject_wire[1..].into(),
     };
     let good_config_chg = CeaseError::OtherConfigurationChange {
-        value: good_config_chg_wire[1..].to_vec(),
+        value: good_config_chg_wire[1..].into(),
     };
     let good_conn_collision = CeaseError::ConnectionCollisionResolution {
-        value: good_conn_collision_wire[1..].to_vec(),
+        value: good_conn_collision_wire[1..].into(),
     };
     let good_out = CeaseError::OutOfResources {
-        value: good_out_wire[1..].to_vec(),
+        value: good_out_wire[1..].into(),
     };
     let good_reset = CeaseError::HardReset {
-        value: good_reset_wire[1..].to_vec(),
+        value: good_reset_wire[1..].into(),
     };
     let good_bfd = CeaseError::BfdDown {
-        value: good_bfd_wire[1..].to_vec(),
+        value: good_bfd_wire[1..].into(),
     };
 
     let bad_undefined = CeaseErrorParsingError::Undefined {
@@ -627,7 +627,7 @@ fn test_bgp_notification_cease() -> Result<(), BgpNotificationMessageWritingErro
     let bad_incomplete_wire = [0x06];
 
     let good = BgpNotificationMessage::CeaseError(CeaseError::MaximumNumberOfPrefixesReached {
-        value: good_wire[2..].to_vec(),
+        value: good_wire[2..].into(),
     });
 
     let bad_undefined =
@@ -664,7 +664,7 @@ fn test_route_refresh_error() -> Result<(), RouteRefreshErrorWritingError> {
     let bad_incomplete_wire = [];
 
     let good = RouteRefreshError::InvalidMessageLength {
-        value: good_wire[1..].to_vec(),
+        value: good_wire[1..].into(),
     };
 
     let bad_undefined = RouteRefreshErrorParsingError::Undefined {
@@ -698,7 +698,7 @@ fn test_bgp_notification_route_refresh_error() -> Result<(), BgpNotificationMess
     let bad_incomplete_wire = [0x07];
 
     let good = BgpNotificationMessage::RouteRefreshError(RouteRefreshError::InvalidMessageLength {
-        value: good_wire[2..].to_vec(),
+        value: good_wire[2..].into(),
     });
 
     let bad_undefined = BgpNotificationMessageParsingError::RouteRefreshError(

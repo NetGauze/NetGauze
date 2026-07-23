@@ -877,7 +877,9 @@ fn test_bmp_peer_up_loc_rib_notification() -> Result<(), BmpMessageWritingError>
 #[test]
 fn test_peer_down_reason() -> Result<(), PeerDownNotificationReasonWritingError> {
     let notif = BgpMessage::Notification(BgpNotificationMessage::CeaseError(
-        CeaseError::PeerDeConfigured { value: vec![] },
+        CeaseError::PeerDeConfigured {
+            value: Box::new([]),
+        },
     ));
     let good_local_pdu_wire = [
         0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,

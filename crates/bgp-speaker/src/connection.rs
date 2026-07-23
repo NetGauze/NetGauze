@@ -608,7 +608,7 @@ impl<
                 let msg = BgpMessage::Notification(BgpNotificationMessage::HoldTimerExpiredError(
                     HoldTimerExpiredError::Unspecific {
                         sub_code: 0,
-                        value: vec![],
+                        value: vec![].into(),
                     },
                 ));
                 self.send(msg).await?;
@@ -676,7 +676,7 @@ impl<
             | ConnectionEvent::RouteRefreshErr(_) => {
                 let notif = BgpNotificationMessage::FiniteStateMachineError(
                     FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
-                        value: vec![],
+                        value: vec![].into(),
                     },
                 );
                 if let Err(err) = self.send(BgpMessage::Notification(notif)).await {
@@ -704,7 +704,7 @@ impl<
                 let msg = BgpMessage::Notification(BgpNotificationMessage::HoldTimerExpiredError(
                     HoldTimerExpiredError::Unspecific {
                         sub_code: 0,
-                        value: vec![],
+                        value: vec![].into(),
                     },
                 ));
                 self.state = ConnectionState::Terminate;
@@ -739,7 +739,7 @@ impl<
             ConnectionEvent::BGPOpen(_) => {
                 let notif = BgpNotificationMessage::FiniteStateMachineError(
                     FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState {
-                        value: vec![],
+                        value: vec![].into(),
                     },
                 );
                 let ret = self.send(BgpMessage::Notification(notif)).await;
@@ -774,7 +774,7 @@ impl<
             | ConnectionEvent::RouteRefreshErr(_) => {
                 let notif = BgpNotificationMessage::FiniteStateMachineError(
                     FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState {
-                        value: vec![],
+                        value: vec![].into(),
                     },
                 );
                 if let Err(err) = self.send(BgpMessage::Notification(notif)).await {
@@ -802,7 +802,7 @@ impl<
                 let notif = BgpNotificationMessage::HoldTimerExpiredError(
                     HoldTimerExpiredError::Unspecific {
                         sub_code: 0,
-                        value: vec![],
+                        value: vec![].into(),
                     },
                 );
                 if let Err(err) = self.send(BgpMessage::Notification(notif)).await {
@@ -1216,7 +1216,7 @@ fn handle_open_message<A>(
         return (
             open.bgp_id(),
             ConnectionEvent::BGPOpenMsgErr(OpenMessageError::BadPeerAs {
-                value: peer_asn.to_be_bytes().to_vec(),
+                value: peer_asn.to_be_bytes().into(),
             }),
         );
     }
@@ -1269,14 +1269,14 @@ fn handle_update_message<A>(
     if end_of_rib.is_none() && !has_origin {
         return Some(ConnectionEvent::UpdateMsgErr(
             UpdateMessageError::MissingWellKnownAttribute {
-                value: vec![PathAttributeType::Origin as u8],
+                value: vec![PathAttributeType::Origin as u8].into(),
             },
         ));
     }
     if end_of_rib.is_none() && !has_asn_path {
         return Some(ConnectionEvent::UpdateMsgErr(
             UpdateMessageError::MissingWellKnownAttribute {
-                value: vec![PathAttributeType::AsPath as u8],
+                value: vec![PathAttributeType::AsPath as u8].into(),
             },
         ));
     }
@@ -1290,7 +1290,7 @@ fn handle_update_message<A>(
         // Complain if BGP-MP is not used and there are reachable NLRI announced.
         return Some(ConnectionEvent::UpdateMsgErr(
             UpdateMessageError::MissingWellKnownAttribute {
-                value: vec![PathAttributeType::NextHop as u8],
+                value: vec![PathAttributeType::NextHop as u8].into(),
             },
         ));
     }
@@ -1299,7 +1299,9 @@ fn handle_update_message<A>(
         // attribute appears more than once in the UPDATE message, then a NOTIFICATION
         // message MUST be sent with the Error Subcode "Malformed Attribute List".
         return Some(ConnectionEvent::UpdateMsgErr(
-            UpdateMessageError::MalformedAttributeList { value: vec![] },
+            UpdateMessageError::MalformedAttributeList {
+                value: vec![].into(),
+            },
         ));
     }
     let treatment = update_treatment(&parsing_errors);
