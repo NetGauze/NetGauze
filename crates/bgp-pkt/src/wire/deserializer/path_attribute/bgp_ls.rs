@@ -23,7 +23,7 @@ use crate::path_attribute::{
     BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, LinkProtectionType,
 };
 use crate::wire::deserializer::nlri::{MplsLabelParsingError, MultiTopologyIdDataParsingError};
-use crate::wire::deserializer::read_tlv_header_t16_l16;
+use crate::wire::deserializer::{count_tlvs_t16_l16, read_tlv_header_t16_l16};
 use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
 use netgauze_parse_utils::error::ParseError;
 use netgauze_parse_utils::reader::SliceReader;
@@ -67,7 +67,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsAttribute {
             cur.take_slice(len as usize)?
         };
 
-        let mut attributes = Vec::with_capacity(ls_buf.remaining() / 4);
+        let mut attributes = Vec::with_capacity(count_tlvs_t16_l16(ls_buf));
         while !ls_buf.is_empty() {
             let attribute = BgpLsAttributeValue::parse(&mut ls_buf)?;
             attributes.push(attribute);

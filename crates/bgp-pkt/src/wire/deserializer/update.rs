@@ -55,6 +55,39 @@ pub enum BgpUpdateMessageParsingError {
     InvalidIpv4UnicastNetwork { offset: usize, network: Ipv4Net },
 }
 
+/// Counts entries in a withdrawn-routes/NLRI buffer without materializing
+/// them, mirroring [`Ipv4Net`]'s own prefix-length-to-byte-count logic, so
+/// `parse_nlri` can size its `Vec::with_capacity` exactly instead of
+/// guessing from a flat minimum-size heuristic.
+///
+/// Purely advisory: a malformed buffer stops the count early rather than
+/// returning an error, so it never changes what error the real parsing
+/// loop reports (or its type) — it only ever affects the capacity hint.
+#[inline]
+fn count_nlri(mut cur: SliceReader<'_>, add_path: bool) -> usize {
+    let mut count = 0usize;
+    loop {
+        if cur.is_empty() {
+            return count;
+        }
+        if add_path && cur.read_u32_be().is_err() {
+            return count;
+        }
+        let Ok(prefix_len) = cur.read_u8() else {
+            return count;
+        };
+        let prefix_size = if prefix_len >= u8::MAX - 7 {
+            u8::MAX
+        } else {
+            prefix_len.div_ceil(8)
+        };
+        if cur.read_bytes(prefix_size.min(4) as usize).is_err() {
+            return count;
+        }
+        count += 1;
+    }
+}
+
 #[inline]
 fn parse_nlri<'a>(
     cur: &mut SliceReader<'a>,
@@ -62,7 +95,7 @@ fn parse_nlri<'a>(
     is_update: bool,
     ctx: &mut BgpParsingContext,
 ) -> Result<Vec<Ipv4UnicastAddress>, BgpUpdateMessageParsingError> {
-    let mut nlri_vec = Vec::with_capacity(cur.remaining() / 2);
+    let mut nlri_vec = Vec::with_capacity(count_nlri(*cur, add_path));
     while !cur.is_empty() {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)
@@ -97,6 +130,47 @@ fn parse_nlri<'a>(
         };
     }
     Ok(nlri_vec)
+}
+
+/// Counts path attributes in a buffer without parsing their values,
+/// mirroring [`advance_attr_buffer`]'s header framing, so the real parsing
+/// loop can size its `Vec::with_capacity` exactly instead of guessing from
+/// a flat minimum-size heuristic.
+///
+/// Purely advisory: a malformed buffer stops the count early rather than
+/// returning an error, so it never changes what error the real parsing
+/// loop reports (or its type) — it only ever affects the capacity hint.
+#[inline(always)]
+fn count_path_attributes(mut cur: SliceReader<'_>) -> usize {
+    let mut count = 0usize;
+    loop {
+        if cur.is_empty() {
+            return count;
+        }
+        let Ok(attributes) = cur.read_u8() else {
+            return count;
+        };
+        let Ok(_code) = cur.read_u8() else {
+            return count;
+        };
+        let extended_length =
+            attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
+        let len = if extended_length {
+            let Ok(len) = cur.read_u16_be() else {
+                return count;
+            };
+            len as usize
+        } else {
+            let Ok(len) = cur.read_u8() else {
+                return count;
+            };
+            len as usize
+        };
+        if cur.take_slice(len).is_err() {
+            return count;
+        }
+        count += 1;
+    }
 }
 
 #[inline]
@@ -152,7 +226,7 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpUpdateMessage 
         let withdrawn_routes = parse_nlri(&mut withdrawn_buf, add_path, false, ctx)?;
         let len = cur.read_u16_be()?;
         let mut path_attributes_buf = cur.take_slice(len as usize)?;
-        let mut path_attributes = Vec::with_capacity((len as usize) / 4);
+        let mut path_attributes = Vec::with_capacity(count_path_attributes(path_attributes_buf));
         while !path_attributes_buf.is_empty() {
             match PathAttribute::parse(&mut path_attributes_buf, &mut *ctx) {
                 Ok(element) => {

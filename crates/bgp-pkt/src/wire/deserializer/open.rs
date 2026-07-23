@@ -18,6 +18,7 @@ use crate::capabilities::BgpCapability;
 use crate::iana::BgpOpenMessageParameterType;
 use crate::notification::OpenMessageError;
 use crate::open::{BGP_VERSION, BgpOpenMessageParameter};
+use crate::wire::deserializer;
 use crate::wire::deserializer::BgpParsingContext;
 use crate::wire::deserializer::capabilities::BgpCapabilityParsingError;
 use netgauze_parse_utils::error::ParseError;
@@ -113,8 +114,7 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessage {
             return Ok(BgpOpenMessage::new(my_as, hold_time, bgp_id, vec![]));
         }
         let mut params_buf = cur.take_slice(len as usize)?;
-        // Each parameter has at least 2 bytes (type + length), so pre-size accordingly.
-        let mut params = Vec::with_capacity((len as usize) / 2);
+        let mut params = Vec::with_capacity(deserializer::count_t8_l8_tlvs(params_buf));
         while !params_buf.is_empty() {
             let element = BgpOpenMessageParameter::parse(&mut params_buf, ctx)?;
             params.push(element);
@@ -156,9 +156,7 @@ fn parse_capability_param<'a>(
 ) -> Result<BgpOpenMessageParameter, BgpParameterParsingError> {
     let len = cur.read_u8()?;
     let mut capabilities_buf = cur.take_slice(len as usize)?;
-    // Each capability has at least 2 bytes (code + length), so pre-size
-    // accordingly.
-    let mut capabilities = Vec::with_capacity((len as usize) / 2);
+    let mut capabilities = Vec::with_capacity(deserializer::count_t8_l8_tlvs(capabilities_buf));
     while !capabilities_buf.is_empty() {
         match BgpCapability::parse(&mut capabilities_buf) {
             Ok(capability) => {

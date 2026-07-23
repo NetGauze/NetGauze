@@ -31,7 +31,7 @@ use crate::path_attribute::{
     SegmentRoutingGlobalBlock,
 };
 use crate::wire::deserializer::nlri::MplsLabelParsingError;
-use crate::wire::deserializer::read_tlv_header_t8_l16;
+use crate::wire::deserializer::{count_tlvs_t8_l16, read_tlv_header_t8_l16};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum SegmentIdentifierParsingError {
@@ -94,7 +94,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for PrefixSegmentIdentifier {
             cur.read_u8()? as usize
         };
         let mut segment_id_buf = cur.take_slice(segment_id_len)?;
-        let mut tlvs = Vec::with_capacity(segment_id_buf.remaining() / 4);
+        let mut tlvs = Vec::with_capacity(count_tlvs_t8_l16(segment_id_buf));
         while !segment_id_buf.is_empty() {
             let tlv = BgpSidAttribute::parse(&mut segment_id_buf)?;
             tlvs.push(tlv);
@@ -141,7 +141,7 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
             }
             BgpSidAttributeType::SRv6ServiceL3 => {
                 let reserved = data.read_u8()?;
-                let mut subtlvs = Vec::with_capacity(data.remaining() / 4);
+                let mut subtlvs = Vec::with_capacity(count_tlvs_t8_l16(data));
                 while !data.is_empty() {
                     let v = SRv6ServiceSubTlv::parse(&mut data)?;
                     subtlvs.push(v);
@@ -150,7 +150,7 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
             }
             BgpSidAttributeType::SRv6ServiceL2 => {
                 let reserved = data.read_u8()?;
-                let mut subtlvs = Vec::with_capacity(data.remaining() / 4);
+                let mut subtlvs = Vec::with_capacity(count_tlvs_t8_l16(data));
                 while !data.is_empty() {
                     let v = SRv6ServiceSubTlv::parse(&mut data)?;
                     subtlvs.push(v);
@@ -193,7 +193,7 @@ impl<'a> ParseFrom<'a> for SRv6ServiceSubTlv {
                 let service_sid_flags = data.read_u8()?;
                 let endpoint_behaviour = data.read_u16_be()?;
                 let reserved2 = data.read_u8()?;
-                let mut subsubtlvs = Vec::with_capacity(data.remaining() / 4);
+                let mut subsubtlvs = Vec::with_capacity(count_tlvs_t8_l16(data));
 
                 while !data.is_empty() {
                     let subsubtlv = SRv6ServiceSubSubTlv::parse(&mut data)?;
