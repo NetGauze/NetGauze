@@ -107,7 +107,7 @@ pub enum BgpSidAttribute {
     Originator {
         /// None defined in RFC8669
         flags: u16,
-        srgbs: Vec<SegmentRoutingGlobalBlock>,
+        srgbs: Box<[SegmentRoutingGlobalBlock]>,
     },
     /// ```text
     ///     0                   1                   2                   3
@@ -140,7 +140,7 @@ pub enum BgpSidAttribute {
     ///       below.
     SRv6ServiceL3 {
         reserved: u8,
-        subtlvs: Vec<SRv6ServiceSubTlv>,
+        subtlvs: Box<[SRv6ServiceSubTlv]>,
     },
     /// ```text
     ///     0                   1                   2                   3
@@ -173,11 +173,11 @@ pub enum BgpSidAttribute {
     ///       below.
     SRv6ServiceL2 {
         reserved: u8,
-        subtlvs: Vec<SRv6ServiceSubTlv>,
+        subtlvs: Box<[SRv6ServiceSubTlv]>,
     },
     Unknown {
         code: u8,
-        value: Vec<u8>,
+        value: Box<[u8]>,
     },
 }
 /// ```text
@@ -268,11 +268,11 @@ pub enum SRv6ServiceSubTlv {
         service_sid_flags: u8,
         endpoint_behaviour: u16,
         reserved2: u8,
-        subsubtlvs: Vec<SRv6ServiceSubSubTlv>,
+        subsubtlvs: Box<[SRv6ServiceSubSubTlv]>,
     },
     Unknown {
         code: u8,
-        value: Vec<u8>,
+        value: Box<[u8]>,
     },
 }
 
@@ -377,7 +377,7 @@ pub enum SRv6ServiceSubSubTlv {
     },
     Unknown {
         code: u8,
-        value: Vec<u8>,
+        value: Box<[u8]>,
     },
 }
 
@@ -403,12 +403,12 @@ impl SRv6ServiceSubSubTlv {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PrefixSegmentIdentifier {
-    tlvs: Vec<BgpSidAttribute>,
+    tlvs: Box<[BgpSidAttribute]>,
 }
 
 impl PrefixSegmentIdentifier {
-    pub fn new(tlvs: Vec<BgpSidAttribute>) -> Self {
-        Self { tlvs }
+    pub fn new(tlvs: impl Into<Box<[BgpSidAttribute]>>) -> Self {
+        Self { tlvs: tlvs.into() }
     }
 
     pub fn tlvs(&self) -> &[BgpSidAttribute] {

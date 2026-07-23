@@ -115,7 +115,7 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
             Err(BgpSidAttributeTypeError(IanaValueError::Unknown(code))) => {
                 return Ok(BgpSidAttribute::Unknown {
                     code,
-                    value: data.read_bytes(data.remaining())?.to_vec(),
+                    value: data.read_bytes(data.remaining())?.into(),
                 });
             }
             Err(error) => {
@@ -137,7 +137,10 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
                     let v = SegmentRoutingGlobalBlock::parse(&mut data)?;
                     srgbs.push(v);
                 }
-                BgpSidAttribute::Originator { flags, srgbs }
+                BgpSidAttribute::Originator {
+                    flags,
+                    srgbs: srgbs.into(),
+                }
             }
             BgpSidAttributeType::SRv6ServiceL3 => {
                 let reserved = data.read_u8()?;
@@ -146,7 +149,10 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
                     let v = SRv6ServiceSubTlv::parse(&mut data)?;
                     subtlvs.push(v);
                 }
-                BgpSidAttribute::SRv6ServiceL3 { reserved, subtlvs }
+                BgpSidAttribute::SRv6ServiceL3 {
+                    reserved,
+                    subtlvs: subtlvs.into(),
+                }
             }
             BgpSidAttributeType::SRv6ServiceL2 => {
                 let reserved = data.read_u8()?;
@@ -155,7 +161,10 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
                     let v = SRv6ServiceSubTlv::parse(&mut data)?;
                     subtlvs.push(v);
                 }
-                BgpSidAttribute::SRv6ServiceL2 { reserved, subtlvs }
+                BgpSidAttribute::SRv6ServiceL2 {
+                    reserved,
+                    subtlvs: subtlvs.into(),
+                }
             }
         };
 
@@ -175,7 +184,7 @@ impl<'a> ParseFrom<'a> for SRv6ServiceSubTlv {
             Err(BgpSrv6ServiceSubTlvTypeError(IanaValueError::Unknown(code))) => {
                 return Ok(SRv6ServiceSubTlv::Unknown {
                     code,
-                    value: data.read_bytes(data.remaining())?.to_vec(),
+                    value: data.read_bytes(data.remaining())?.into(),
                 });
             }
             Err(error) => {
@@ -206,7 +215,7 @@ impl<'a> ParseFrom<'a> for SRv6ServiceSubTlv {
                     service_sid_flags,
                     endpoint_behaviour,
                     reserved2,
-                    subsubtlvs,
+                    subsubtlvs: subsubtlvs.into(),
                 }
             }
         };
@@ -228,7 +237,7 @@ impl<'a> ParseFrom<'a> for SRv6ServiceSubSubTlv {
             Err(BgpSrv6ServiceSubSubTlvTypeError(IanaValueError::Unknown(code))) => {
                 return Ok(SRv6ServiceSubSubTlv::Unknown {
                     code,
-                    value: data.read_bytes(data.remaining())?.to_vec(),
+                    value: data.read_bytes(data.remaining())?.into(),
                 });
             }
             Err(error) => {
@@ -440,8 +449,10 @@ pub mod tests {
                                     arg_len: 0,
                                     transposition_len: 16,
                                     transposition_offset: 48,
-                                }],
-                            }],
+                                }]
+                                .into(),
+                            }]
+                            .into(),
                         }],
                     )),
                 )
