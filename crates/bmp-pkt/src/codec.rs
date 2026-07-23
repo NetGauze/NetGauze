@@ -66,7 +66,7 @@ pub struct BmpCodec {
 #[inline]
 fn get_caps(
     capabilities: Vec<&BgpCapability>,
-) -> (Vec<AddPathCapability>, Vec<Vec<MultipleLabel>>) {
+) -> (Vec<AddPathCapability>, Vec<Box<[MultipleLabel]>>) {
     let add_path_caps = capabilities
         .iter()
         .flat_map(|cap| {
@@ -88,7 +88,7 @@ fn get_caps(
             }
         })
         .cloned()
-        .collect::<Vec<Vec<MultipleLabel>>>();
+        .collect::<Vec<Box<[MultipleLabel]>>>();
     (add_path_caps, multiple_labels_caps)
 }
 
