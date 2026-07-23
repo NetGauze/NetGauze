@@ -75,7 +75,7 @@ fn test_wire() -> Result<(), PathAttributeWritingError> {
                         BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
                             BgpLsNodeDescriptorSubTlv::AutonomousSystem(65536),
                             BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(0),
-                            BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![0, 0, 0, 0, 0, 9, 1]),
+                            BgpLsNodeDescriptorSubTlv::IgpRouterId(Box::new([0, 0, 0, 0, 0, 9, 1])),
                         ])),
                     )),
                 ),
@@ -87,7 +87,7 @@ fn test_wire() -> Result<(), PathAttributeWritingError> {
                         BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
                             BgpLsNodeDescriptorSubTlv::AutonomousSystem(65536),
                             BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(0),
-                            BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![0, 0, 0, 0, 0, 1, 3]),
+                            BgpLsNodeDescriptorSubTlv::IgpRouterId(Box::new([0, 0, 0, 0, 0, 1, 3])),
                         ])),
                     )),
                 ),

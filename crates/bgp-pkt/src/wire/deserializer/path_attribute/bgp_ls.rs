@@ -88,7 +88,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
             Err(BgpLsAttributeTypeError(IanaValueError::Unknown(value))) => {
                 return Ok(BgpLsAttributeValue::Unknown {
                     code: value,
-                    value: data.read_bytes(data.remaining())?.to_vec(),
+                    value: data.read_bytes(data.remaining())?.into(),
                 });
             }
             Err(error) => {
@@ -117,9 +117,9 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
                     v6: flags.bitand(BgpLsNodeFlagsBits::V6 as u8) == BgpLsNodeFlagsBits::V6 as u8,
                 }
             }
-            BgpLsAttributeType::OpaqueNodeAttribute => BgpLsAttributeValue::OpaqueNodeAttribute(
-                data.read_bytes(data.remaining())?.to_vec(),
-            ),
+            BgpLsAttributeType::OpaqueNodeAttribute => {
+                BgpLsAttributeValue::OpaqueNodeAttribute(data.read_bytes(data.remaining())?.into())
+            }
             BgpLsAttributeType::NodeNameTlv => {
                 let offset = data.offset();
                 let str_buf = data.read_bytes(tlv_length as usize)?;
@@ -132,7 +132,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
                 BgpLsAttributeValue::NodeNameTlv(str)
             }
             BgpLsAttributeType::IsIsArea => {
-                BgpLsAttributeValue::IsIsArea(data.read_bytes(data.remaining())?.to_vec())
+                BgpLsAttributeValue::IsIsArea(data.read_bytes(data.remaining())?.into())
             }
             BgpLsAttributeType::LocalNodeIpv4RouterId => {
                 let address = data.read_u32_be()?;
@@ -200,7 +200,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
                 }
             }
             BgpLsAttributeType::IgpMetric => {
-                BgpLsAttributeValue::IgpMetric(data.read_bytes(data.remaining())?.to_vec())
+                BgpLsAttributeValue::IgpMetric(data.read_bytes(data.remaining())?.into())
             }
             BgpLsAttributeType::SharedRiskLinkGroup => {
                 let mut values = Vec::with_capacity(data.remaining() / 4);
@@ -208,11 +208,11 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
                     let v = SharedRiskLinkGroupValue::parse(&mut data)?;
                     values.push(v);
                 }
-                BgpLsAttributeValue::SharedRiskLinkGroup(values)
+                BgpLsAttributeValue::SharedRiskLinkGroup(values.into())
             }
-            BgpLsAttributeType::OpaqueLinkAttribute => BgpLsAttributeValue::OpaqueLinkAttribute(
-                data.read_bytes(data.remaining())?.to_vec(),
-            ),
+            BgpLsAttributeType::OpaqueLinkAttribute => {
+                BgpLsAttributeValue::OpaqueLinkAttribute(data.read_bytes(data.remaining())?.into())
+            }
             BgpLsAttributeType::LinkName => {
                 let offset = data.offset();
                 let str_buf = data.read_bytes(tlv_length as usize)?;
@@ -242,7 +242,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
                     let v = cur.read_u32_be()?;
                     vec.push(v);
                 }
-                BgpLsAttributeValue::IgpRouteTag(vec)
+                BgpLsAttributeValue::IgpRouteTag(vec.into())
             }
             BgpLsAttributeType::IgpExtendedRouteTag => {
                 let mut vec = Vec::with_capacity(data.remaining() / 8);
@@ -250,7 +250,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
                     let v = cur.read_u64_be()?;
                     vec.push(v);
                 }
-                BgpLsAttributeValue::IgpExtendedRouteTag(vec)
+                BgpLsAttributeValue::IgpExtendedRouteTag(vec.into())
             }
             BgpLsAttributeType::PrefixMetric => {
                 let metric = data.read_u32_be()?;
@@ -274,7 +274,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
             }
             BgpLsAttributeType::OpaquePrefixAttribute => {
                 BgpLsAttributeValue::OpaquePrefixAttribute(
-                    data.read_bytes(data.remaining())?.to_vec(),
+                    data.read_bytes(data.remaining())?.into(),
                 )
             }
             BgpLsAttributeType::PeerNodeSid => {

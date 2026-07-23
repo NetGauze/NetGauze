@@ -26,12 +26,14 @@ use strum_macros::{Display, FromRepr};
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsAttribute {
-    attributes: Vec<BgpLsAttributeValue>,
+    attributes: Box<[BgpLsAttributeValue]>,
 }
 
 impl BgpLsAttribute {
-    pub const fn new(attributes: Vec<BgpLsAttributeValue>) -> Self {
-        Self { attributes }
+    pub fn new(attributes: impl Into<Box<[BgpLsAttributeValue]>>) -> Self {
+        Self {
+            attributes: attributes.into(),
+        }
     }
 
     pub fn attributes(&self) -> &[BgpLsAttributeValue] {
@@ -152,7 +154,7 @@ pub enum BgpLsAttributeValue {
     /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     /// ```
     /// see [RFC7752 Section 3.3.2.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.4)
-    IgpMetric(Vec<u8>),
+    IgpMetric(Box<[u8]>),
 
     /// ```text
     ///  0                   1                   2                   3
@@ -168,7 +170,7 @@ pub enum BgpLsAttributeValue {
     /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     /// ```
     /// see [RFC7752 Section 3.3.2.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.5)
-    SharedRiskLinkGroup(Vec<SharedRiskLinkGroupValue>),
+    SharedRiskLinkGroup(Box<[SharedRiskLinkGroupValue]>),
 
     /// ```text
     ///  0                   1                   2                   3
@@ -180,7 +182,7 @@ pub enum BgpLsAttributeValue {
     /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     /// ```
     /// see [RFC7752 Section 3.3.2.6](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.6)
-    OpaqueLinkAttribute(Vec<u8>),
+    OpaqueLinkAttribute(Box<[u8]>),
 
     /// ```text
     ///  0                   1                   2                   3
@@ -236,7 +238,7 @@ pub enum BgpLsAttributeValue {
     /// Length is a multiple of 4.
     /// ```
     /// see [RFC7752 Section 3.3.3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.2)
-    IgpRouteTag(Vec<u32>),
+    IgpRouteTag(Box<[u32]>),
 
     /// ```text
     ///  0                   1                   2                   3
@@ -250,7 +252,7 @@ pub enum BgpLsAttributeValue {
     /// Length is a multiple of 8.
     /// ```
     /// see [RFC7752 Section 3.3.3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.3)
-    IgpExtendedRouteTag(Vec<u64>),
+    IgpExtendedRouteTag(Box<[u64]>),
 
     /// ```text
     ///  0                   1                   2                   3
@@ -293,7 +295,7 @@ pub enum BgpLsAttributeValue {
     /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     /// ```
     /// see [RFC7752 Section 3.3.3.6](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.6)
-    OpaquePrefixAttribute(Vec<u8>),
+    OpaquePrefixAttribute(Box<[u8]>),
 
     /* Node Attribute TLV */
     /// ```text
@@ -358,7 +360,7 @@ pub enum BgpLsAttributeValue {
     /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     /// ```
     /// see [RFC7752 Section 3.3.1.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.5)
-    OpaqueNodeAttribute(Vec<u8>),
+    OpaqueNodeAttribute(Box<[u8]>),
 
     /// ```text
     ///  0                   1                   2                   3
@@ -382,7 +384,7 @@ pub enum BgpLsAttributeValue {
     /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     /// ```
     /// see [RFC7752 Section 3.3.1.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.2)
-    IsIsArea(Vec<u8>),
+    IsIsArea(Box<[u8]>),
 
     /// ```text
     ///  0                   1                   2                   3
@@ -429,7 +431,7 @@ pub enum BgpLsAttributeValue {
     PeerSetSid(BgpLsPeerSid),
 
     /// Unrecognized types MUST be preserved and propagated. [RFC7752 Section 3.1](https://datatracker.ietf.org/doc/html/rfc7752#section-3.1)
-    Unknown { code: u16, value: Vec<u8> },
+    Unknown { code: u16, value: Box<[u8]> },
 }
 
 /// ```text
