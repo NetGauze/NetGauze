@@ -316,14 +316,14 @@ impl<'a> ParseFromWithTwoInputs<'a, bool, bool> for AsPath {
                 let segment = As4PathSegment::parse(&mut segments_buf)?;
                 segments.push(segment);
             }
-            Ok(Self::As4PathSegments(segments))
+            Ok(Self::As4PathSegments(segments.into_boxed_slice()))
         } else {
             let mut segments = Vec::new();
             while !segments_buf.is_empty() {
                 let segment = As2PathSegment::parse(&mut segments_buf)?;
                 segments.push(segment);
             }
-            Ok(Self::As2PathSegments(segments))
+            Ok(Self::As2PathSegments(segments.into_boxed_slice()))
         }
     }
 }

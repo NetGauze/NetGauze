@@ -372,7 +372,7 @@ pub mod tests {
                     true,
                     false,
                     false,
-                    PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
+                    PathAttributeValue::AsPath(AsPath::as4_path_segments([As4PathSegment::new(
                         AsPathSegmentType::AsSequence,
                         vec![64496, 4226809946, 65000],
                     )])),
@@ -506,7 +506,7 @@ pub mod tests {
                     true,
                     false,
                     false,
-                    PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![])),
+                    PathAttributeValue::AsPath(AsPath::as4_path_segments([])),
                 )
                 .unwrap(),
                 PathAttribute::from(

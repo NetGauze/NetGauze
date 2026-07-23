@@ -88,7 +88,7 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
                         true,
                         false,
                         true,
-                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
+                        PathAttributeValue::AsPath(AsPath::as4_path_segments([
                             As4PathSegment::new(
                                 AsPathSegmentType::AsSequence,
                                 vec![65592, 65536, 65555],
@@ -175,7 +175,7 @@ fn test_bmp_v4_route_monitoring_with_groups() -> Result<(), BmpMessageWritingErr
                         true,
                         false,
                         true,
-                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
+                        PathAttributeValue::AsPath(AsPath::as4_path_segments([
                             As4PathSegment::new(
                                 AsPathSegmentType::AsSequence,
                                 vec![65592, 65536, 65555],
@@ -261,7 +261,7 @@ fn test_bmp_v4_route_monitoring_with_stateless_parsing() -> Result<(), BmpMessag
                         true,
                         false,
                         true,
-                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
+                        PathAttributeValue::AsPath(AsPath::as4_path_segments([
                             As4PathSegment::new(
                                 AsPathSegmentType::AsSequence,
                                 vec![65592, 65536, 65555],
@@ -341,10 +341,10 @@ fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMes
                         true,
                         false,
                         true,
-                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
+                        PathAttributeValue::AsPath(AsPath::as4_path_segments([
                             As4PathSegment::new(
                                 AsPathSegmentType::AsSequence,
-                                vec![65592, 65536, 65555],
+                                [65592, 65536, 65555],
                             ),
                         ])),
                     )
@@ -507,7 +507,7 @@ fn test_bmp_v4_path_marking() -> Result<(), BmpMessageWritingError> {
                         true,
                         false,
                         true,
-                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![])),
+                        PathAttributeValue::AsPath(AsPath::as4_path_segments([])),
                     )
                     .unwrap(),
                     PathAttribute::from(
@@ -635,7 +635,7 @@ fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritin
                         true,
                         false,
                         true,
-                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![])),
+                        PathAttributeValue::AsPath(AsPath::as4_path_segments([])),
                     )
                     .unwrap(),
                     PathAttribute::from(

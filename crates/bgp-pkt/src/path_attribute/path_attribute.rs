@@ -373,10 +373,21 @@ impl TryFrom<u8> for Origin {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum AsPath {
-    As2PathSegments(Vec<As2PathSegment>),
-    As4PathSegments(Vec<As4PathSegment>),
+    As2PathSegments(Box<[As2PathSegment]>),
+    As4PathSegments(Box<[As4PathSegment]>),
 }
 
+impl AsPath {
+    /// Helper to create AsPath::As2PathSegments
+    pub fn as2_path_segments(segments: impl Into<Box<[As2PathSegment]>>) -> Self {
+        Self::As2PathSegments(segments.into())
+    }
+
+    /// Helper to create AsPath::As4PathSegments
+    pub fn as4_path_segments(segments: impl Into<Box<[As4PathSegment]>>) -> Self {
+        Self::As4PathSegments(segments.into())
+    }
+}
 impl PathAttributeValueProperties for AsPath {
     fn can_be_optional() -> Option<bool> {
         Some(false)
@@ -475,14 +486,14 @@ impl TryFrom<u8> for AsPathSegmentType {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct As2PathSegment {
     segment_type: AsPathSegmentType,
-    as_numbers: Vec<u16>,
+    as_numbers: Box<[u16]>,
 }
 
 impl As2PathSegment {
-    pub fn new(segment_type: AsPathSegmentType, as_numbers: Vec<u16>) -> Self {
+    pub fn new(segment_type: AsPathSegmentType, as_numbers: impl Into<Box<[u16]>>) -> Self {
         Self {
             segment_type,
-            as_numbers,
+            as_numbers: as_numbers.into(),
         }
     }
 
@@ -490,7 +501,7 @@ impl As2PathSegment {
         self.segment_type
     }
 
-    pub const fn as_numbers(&self) -> &Vec<u16> {
+    pub const fn as_numbers(&self) -> &[u16] {
         &self.as_numbers
     }
 }
@@ -502,14 +513,14 @@ impl As2PathSegment {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct As4PathSegment {
     segment_type: AsPathSegmentType,
-    as_numbers: Vec<u32>,
+    as_numbers: Box<[u32]>,
 }
 
 impl As4PathSegment {
-    pub const fn new(segment_type: AsPathSegmentType, as_numbers: Vec<u32>) -> Self {
+    pub fn new(segment_type: AsPathSegmentType, as_numbers: impl Into<Box<[u32]>>) -> Self {
         Self {
             segment_type,
-            as_numbers,
+            as_numbers: as_numbers.into(),
         }
     }
 
@@ -517,7 +528,7 @@ impl As4PathSegment {
         self.segment_type
     }
 
-    pub const fn as_numbers(&self) -> &Vec<u32> {
+    pub const fn as_numbers(&self) -> &[u32] {
         &self.as_numbers
     }
 }
@@ -526,7 +537,7 @@ impl As4PathSegment {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct As4Path {
-    segments: Vec<As4PathSegment>,
+    segments: Box<[As4PathSegment]>,
 }
 
 /// This is an optional transitive attribute that
@@ -536,11 +547,13 @@ pub struct As4Path {
 /// it carries four-octet AS numbers.
 /// See [RFC6793](https://datatracker.ietf.org/doc/html/RFC6793)
 impl As4Path {
-    pub const fn new(segments: Vec<As4PathSegment>) -> Self {
-        Self { segments }
+    pub fn new(segments: impl Into<Box<[As4PathSegment]>>) -> Self {
+        Self {
+            segments: segments.into(),
+        }
     }
 
-    pub const fn segments(&self) -> &Vec<As4PathSegment> {
+    pub const fn segments(&self) -> &[As4PathSegment] {
         &self.segments
     }
 }
@@ -1894,13 +1907,13 @@ mod tests {
 
     #[test]
     fn test_as_path_to_vec() {
-        let as2_path = AsPath::As2PathSegments(vec![
-            As2PathSegment::new(AsPathSegmentType::AsSequence, vec![100, 200]),
-            As2PathSegment::new(AsPathSegmentType::AsSet, vec![300, 400]),
+        let as2_path = AsPath::as2_path_segments([
+            As2PathSegment::new(AsPathSegmentType::AsSequence, [100, 200]),
+            As2PathSegment::new(AsPathSegmentType::AsSet, [300, 400]),
         ]);
-        let as4_path = AsPath::As4PathSegments(vec![
-            As4PathSegment::new(AsPathSegmentType::AsSequence, vec![100000, 200000]),
-            As4PathSegment::new(AsPathSegmentType::AsSet, vec![300000, 400000]),
+        let as4_path = AsPath::as4_path_segments([
+            As4PathSegment::new(AsPathSegmentType::AsSequence, [100000, 200000]),
+            As4PathSegment::new(AsPathSegmentType::AsSet, [300000, 400000]),
         ]);
 
         assert_eq!(Vec::<u32>::from(as2_path), vec![100, 200, 300, 400]);
