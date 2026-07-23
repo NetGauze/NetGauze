@@ -408,7 +408,7 @@ fn test_l2_evpn_route() -> Result<(), L2EvpnRouteWritingError> {
 
     let good_unknown = L2EvpnRoute::Unknown {
         code: 0xfe,
-        value: vec![0xaa, 0xbb, 0xcc],
+        value: Box::new([0xaa, 0xbb, 0xcc]),
     };
 
     test_parsed_completely_bytes_reader(&good_ad_wire, &good_ad);

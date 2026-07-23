@@ -305,34 +305,34 @@ impl NlriAddressType for Ipv4UnicastAddress {
 pub struct Ipv4MplsVpnUnicastAddress {
     path_id: Option<u32>,
     rd: RouteDistinguisher,
-    label_stack: Vec<MplsLabel>,
+    label_stack: Box<[MplsLabel]>,
     network: Ipv4Unicast,
 }
 
 impl Ipv4MplsVpnUnicastAddress {
-    pub const fn new(
+    pub fn new(
         path_id: Option<u32>,
         rd: RouteDistinguisher,
-        label_stack: Vec<MplsLabel>,
+        label_stack: impl Into<Box<[MplsLabel]>>,
         network: Ipv4Unicast,
     ) -> Self {
         Self {
             path_id,
             rd,
-            label_stack,
+            label_stack: label_stack.into(),
             network,
         }
     }
 
-    pub const fn new_no_path_id(
+    pub fn new_no_path_id(
         rd: RouteDistinguisher,
-        label_stack: Vec<MplsLabel>,
+        label_stack: impl Into<Box<[MplsLabel]>>,
         network: Ipv4Unicast,
     ) -> Self {
         Self {
             path_id: None,
             rd,
-            label_stack,
+            label_stack: label_stack.into(),
             network,
         }
     }
@@ -345,7 +345,7 @@ impl Ipv4MplsVpnUnicastAddress {
         self.rd
     }
 
-    pub const fn label_stack(&self) -> &Vec<MplsLabel> {
+    pub const fn label_stack(&self) -> &[MplsLabel] {
         &self.label_stack
     }
 
@@ -517,34 +517,34 @@ impl NlriAddressType for Ipv6UnicastAddress {
 pub struct Ipv6MplsVpnUnicastAddress {
     path_id: Option<u32>,
     rd: RouteDistinguisher,
-    label_stack: Vec<MplsLabel>,
+    label_stack: Box<[MplsLabel]>,
     network: Ipv6Unicast,
 }
 
 impl Ipv6MplsVpnUnicastAddress {
-    pub const fn new(
+    pub fn new(
         path_id: Option<u32>,
         rd: RouteDistinguisher,
-        label_stack: Vec<MplsLabel>,
+        label_stack: impl Into<Box<[MplsLabel]>>,
         network: Ipv6Unicast,
     ) -> Self {
         Self {
             path_id,
             rd,
-            label_stack,
+            label_stack: label_stack.into(),
             network,
         }
     }
 
-    pub const fn new_no_path_id(
+    pub fn new_no_path_id(
         rd: RouteDistinguisher,
-        label_stack: Vec<MplsLabel>,
+        label_stack: impl Into<Box<[MplsLabel]>>,
         network: Ipv6Unicast,
     ) -> Self {
         Self {
             path_id: None,
             rd,
-            label_stack,
+            label_stack: label_stack.into(),
             network,
         }
     }
@@ -553,7 +553,7 @@ impl Ipv6MplsVpnUnicastAddress {
         self.rd
     }
 
-    pub const fn label_stack(&self) -> &Vec<MplsLabel> {
+    pub const fn label_stack(&self) -> &[MplsLabel] {
         &self.label_stack
     }
 
@@ -742,7 +742,7 @@ pub enum L2EvpnRoute {
     InclusiveMulticastEthernetTagRoute(InclusiveMulticastEthernetTagRoute),
     EthernetSegmentRoute(EthernetSegmentRoute),
     IpPrefixRoute(L2EvpnIpPrefixRoute),
-    Unknown { code: u8, value: Vec<u8> },
+    Unknown { code: u8, value: Box<[u8]> },
 }
 
 impl L2EvpnRoute {
@@ -1200,14 +1200,14 @@ pub struct RouteTargetMembership {
     /// Route targets can then be expressed as prefixes, where, for instance,
     /// a prefix would encompass all route target extended communities
     /// assigned by a given Global Administrator
-    route_target: Vec<u8>,
+    route_target: Box<[u8]>,
 }
 
 impl RouteTargetMembership {
-    pub const fn new(origin_as: u32, route_target: Vec<u8>) -> Self {
+    pub fn new(origin_as: u32, route_target: impl Into<Box<[u8]>>) -> Self {
         Self {
             origin_as,
-            route_target,
+            route_target: route_target.into(),
         }
     }
 
@@ -1215,7 +1215,7 @@ impl RouteTargetMembership {
         self.origin_as
     }
 
-    pub const fn route_target(&self) -> &Vec<u8> {
+    pub const fn route_target(&self) -> &[u8] {
         &self.route_target
     }
 }
@@ -1274,7 +1274,7 @@ pub enum InvalidIpv4NlriMplsLabelsAddress {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv4NlriMplsLabelsAddress {
     path_id: Option<u32>,
-    labels: Vec<MplsLabel>,
+    labels: Box<[MplsLabel]>,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))]
     prefix: Ipv4Net,
 }
@@ -1282,9 +1282,10 @@ pub struct Ipv4NlriMplsLabelsAddress {
 impl Ipv4NlriMplsLabelsAddress {
     pub fn from(
         path_id: Option<u32>,
-        labels: Vec<MplsLabel>,
+        labels: impl Into<Box<[MplsLabel]>>,
         prefix: Ipv4Net,
     ) -> Result<Self, InvalidIpv4NlriMplsLabelsAddress> {
+        let labels: Box<[MplsLabel]> = labels.into();
         // Total length should not exceed 255, each MPLS Label is 24 bit and account for
         // 32 bit IP prefix length
         if labels.len() * 24 + prefix.prefix_len() as usize > u8::MAX as usize {
@@ -1301,7 +1302,7 @@ impl Ipv4NlriMplsLabelsAddress {
     }
 
     pub fn new_no_path_id(
-        labels: Vec<MplsLabel>,
+        labels: impl Into<Box<[MplsLabel]>>,
         prefix: Ipv4Net,
     ) -> Result<Self, InvalidIpv4NlriMplsLabelsAddress> {
         Self::from(None, labels, prefix)
@@ -1311,7 +1312,7 @@ impl Ipv4NlriMplsLabelsAddress {
         self.path_id
     }
 
-    pub const fn labels(&self) -> &Vec<MplsLabel> {
+    pub const fn labels(&self) -> &[MplsLabel] {
         &self.labels
     }
 
@@ -1374,7 +1375,7 @@ pub enum InvalidIpv6NlriMplsLabelsAddress {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv6NlriMplsLabelsAddress {
     path_id: Option<u32>,
-    labels: Vec<MplsLabel>,
+    labels: Box<[MplsLabel]>,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))]
     prefix: Ipv6Net,
 }
@@ -1382,9 +1383,10 @@ pub struct Ipv6NlriMplsLabelsAddress {
 impl Ipv6NlriMplsLabelsAddress {
     pub fn from(
         path_id: Option<u32>,
-        labels: Vec<MplsLabel>,
+        labels: impl Into<Box<[MplsLabel]>>,
         prefix: Ipv6Net,
     ) -> Result<Self, InvalidIpv6NlriMplsLabelsAddress> {
+        let labels: Box<[MplsLabel]> = labels.into();
         // Total length should not exceed 255, each MPLS Label is 24 bit and account for
         // 32 bit IP prefix length
         if labels.len() * 24 + prefix.prefix_len() as usize > u8::MAX as usize {
@@ -1401,7 +1403,7 @@ impl Ipv6NlriMplsLabelsAddress {
     }
 
     pub fn new_no_path_id(
-        labels: Vec<MplsLabel>,
+        labels: impl Into<Box<[MplsLabel]>>,
         prefix: Ipv6Net,
     ) -> Result<Self, InvalidIpv6NlriMplsLabelsAddress> {
         Self::from(None, labels, prefix)
@@ -1411,7 +1413,7 @@ impl Ipv6NlriMplsLabelsAddress {
         self.path_id
     }
 
-    pub const fn labels(&self) -> &Vec<MplsLabel> {
+    pub const fn labels(&self) -> &[MplsLabel] {
         &self.labels
     }
 

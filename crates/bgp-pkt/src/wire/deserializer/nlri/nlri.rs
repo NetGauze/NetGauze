@@ -860,7 +860,7 @@ impl<'a> ParseFrom<'a> for L2EvpnRoute {
             }
             Ok(_) | Err(_) => L2EvpnRoute::Unknown {
                 code: typ_code,
-                value: route_buf.read_bytes(route_buf.remaining())?.to_vec(),
+                value: route_buf.read_bytes(route_buf.remaining())?.into(),
             },
         };
         Ok(value)
