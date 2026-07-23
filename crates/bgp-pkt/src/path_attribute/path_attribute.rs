@@ -808,15 +808,17 @@ impl From<PathAttributeLength> for u16 {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Communities {
-    communities: Vec<Community>,
+    communities: Box<[Community]>,
 }
 
 impl Communities {
-    pub const fn new(communities: Vec<Community>) -> Self {
-        Self { communities }
+    pub fn new(communities: impl Into<Box<[Community]>>) -> Self {
+        Self {
+            communities: communities.into(),
+        }
     }
 
-    pub const fn communities(&self) -> &Vec<Community> {
+    pub const fn communities(&self) -> &[Community] {
         &self.communities
     }
 }
@@ -839,15 +841,17 @@ impl PathAttributeValueProperties for Communities {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExtendedCommunities {
-    communities: Vec<ExtendedCommunity>,
+    communities: Box<[ExtendedCommunity]>,
 }
 
 impl ExtendedCommunities {
-    pub const fn new(communities: Vec<ExtendedCommunity>) -> Self {
-        Self { communities }
+    pub fn new(communities: impl Into<Box<[ExtendedCommunity]>>) -> Self {
+        Self {
+            communities: communities.into(),
+        }
     }
 
-    pub const fn communities(&self) -> &Vec<ExtendedCommunity> {
+    pub const fn communities(&self) -> &[ExtendedCommunity] {
         &self.communities
     }
 }
@@ -870,15 +874,17 @@ impl PathAttributeValueProperties for ExtendedCommunities {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExtendedCommunitiesIpv6 {
-    communities: Vec<ExtendedCommunityIpv6>,
+    communities: Box<[ExtendedCommunityIpv6]>,
 }
 
 impl ExtendedCommunitiesIpv6 {
-    pub const fn new(communities: Vec<ExtendedCommunityIpv6>) -> Self {
-        Self { communities }
+    pub fn new(communities: impl Into<Box<[ExtendedCommunityIpv6]>>) -> Self {
+        Self {
+            communities: communities.into(),
+        }
     }
 
-    pub const fn communities(&self) -> &Vec<ExtendedCommunityIpv6> {
+    pub const fn communities(&self) -> &[ExtendedCommunityIpv6] {
         &self.communities
     }
 }
@@ -901,15 +907,17 @@ impl PathAttributeValueProperties for ExtendedCommunitiesIpv6 {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LargeCommunities {
-    communities: Vec<LargeCommunity>,
+    communities: Box<[LargeCommunity]>,
 }
 
 impl LargeCommunities {
-    pub const fn new(communities: Vec<LargeCommunity>) -> Self {
-        Self { communities }
+    pub fn new(communities: impl Into<Box<[LargeCommunity]>>) -> Self {
+        Self {
+            communities: communities.into(),
+        }
     }
 
-    pub const fn communities(&self) -> &Vec<LargeCommunity> {
+    pub const fn communities(&self) -> &[LargeCommunity] {
         &self.communities
     }
 }
