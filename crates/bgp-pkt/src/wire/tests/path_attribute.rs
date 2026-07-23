@@ -2837,18 +2837,20 @@ pub fn test_segment_identifier_unknown_tlvs_are_preserved() {
                     reserved2: 0,
                     subsubtlvs: vec![SRv6ServiceSubSubTlv::Unknown {
                         code: 99,
-                        value: vec![0xde, 0xad, 0xbe, 0xef],
-                    }],
+                        value: vec![0xde, 0xad, 0xbe, 0xef].into(),
+                    }]
+                    .into(),
                 },
                 SRv6ServiceSubTlv::Unknown {
                     code: 77,
-                    value: vec![0x01, 0x02, 0x03],
+                    value: vec![0x01, 0x02, 0x03].into(),
                 },
-            ],
+            ]
+            .into(),
         },
         BgpSidAttribute::Unknown {
             code: 200,
-            value: vec![0xaa, 0xbb],
+            value: vec![0xaa, 0xbb].into(),
         },
     ]);
 
