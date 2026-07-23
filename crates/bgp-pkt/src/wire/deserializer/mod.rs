@@ -468,3 +468,83 @@ where
 
     Ok((tlv_type, tlv_length, data))
 }
+
+/// Counts the TLVs in a t16/l16-framed buffer without parsing their
+/// values, so the caller can size a `Vec::with_capacity` exactly instead of
+/// guessing from a minimum-element-size heuristic (which either wastes
+/// memory on over-allocation or triggers repeated reallocation on
+/// under-allocation). `cur` is taken by value; `SliceReader` is `Copy` and
+/// zero-cost, so this never disturbs the caller's own cursor.
+///
+/// Purely advisory: a malformed buffer stops the count early rather than
+/// returning an error, so it never changes what error the real parsing
+/// loop reports (or its type); it only ever affects the capacity hint.
+#[inline]
+fn count_tlvs_t16_l16(mut cur: SliceReader<'_>) -> usize {
+    let mut count = 0usize;
+    loop {
+        if cur.is_empty() {
+            return count;
+        }
+        let Ok(_tlv_type) = cur.read_u16_be() else {
+            return count;
+        };
+        let Ok(tlv_length) = cur.read_u16_be() else {
+            return count;
+        };
+        if cur.take_slice(tlv_length as usize).is_err() {
+            return count;
+        }
+        count += 1;
+    }
+}
+
+/// Same as [`count_tlvs_t16_l16`] for the t8/l16 TLV framing.
+#[inline]
+fn count_tlvs_t8_l16(mut cur: SliceReader<'_>) -> usize {
+    let mut count = 0usize;
+    loop {
+        if cur.is_empty() {
+            return count;
+        }
+        let Ok(_tlv_type) = cur.read_u8() else {
+            return count;
+        };
+        let Ok(tlv_length) = cur.read_u16_be() else {
+            return count;
+        };
+        if cur.take_slice(tlv_length as usize).is_err() {
+            return count;
+        }
+        count += 1;
+    }
+}
+
+/// Counts type+length+value tuples in a buffer using the 1-byte-type,
+/// 1-byte-length TLV shape shared by both OPEN parameters and capabilities,
+/// without parsing the values. Used to size a `Vec::with_capacity` exactly:
+/// most parameters/capabilities are only a handful of bytes each, so a
+/// byte-count-based guess systematically over-allocates.
+///
+/// Purely advisory: a malformed buffer stops the count early rather than
+/// returning an error, so it never changes what error the real parsing
+/// loop reports (or its type); it only ever affects the capacity hint.
+#[inline]
+fn count_t8_l8_tlvs(mut cur: SliceReader<'_>) -> usize {
+    let mut count = 0usize;
+    loop {
+        if cur.is_empty() {
+            return count;
+        }
+        let Ok(_code) = cur.read_u8() else {
+            return count;
+        };
+        let Ok(len) = cur.read_u8() else {
+            return count;
+        };
+        if cur.take_slice(len as usize).is_err() {
+            return count;
+        }
+        count += 1;
+    }
+}
