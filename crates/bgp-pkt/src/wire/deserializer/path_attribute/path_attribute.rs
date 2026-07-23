@@ -1284,7 +1284,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for ExtendedCommunitiesIpv6 {
             let v = ExtendedCommunityIpv6::parse(&mut communities_buf)?;
             communities.push(v);
         }
-        Ok(ExtendedCommunitiesIpv6::new(communities))
+        Ok(ExtendedCommunitiesIpv6::new(communities.into_boxed_slice()))
     }
 }
 
