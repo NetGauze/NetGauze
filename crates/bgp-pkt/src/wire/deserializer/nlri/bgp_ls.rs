@@ -158,7 +158,7 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for BgpLsNlriValue {
                 let value = cur.read_bytes(cur.remaining())?;
                 BgpLsNlriValue::Unknown {
                     code: nlri_type.into(),
-                    value: value.to_vec(),
+                    value: value.into(),
                 }
             }
         };
@@ -209,7 +209,7 @@ impl<'a> ParseFrom<'a> for BgpLsLinkDescriptor {
             Err(LinkDescriptorTypeError(IanaValueError::Unknown(value))) => {
                 return Ok(BgpLsLinkDescriptor::Unknown {
                     code: value,
-                    value: data.read_bytes(data.remaining())?.to_vec(),
+                    value: data.read_bytes(data.remaining())?.into(),
                 });
             }
             Err(error) => {
@@ -338,7 +338,7 @@ impl<'a> ParseFrom<'a> for BgpLsNodeDescriptorSubTlv {
             Err(NodeDescriptorSubTypeError(IanaValueError::Unknown(value))) => {
                 return Ok(BgpLsNodeDescriptorSubTlv::Unknown {
                     code: value,
-                    value: data.read_bytes(data.remaining())?.to_vec(),
+                    value: data.read_bytes(data.remaining())?.into(),
                 });
             }
             Err(error) => {
@@ -363,7 +363,7 @@ impl<'a> ParseFrom<'a> for BgpLsNodeDescriptorSubTlv {
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(value)
             }
             BgpLsNodeDescriptorSubType::IgpRouterId => {
-                BgpLsNodeDescriptorSubTlv::IgpRouterId(data.read_bytes(data.remaining())?.to_vec())
+                BgpLsNodeDescriptorSubTlv::IgpRouterId(data.read_bytes(data.remaining())?.into())
             }
             BgpLsNodeDescriptorSubType::BgpRouterIdentifier => {
                 let value = data.read_u32_be()?;
@@ -419,7 +419,7 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for BgpLsPrefixDescriptor {
             Err(PrefixDescriptorTypeError(IanaValueError::Unknown(value))) => {
                 return Ok(BgpLsPrefixDescriptor::Unknown {
                     code: value,
-                    value: data.read_bytes(data.remaining())?.to_vec(),
+                    value: data.read_bytes(data.remaining())?.into(),
                 });
             }
             Err(error) => {

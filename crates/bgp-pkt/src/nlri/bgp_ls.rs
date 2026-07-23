@@ -183,7 +183,7 @@ pub enum BgpLsNlriValue {
 
     Unknown {
         code: u16,
-        value: Vec<u8>,
+        value: Box<[u8]>,
     },
 }
 
@@ -228,21 +228,21 @@ pub struct BgpLsNlriIpPrefix {
     protocol_id: BgpLsProtocolId,
     identifier: u64,
     local_node_descriptors: BgpLsLocalNodeDescriptors,
-    prefix_descriptors: Vec<BgpLsPrefixDescriptor>,
+    prefix_descriptors: Box<[BgpLsPrefixDescriptor]>,
 }
 
 impl BgpLsNlriIpPrefix {
-    pub const fn new(
+    pub fn new(
         protocol_id: BgpLsProtocolId,
         identifier: u64,
         local_node_descriptors: BgpLsLocalNodeDescriptors,
-        prefix_descriptors: Vec<BgpLsPrefixDescriptor>,
+        prefix_descriptors: impl Into<Box<[BgpLsPrefixDescriptor]>>,
     ) -> Self {
         Self {
             protocol_id,
             identifier,
             local_node_descriptors,
-            prefix_descriptors,
+            prefix_descriptors: prefix_descriptors.into(),
         }
     }
 
@@ -433,7 +433,7 @@ pub enum BgpLsPrefixDescriptor {
     IpReachabilityInformation(IpReachabilityInformationData),
     Unknown {
         code: u16,
-        value: Vec<u8>,
+        value: Box<[u8]>,
     },
 }
 
@@ -521,7 +521,7 @@ impl BgpLsNlriNode {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct BgpLsNodeDescriptors(Vec<BgpLsNodeDescriptorSubTlv>);
+pub struct BgpLsNodeDescriptors(Box<[BgpLsNodeDescriptorSubTlv]>);
 
 /// ```text
 ///  0                   1                   2                   3
@@ -583,8 +583,8 @@ impl BgpLsRemoteNodeDescriptors {
 }
 
 impl BgpLsNodeDescriptors {
-    pub const fn new(subtlvs: Vec<BgpLsNodeDescriptorSubTlv>) -> Self {
-        Self(subtlvs)
+    pub fn new(subtlvs: impl Into<Box<[BgpLsNodeDescriptorSubTlv]>>) -> Self {
+        Self(subtlvs.into())
     }
 
     pub fn subtlvs(&self) -> &[BgpLsNodeDescriptorSubTlv] {
@@ -623,7 +623,7 @@ pub enum BgpLsLinkDescriptor {
     MultiTopologyIdentifier(MultiTopologyIdData),
     Unknown {
         code: u16,
-        value: Vec<u8>,
+        value: Box<[u8]>,
     },
 }
 
@@ -680,10 +680,10 @@ pub enum BgpLsNodeDescriptorSubTlv {
     AutonomousSystem(u32),
     BgpLsIdentifier(u32),
     OspfAreaId(u32),
-    IgpRouterId(Vec<u8>),
+    IgpRouterId(Box<[u8]>),
     BgpRouterIdentifier(u32),
     MemberAsNumber(u32),
-    Unknown { code: u16, value: Vec<u8> },
+    Unknown { code: u16, value: Box<[u8]> },
 }
 
 impl BgpLsNodeDescriptorSubTlv {
@@ -742,23 +742,23 @@ pub struct BgpLsNlriLink {
     identifier: u64,
     local_node_descriptors: BgpLsLocalNodeDescriptors,
     remote_node_descriptors: BgpLsRemoteNodeDescriptors,
-    link_descriptors: Vec<BgpLsLinkDescriptor>,
+    link_descriptors: Box<[BgpLsLinkDescriptor]>,
 }
 
 impl BgpLsNlriLink {
-    pub const fn new(
+    pub fn new(
         protocol_id: BgpLsProtocolId,
         identifier: u64,
         local_node_descriptors: BgpLsLocalNodeDescriptors,
         remote_node_descriptors: BgpLsRemoteNodeDescriptors,
-        link_descriptors: Vec<BgpLsLinkDescriptor>,
+        link_descriptors: impl Into<Box<[BgpLsLinkDescriptor]>>,
     ) -> Self {
         Self {
             protocol_id,
             identifier,
             local_node_descriptors,
             remote_node_descriptors,
-            link_descriptors,
+            link_descriptors: link_descriptors.into(),
         }
     }
 
@@ -803,17 +803,17 @@ impl BgpLsNlriLink {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct MultiTopologyIdData(Vec<MultiTopologyId>);
+pub struct MultiTopologyIdData(Box<[MultiTopologyId]>);
 
 impl From<Vec<MultiTopologyId>> for MultiTopologyIdData {
     fn from(value: Vec<MultiTopologyId>) -> Self {
-        Self(value)
+        Self(value.into_boxed_slice())
     }
 }
 
 impl MultiTopologyIdData {
-    pub const fn new(ids: Vec<MultiTopologyId>) -> Self {
-        Self(ids)
+    pub fn new(ids: impl Into<Box<[MultiTopologyId]>>) -> Self {
+        Self(ids.into())
     }
 
     pub fn id(&self) -> &[MultiTopologyId] {

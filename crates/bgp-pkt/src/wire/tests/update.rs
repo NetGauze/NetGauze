@@ -435,7 +435,9 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
                                 BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
                                     BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
                                     BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
-                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![100, 100, 100, 1]),
+                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(Box::new([
+                                        100, 100, 100, 1,
+                                    ])),
                                 ])),
                             )),
                         ),
@@ -447,7 +449,9 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
                                 BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
                                     BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
                                     BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
-                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![100, 100, 100, 2]),
+                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(Box::new([
+                                        100, 100, 100, 2,
+                                    ])),
                                 ])),
                             )),
                         ),
@@ -459,7 +463,9 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
                                 BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
                                     BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
                                     BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
-                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![100, 100, 100, 3]),
+                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(Box::new([
+                                        100, 100, 100, 3,
+                                    ])),
                                 ])),
                             )),
                         ),
@@ -471,9 +477,9 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
                                 BgpLsLocalNodeDescriptors::new(BgpLsNodeDescriptors::new(vec![
                                     BgpLsNodeDescriptorSubTlv::AutonomousSystem(65000),
                                     BgpLsNodeDescriptorSubTlv::OspfAreaId(0),
-                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![
+                                    BgpLsNodeDescriptorSubTlv::IgpRouterId(Box::new([
                                         100, 100, 100, 255,
-                                    ]),
+                                    ])),
                                 ])),
                             )),
                         ),
