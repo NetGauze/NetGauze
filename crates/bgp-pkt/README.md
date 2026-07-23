@@ -53,18 +53,18 @@ pub fn main() {
         180,
         Ipv4Addr::new(5, 5, 5, 5),
         vec![
-            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::MultiProtocolExtensions(
+            BgpOpenMessageParameter::new_capabilities([BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
-            )])),
-            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::MultiProtocolExtensions(
+            )]),
+            BgpOpenMessageParameter::new_capabilities([BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
-            )])),
-            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::CiscoRouteRefresh])),
-            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::RouteRefresh])),
-            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::FourOctetAs(
+            )]),
+            BgpOpenMessageParameter::new_capabilities([BgpCapability::CiscoRouteRefresh]),
+            BgpOpenMessageParameter::new_capabilities([BgpCapability::RouteRefresh]),
+            BgpOpenMessageParameter::new_capabilities([BgpCapability::FourOctetAs(
                 FourOctetAsCapability::new(100),
-            )])),
-            BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::ExtendedNextHopEncoding(
+            )]),
+            BgpOpenMessageParameter::new_capabilities([BgpCapability::ExtendedNextHopEncoding(
                 ExtendedNextHopEncodingCapability::new(vec![
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
@@ -73,7 +73,7 @@ pub fn main() {
                         AddressFamily::IPv6,
                     ),
                 ]),
-            )])),
+            )]),
         ],
     ));
 
