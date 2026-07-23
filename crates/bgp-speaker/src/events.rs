@@ -420,31 +420,33 @@ impl<A> From<BgpCodecDecoderError> for ConnectionEvent<A> {
             BgpCodecDecoderError::IoError(_) => ConnectionEvent::TcpConnectionFails,
             BgpCodecDecoderError::Incomplete(_) => {
                 ConnectionEvent::BGPHeaderErr(MessageHeaderError::BadMessageLength {
-                    value: vec![],
+                    value: vec![].into(),
                 })
             }
             BgpCodecDecoderError::BgpMessageParsingError(parse_err) => match parse_err {
                 BgpMessageParsingError::Parse(_) => {
-                    ConnectionEvent::BGPHeaderErr(MessageHeaderError::Unspecific { value: vec![] })
+                    ConnectionEvent::BGPHeaderErr(MessageHeaderError::Unspecific {
+                        value: vec![].into(),
+                    })
                 }
                 BgpMessageParsingError::ConnectionNotSynchronized { header, .. } => {
                     ConnectionEvent::BGPHeaderErr(MessageHeaderError::ConnectionNotSynchronized {
-                        value: header.to_be_bytes().to_vec(),
+                        value: header.to_be_bytes().into(),
                     })
                 }
                 BgpMessageParsingError::UndefinedBgpMessageType { code, .. } => {
                     ConnectionEvent::BGPHeaderErr(MessageHeaderError::BadMessageType {
-                        value: vec![code],
+                        value: vec![code].into(),
                     })
                 }
                 BgpMessageParsingError::BadMessageLength { length, .. } => {
                     ConnectionEvent::BGPHeaderErr(MessageHeaderError::BadMessageLength {
-                        value: length.to_be_bytes().to_vec(),
+                        value: length.to_be_bytes().into(),
                     })
                 }
                 BgpMessageParsingError::UnparseableBytes { length, .. } => {
                     ConnectionEvent::BGPHeaderErr(MessageHeaderError::BadMessageLength {
-                        value: length.to_be_bytes().to_vec(),
+                        value: length.to_be_bytes().into(),
                     })
                 }
                 BgpMessageParsingError::BgpOpenMessageParsingError(err) => {

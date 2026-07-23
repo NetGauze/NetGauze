@@ -51,7 +51,7 @@ async fn test_start_stop()
         .wait(Duration::from_millis(100))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
 
@@ -318,7 +318,7 @@ async fn test_get_exchanged_capabilities_tracked_connection()
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::ConnectionCollisionResolution {
-                value: vec![],
+                value: vec![].into(),
             }),
         ));
     let active_connect = MockActiveConnect {

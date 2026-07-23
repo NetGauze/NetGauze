@@ -190,20 +190,24 @@ impl From<BgpParameterParsingError> for OpenMessageError {
         match param_err {
             // RFC 4271: If one of the Optional Parameters in the OPEN message is recognized, but is
             // malformed, then the Error Subcode MUST be set to 0 (Unspecific)
-            BgpParameterParsingError::Parse(_) => OpenMessageError::Unspecific { value: vec![] },
+            BgpParameterParsingError::Parse(_) => OpenMessageError::Unspecific {
+                value: vec![].into(),
+            },
             // RFC 4271: If one of the Optional Parameters in the OPEN message is not recognized,
             // then the Error Subcode MUST be set to Unsupported Optional Parameters.
             BgpParameterParsingError::UndefinedParameterType { offset: _, code } => {
-                OpenMessageError::UnsupportedOptionalParameter { value: vec![code] }
+                OpenMessageError::UnsupportedOptionalParameter {
+                    value: vec![code].into(),
+                }
             }
             // RFC 5492 defines that a BGP speaker should ignore capabilities it
             // does not understand and not report any error.
             // It will only report a notification if the capability is
             // understood but not supported by the speaker. If an error is reported anyways by the
             // parser we set the notif to Unspecific
-            BgpParameterParsingError::CapabilityError(_) => {
-                OpenMessageError::Unspecific { value: vec![] }
-            }
+            BgpParameterParsingError::CapabilityError(_) => OpenMessageError::Unspecific {
+                value: vec![].into(),
+            },
         }
     }
 }
@@ -211,7 +215,9 @@ impl From<BgpParameterParsingError> for OpenMessageError {
 impl From<BgpOpenMessageParsingError> for OpenMessageError {
     fn from(error: BgpOpenMessageParsingError) -> Self {
         match error {
-            BgpOpenMessageParsingError::Parse(_) => OpenMessageError::Unspecific { value: vec![] },
+            BgpOpenMessageParsingError::Parse(_) => OpenMessageError::Unspecific {
+                value: vec![].into(),
+            },
             // RFC 4271: If the version number in the Version field of the received OPEN message is
             // not supported, then the Error Subcode MUST be set to Unsupported Version Number.
             // The Data field is a 2-octet unsigned integer, which indicates the largest,
@@ -221,12 +227,12 @@ impl From<BgpOpenMessageParsingError> for OpenMessageError {
             // smallest, locally-supported version number.
             BgpOpenMessageParsingError::UnsupportedVersionNumber { .. } => {
                 OpenMessageError::UnsupportedVersionNumber {
-                    value: (BGP_VERSION as u16).to_be_bytes().to_vec(),
+                    value: (BGP_VERSION as u16).to_be_bytes().into(),
                 }
             }
             BgpOpenMessageParsingError::UnacceptableHoldTime { offset: _, time } => {
                 OpenMessageError::UnacceptableHoldTime {
-                    value: time.to_be_bytes().to_vec(),
+                    value: time.to_be_bytes().into(),
                 }
             }
             // RFC 4271: If the BGP Identifier field of the OPEN message is syntactically incorrect,
@@ -235,7 +241,7 @@ impl From<BgpOpenMessageParsingError> for OpenMessageError {
             // NOTE: not all BGP implementation check for syntactic correctness
             BgpOpenMessageParsingError::InvalidBgpId { bgp_id, .. } => {
                 OpenMessageError::BadBgpIdentifier {
-                    value: bgp_id.to_bits().to_be_bytes().to_vec(),
+                    value: bgp_id.to_bits().to_be_bytes().into(),
                 }
             }
             BgpOpenMessageParsingError::ParameterError(param_error) => param_error.into(),

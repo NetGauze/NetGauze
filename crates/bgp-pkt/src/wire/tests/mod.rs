@@ -289,7 +289,7 @@ fn test_bgp_message_notification() -> Result<(), BgpMessageWritingError> {
 
     let good_cease =
         BgpMessage::Notification(BgpNotificationMessage::CeaseError(CeaseError::HardReset {
-            value: vec![6, 3],
+            value: vec![6, 3].into(),
         }));
     let bad_undefined_notif = BgpMessageParsingError::BgpNotificationMessageParsingError(
         BgpNotificationMessageParsingError::UndefinedBgpErrorNotificationCode {

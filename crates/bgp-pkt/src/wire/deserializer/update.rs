@@ -371,98 +371,150 @@ impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
         // Error Subcode MUST be set to Malformed Attribute List.
         match value {
             BgpUpdateMessageParsingError::Parse(err) => match err {
-                ParseError::UnexpectedEof { .. } => {
-                    UpdateMessageError::MalformedAttributeList { value: vec![] }
-                }
-                ParseError::InvalidPaddingLength { .. } => {
-                    UpdateMessageError::Unspecific { value: vec![] }
-                }
+                ParseError::UnexpectedEof { .. } => UpdateMessageError::MalformedAttributeList {
+                    value: vec![].into(),
+                },
+                ParseError::InvalidPaddingLength { .. } => UpdateMessageError::Unspecific {
+                    value: vec![].into(),
+                },
             },
             BgpUpdateMessageParsingError::PathAttributeError(attr_err) => {
                 // TODO need to be refined in accordance with RFC 7606
                 match attr_err {
                     PathAttributeParsingError::Parse(_) => {
-                        UpdateMessageError::MalformedAttributeList { value: vec![] }
+                        UpdateMessageError::MalformedAttributeList {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::OriginError(err) => match err {
                         OriginParsingError::Parse(_) => {
-                            UpdateMessageError::InvalidOriginAttribute { value: vec![] }
+                            UpdateMessageError::InvalidOriginAttribute {
+                                value: vec![].into(),
+                            }
                         }
                         OriginParsingError::InvalidOriginLength { .. } => {
-                            UpdateMessageError::InvalidOriginAttribute { value: vec![] }
+                            UpdateMessageError::InvalidOriginAttribute {
+                                value: vec![].into(),
+                            }
                         }
                         OriginParsingError::UndefinedOrigin { .. } => {
-                            UpdateMessageError::InvalidOriginAttribute { value: vec![] }
+                            UpdateMessageError::InvalidOriginAttribute {
+                                value: vec![].into(),
+                            }
                         }
                     },
                     PathAttributeParsingError::AsPathError(_) => {
-                        UpdateMessageError::MalformedAsPath { value: vec![] }
+                        UpdateMessageError::MalformedAsPath {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::NextHopError(_) => {
-                        UpdateMessageError::InvalidNextHopAttribute { value: vec![] }
+                        UpdateMessageError::InvalidNextHopAttribute {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::MultiExitDiscriminatorError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::LocalPreferenceError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::AtomicAggregateError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::AggregatorError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::CommunitiesError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::ExtendedCommunitiesError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::ExtendedCommunitiesErrorIpv6(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::LargeCommunitiesError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::OriginatorError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::ClusterListError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::MpReachErrorError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::MpUnreachErrorError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::OnlyToCustomerError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::AigpError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::UnknownAttributeError(_) => {
-                        UpdateMessageError::Unspecific { value: vec![] }
+                        UpdateMessageError::Unspecific {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::InvalidPathAttribute { .. } => {
-                        UpdateMessageError::AttributeFlagsError { value: vec![] }
+                        UpdateMessageError::AttributeFlagsError {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::BgpLsError(_) => {
                         // TODO what to do here ?
-                        UpdateMessageError::Unspecific { value: vec![] }
+                        UpdateMessageError::Unspecific {
+                            value: vec![].into(),
+                        }
                     }
                     PathAttributeParsingError::SegmentIdentifierParsingError(_) => {
-                        UpdateMessageError::OptionalAttributeError { value: vec![] }
+                        UpdateMessageError::OptionalAttributeError {
+                            value: vec![].into(),
+                        }
                     }
                 }
             }
             BgpUpdateMessageParsingError::Ipv4PrefixError(prefix_err) => {
                 if matches!(prefix_err, Ipv4PrefixParsingError::Parse(_)) {
-                    return UpdateMessageError::MalformedAttributeList { value: vec![] };
+                    return UpdateMessageError::MalformedAttributeList {
+                        value: vec![].into(),
+                    };
                 }
-                UpdateMessageError::InvalidNetworkField { value: vec![] }
+                UpdateMessageError::InvalidNetworkField {
+                    value: vec![].into(),
+                }
             }
             BgpUpdateMessageParsingError::InvalidIpv4UnicastNetwork { .. } => {
                 // RFC 4271: If a prefix in the NLRI field is semantically incorrect (e.g., an
@@ -470,7 +522,9 @@ impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
                 // prefix SHOULD be ignored.
                 // If parser is configured to be strict and this error triggered, then report
                 // Unspecific error
-                UpdateMessageError::Unspecific { value: vec![] }
+                UpdateMessageError::Unspecific {
+                    value: vec![].into(),
+                }
             }
         }
     }

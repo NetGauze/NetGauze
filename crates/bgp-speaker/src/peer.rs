@@ -707,7 +707,7 @@ impl<
             );
             if self.config.send_notif_without_open() {
                 let notif = BgpNotificationMessage::CeaseError(CeaseError::ConnectionRejected {
-                    value: vec![],
+                    value: vec![].into(),
                 });
                 let codec = D::new(self);
                 let mut framed = Framed::new(tcp_stream, codec);
@@ -803,7 +803,7 @@ impl<
             let _ = conn
                 .send(BgpMessage::Notification(
                     BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
-                        value: vec![],
+                        value: vec![].into(),
                     }),
                 ))
                 .await;
@@ -813,7 +813,7 @@ impl<
             let _ = conn
                 .send(BgpMessage::Notification(
                     BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
-                        value: vec![],
+                        value: vec![].into(),
                     }),
                 ))
                 .await;
@@ -1451,7 +1451,7 @@ impl<
                                     BgpMessage::Notification(
                                         BgpNotificationMessage::OpenMessageError(
                                             OpenMessageError::BadBgpIdentifier {
-                                                value: peer_id.octets().to_vec()}))).await;
+                                                value: peer_id.octets().into()}))).await;
                             }
                             None
                         },
@@ -1474,7 +1474,7 @@ impl<
                                     BgpMessage::Notification(
                                         BgpNotificationMessage::OpenMessageError(
                                             OpenMessageError::BadBgpIdentifier {
-                                                value: peer_id.octets().to_vec()}))).await;
+                                                value: peer_id.octets().into()}))).await;
                             }
                             None
                         },
@@ -1507,7 +1507,9 @@ impl<
                         let _ = connection
                             .send(BgpMessage::Notification(
                                 BgpNotificationMessage::CeaseError(
-                                    CeaseError::ConnectionCollisionResolution { value: vec![] },
+                                    CeaseError::ConnectionCollisionResolution {
+                                        value: vec![].into(),
+                                    },
                                 ),
                             ))
                             .await;
@@ -1528,7 +1530,9 @@ impl<
                     let _ = tracked
                         .send(BgpMessage::Notification(
                             BgpNotificationMessage::CeaseError(
-                                CeaseError::ConnectionCollisionResolution { value: vec![] },
+                                CeaseError::ConnectionCollisionResolution {
+                                    value: vec![].into(),
+                                },
                             ),
                         ))
                         .await;
