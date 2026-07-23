@@ -197,7 +197,7 @@ mod tests {
                     false,
                     false,
                     false,
-                    PathAttributeValue::MpUnreach(MpUnreach::Ipv4Unicast { nlri: vec![] }),
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv4Unicast { nlri: Box::new([]) }),
                 )
                 .unwrap(),
             ],
@@ -211,7 +211,7 @@ mod tests {
                     false,
                     false,
                     false,
-                    PathAttributeValue::MpUnreach(MpUnreach::Ipv6Unicast { nlri: vec![] }),
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv6Unicast { nlri: Box::new([]) }),
                 )
                 .unwrap(),
             ],
@@ -225,7 +225,7 @@ mod tests {
                     false,
                     false,
                     false,
-                    PathAttributeValue::MpUnreach(MpUnreach::Ipv4Multicast { nlri: vec![] }),
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv4Multicast { nlri: Box::new([]) }),
                 )
                 .unwrap(),
             ],
@@ -239,7 +239,7 @@ mod tests {
                     false,
                     false,
                     false,
-                    PathAttributeValue::MpUnreach(MpUnreach::Ipv6Multicast { nlri: vec![] }),
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv6Multicast { nlri: Box::new([]) }),
                 )
                 .unwrap(),
             ],
@@ -274,11 +274,11 @@ mod tests {
                             "fc00::1".parse().unwrap(),
                             None,
                         )),
-                        nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
+                        nlri: Box::new([Ipv4MplsVpnUnicastAddress::new_no_path_id(
                             RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
                             vec![MplsLabel::new([0, 65, 0]), MplsLabel::new([0, 65, 1])],
                             Ipv4Unicast::from_net("192.168.1.0/24".parse().unwrap()).unwrap(),
-                        )],
+                        )]),
                     }),
                 )
                 .unwrap(),
@@ -294,7 +294,7 @@ mod tests {
                     false,
                     false,
                     false,
-                    PathAttributeValue::MpUnreach(MpUnreach::Ipv4Unicast { nlri: vec![] }),
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv4Unicast { nlri: Box::new([]) }),
                 )
                 .unwrap(),
                 PathAttribute::from(
@@ -302,7 +302,7 @@ mod tests {
                     false,
                     false,
                     false,
-                    PathAttributeValue::MpUnreach(MpUnreach::Ipv6Multicast { nlri: vec![] }),
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv6Multicast { nlri: Box::new([]) }),
                 )
                 .unwrap(),
             ]),

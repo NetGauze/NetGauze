@@ -426,7 +426,7 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
                 true,
                 PathAttributeValue::MpReach(MpReach::BgpLs {
                     next_hop: IpAddr::from_str("100.100.100.1").unwrap(),
-                    nlri: vec![
+                    nlri: Box::new([
                         BgpLsNlri::new(
                             None,
                             BgpLsNlriValue::Node(BgpLsNlriNode::new(
@@ -477,7 +477,7 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
                                 ])),
                             )),
                         ),
-                    ],
+                    ]),
                 }),
             )
             .unwrap(),
