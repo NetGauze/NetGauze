@@ -511,9 +511,9 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
                     true,
                     false,
                     true,
-                    PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
+                    PathAttributeValue::AsPath(AsPath::as4_path_segments([As4PathSegment::new(
                         AsPathSegmentType::AsSequence,
-                        vec![100, 200, 100],
+                        [100, 200, 100],
                     )])),
                 )
                 .unwrap(),
@@ -627,8 +627,8 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                         true,
                         false,
                         true,
-                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
-                            As4PathSegment::new(AsPathSegmentType::AsSequence, vec![100, 200, 100]),
+                        PathAttributeValue::AsPath(AsPath::as4_path_segments([
+                            As4PathSegment::new(AsPathSegmentType::AsSequence, [100, 200, 100]),
                         ])),
                     )
                     .unwrap(),
@@ -1582,10 +1582,10 @@ fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingE
                         true,
                         false,
                         false,
-                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
+                        PathAttributeValue::AsPath(AsPath::as4_path_segments([
                             As4PathSegment::new(
                                 AsPathSegmentType::AsSequence,
-                                vec![65536, 65539, 65000],
+                                [65536, 65539, 65000],
                             ),
                         ])),
                     )

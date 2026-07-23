@@ -183,9 +183,9 @@ fn test_update_non_unicast_nlri() -> Result<(), BgpMessageWritingError> {
                 true,
                 false,
                 true,
-                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
+                PathAttributeValue::AsPath(AsPath::as4_path_segments([As4PathSegment::new(
                     AsPathSegmentType::AsSequence,
-                    vec![200, 100],
+                    [200, 100],
                 )])),
             )
             .unwrap(),
@@ -228,9 +228,9 @@ fn test_update_non_unicast_nlri() -> Result<(), BgpMessageWritingError> {
                 true,
                 false,
                 true,
-                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
+                PathAttributeValue::AsPath(AsPath::as4_path_segments([As4PathSegment::new(
                     AsPathSegmentType::AsSequence,
-                    vec![200, 100],
+                    [200, 100],
                 )])),
             )
             .unwrap(),
@@ -391,7 +391,7 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
                 true,
                 false,
                 false,
-                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![])),
+                PathAttributeValue::AsPath(AsPath::as4_path_segments([])),
             )
             .unwrap(),
             PathAttribute::from(

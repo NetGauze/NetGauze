@@ -578,7 +578,7 @@ fn test_rd_announce() -> Result<(), BgpMessageWritingError> {
                 true,
                 false,
                 false,
-                PathAttributeValue::AsPath(AsPath::As2PathSegments(vec![])),
+                PathAttributeValue::AsPath(AsPath::as2_path_segments([])),
             )
             .unwrap(),
             PathAttribute::from(
@@ -692,7 +692,7 @@ fn test_bgp_add_path() -> Result<(), BgpMessageWritingError> {
                 true,
                 false,
                 false,
-                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
+                PathAttributeValue::AsPath(AsPath::as4_path_segments([As4PathSegment::new(
                     AsPathSegmentType::AsSequence,
                     vec![64511],
                 )])),
@@ -850,7 +850,7 @@ fn test_bgp_add_path_mp_ipv6_unicast() -> Result<(), BgpMessageWritingError> {
                 true,
                 false,
                 true,
-                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
+                PathAttributeValue::AsPath(AsPath::as4_path_segments([As4PathSegment::new(
                     AsPathSegmentType::AsSequence,
                     vec![100, 1000],
                 )])),
@@ -908,7 +908,7 @@ fn test_evpn_mp_reach() -> Result<(), BgpMessageWritingError> {
                 true,
                 false,
                 false,
-                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![])),
+                PathAttributeValue::AsPath(AsPath::as4_path_segments([])),
             )
             .unwrap(),
             PathAttribute::from(
