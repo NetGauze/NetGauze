@@ -65,7 +65,7 @@ pub fn main() {
                 FourOctetAsCapability::new(100),
             )]),
             BgpOpenMessageParameter::new_capabilities([BgpCapability::ExtendedNextHopEncoding(
-                ExtendedNextHopEncodingCapability::new(vec![
+                ExtendedNextHopEncodingCapability::new([
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
                     ExtendedNextHopEncoding::new(

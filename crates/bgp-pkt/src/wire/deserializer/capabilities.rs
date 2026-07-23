@@ -189,7 +189,7 @@ impl<'a> ParseFrom<'a> for BgpCapability {
                         let v = MultipleLabel::parse(cur)?;
                         cap.push(v);
                     }
-                    Ok(BgpCapability::MultipleLabels(cap))
+                    Ok(BgpCapability::MultipleLabels(cap.into()))
                 }
                 BgpCapabilityCode::BgpRole => {
                     let cap = BgpRoleCapability::parse(cur)?;

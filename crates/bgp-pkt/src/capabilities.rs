@@ -69,7 +69,7 @@ pub enum BgpCapability {
     ExtendedMessage,
 
     /// Defined in [RFC8277](https://datatracker.ietf.org/doc/html/rfc8277)
-    MultipleLabels(Vec<MultipleLabel>),
+    MultipleLabels(Box<[MultipleLabel]>),
 
     /// The BGP Role characterizes the relationship between the eBGP speakers
     /// forming a session. BGP Role used in the route leak prevention and
@@ -169,19 +169,22 @@ impl BgpCapability {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct UnrecognizedCapability {
     code: u8,
-    value: Vec<u8>,
+    value: Box<[u8]>,
 }
 
 impl UnrecognizedCapability {
-    pub const fn new(code: u8, value: Vec<u8>) -> Self {
-        Self { code, value }
+    pub fn new(code: u8, value: impl Into<Box<[u8]>>) -> Self {
+        Self {
+            code,
+            value: value.into(),
+        }
     }
 
     pub const fn code(&self) -> &u8 {
         &self.code
     }
 
-    pub const fn value(&self) -> &Vec<u8> {
+    pub const fn value(&self) -> &[u8] {
         &self.value
     }
 }
@@ -217,19 +220,22 @@ pub enum ExperimentalCapabilityCode {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExperimentalCapability {
     code: ExperimentalCapabilityCode,
-    value: Vec<u8>,
+    value: Box<[u8]>,
 }
 
 impl ExperimentalCapability {
-    pub const fn new(code: ExperimentalCapabilityCode, value: Vec<u8>) -> Self {
-        Self { code, value }
+    pub fn new(code: ExperimentalCapabilityCode, value: impl Into<Box<[u8]>>) -> Self {
+        Self {
+            code,
+            value: value.into(),
+        }
     }
 
     pub const fn code(&self) -> ExperimentalCapabilityCode {
         self.code
     }
 
-    pub const fn value(&self) -> &Vec<u8> {
+    pub const fn value(&self) -> &[u8] {
         &self.value
     }
 }
@@ -287,7 +293,7 @@ pub struct GracefulRestartCapability {
     restart: bool,
     graceful_notification: bool,
     time: u16,
-    address_families: Vec<GracefulRestartAddressFamily>,
+    address_families: Box<[GracefulRestartAddressFamily]>,
 }
 
 impl GracefulRestartCapability {
@@ -295,13 +301,13 @@ impl GracefulRestartCapability {
         restart: bool,
         graceful_notification: bool,
         time: u16,
-        address_families: Vec<GracefulRestartAddressFamily>,
+        address_families: impl Into<Box<[GracefulRestartAddressFamily]>>,
     ) -> Self {
         Self {
             restart,
             graceful_notification,
             time,
-            address_families,
+            address_families: address_families.into(),
         }
     }
 
@@ -317,7 +323,7 @@ impl GracefulRestartCapability {
         self.time
     }
 
-    pub const fn address_families(&self) -> &Vec<GracefulRestartAddressFamily> {
+    pub const fn address_families(&self) -> &[GracefulRestartAddressFamily] {
         &self.address_families
     }
 }
@@ -354,15 +360,17 @@ pub struct GracefulRestartAddressFamily {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LongLivedGracefulRestartCapability {
-    address_families: Vec<LongLivedGracefulRestartAddressFamily>,
+    address_families: Box<[LongLivedGracefulRestartAddressFamily]>,
 }
 
 impl LongLivedGracefulRestartCapability {
-    pub const fn new(address_families: Vec<LongLivedGracefulRestartAddressFamily>) -> Self {
-        Self { address_families }
+    pub fn new(address_families: impl Into<Box<[LongLivedGracefulRestartAddressFamily]>>) -> Self {
+        Self {
+            address_families: address_families.into(),
+        }
     }
 
-    pub const fn address_families(&self) -> &Vec<LongLivedGracefulRestartAddressFamily> {
+    pub const fn address_families(&self) -> &[LongLivedGracefulRestartAddressFamily] {
         &self.address_families
     }
 }
@@ -490,15 +498,17 @@ impl GracefulRestartAddressFamily {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct AddPathCapability {
-    address_families: Vec<AddPathAddressFamily>,
+    address_families: Box<[AddPathAddressFamily]>,
 }
 
 impl AddPathCapability {
-    pub const fn new(address_families: Vec<AddPathAddressFamily>) -> Self {
-        Self { address_families }
+    pub fn new(address_families: impl Into<Box<[AddPathAddressFamily]>>) -> Self {
+        Self {
+            address_families: address_families.into(),
+        }
     }
 
-    pub const fn address_families(&self) -> &Vec<AddPathAddressFamily> {
+    pub const fn address_families(&self) -> &[AddPathAddressFamily] {
         &self.address_families
     }
 }
@@ -574,15 +584,17 @@ impl AddPathAddressFamily {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExtendedNextHopEncodingCapability {
-    encodings: Vec<ExtendedNextHopEncoding>,
+    encodings: Box<[ExtendedNextHopEncoding]>,
 }
 
 impl ExtendedNextHopEncodingCapability {
-    pub const fn new(encodings: Vec<ExtendedNextHopEncoding>) -> Self {
-        Self { encodings }
+    pub fn new(encodings: impl Into<Box<[ExtendedNextHopEncoding]>>) -> Self {
+        Self {
+            encodings: encodings.into(),
+        }
     }
 
-    pub const fn encodings(&self) -> &Vec<ExtendedNextHopEncoding> {
+    pub const fn encodings(&self) -> &[ExtendedNextHopEncoding] {
         &self.encodings
     }
 }
