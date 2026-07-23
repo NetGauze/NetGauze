@@ -130,3 +130,13 @@ pub enum BgpOpenMessageParameter {
     /// Capabilities Advertisement
     Capabilities(Box<[BgpCapability]>),
 }
+
+impl BgpOpenMessageParameter {
+    /// Helper function to create an BgpOpenMessageParameter with list of
+    /// capabilities
+    pub fn new_capabilities(
+        capabilities: impl Into<Box<[BgpCapability]>>,
+    ) -> BgpOpenMessageParameter {
+        Self::Capabilities(capabilities.into())
+    }
+}
