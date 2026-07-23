@@ -2397,7 +2397,7 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
         true,
         false,
         false,
-        PathAttributeValue::UnknownAttribute(UnknownAttribute::new(0, good_wire[3..].into())),
+        PathAttributeValue::UnknownAttribute(UnknownAttribute::new(0, good_wire[3..].to_vec())),
     )
     .unwrap();
 
@@ -2406,7 +2406,7 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
         true,
         false,
         true,
-        PathAttributeValue::UnknownAttribute(UnknownAttribute::new(0, good_wire[3..].into())),
+        PathAttributeValue::UnknownAttribute(UnknownAttribute::new(0, good_wire[3..].to_vec())),
     )
     .unwrap();
 

@@ -982,14 +982,14 @@ impl PathAttributeValueProperties for Originator {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct ClusterList(Vec<ClusterId>);
+pub struct ClusterList(Box<[ClusterId]>);
 
 impl ClusterList {
-    pub const fn new(cluster_list: Vec<ClusterId>) -> Self {
-        Self(cluster_list)
+    pub fn new(cluster_list: impl Into<Box<[ClusterId]>>) -> Self {
+        Self(cluster_list.into())
     }
 
-    pub const fn cluster_list(&self) -> &Vec<ClusterId> {
+    pub const fn cluster_list(&self) -> &[ClusterId] {
         &self.0
     }
 }
@@ -1390,12 +1390,15 @@ impl PathAttributeValueProperties for MpUnreach {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct UnknownAttribute {
     code: u8,
-    value: Vec<u8>,
+    value: Box<[u8]>,
 }
 
 impl UnknownAttribute {
-    pub const fn new(code: u8, value: Vec<u8>) -> Self {
-        Self { code, value }
+    pub fn new(code: u8, value: impl Into<Box<[u8]>>) -> Self {
+        Self {
+            code,
+            value: value.into(),
+        }
     }
 
     /// Attribute Type code
@@ -1403,8 +1406,8 @@ impl UnknownAttribute {
         self.code
     }
 
-    /// Raw u8 vector of the value carried in the attribute
-    pub const fn value(&self) -> &Vec<u8> {
+    /// Raw bytes of the value carried in the attribute
+    pub const fn value(&self) -> &[u8] {
         &self.value
     }
 }
