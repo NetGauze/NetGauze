@@ -532,7 +532,8 @@ fn test_rd_withdraw() -> Result<(), BgpMessageWritingError> {
                         vec![MplsLabel::new([22, 152, 145])],
                         Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(1, 1, 1, 1), 32).unwrap())
                             .unwrap(),
-                    )],
+                    )]
+                    .into_boxed_slice(),
                 }),
             )
             .unwrap(),
@@ -648,7 +649,8 @@ fn test_rd_announce() -> Result<(), BgpMessageWritingError> {
                         vec![MplsLabel::new([2, 192, 81])],
                         Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(1, 1, 1, 1), 32).unwrap())
                             .unwrap(),
-                    )],
+                    )]
+                    .into_boxed_slice(),
                 }),
             )
             .unwrap(),
@@ -833,7 +835,8 @@ fn test_bgp_add_path_mp_ipv6_unicast() -> Result<(), BgpMessageWritingError> {
                         Some(2),
                         Ipv6Unicast::from_net(Ipv6Net::from_str("fd10:eeee::/64").unwrap())
                             .unwrap(),
-                    )],
+                    )]
+                    .into_boxed_slice(),
                 }),
             )
             .unwrap(),
@@ -987,7 +990,8 @@ fn test_evpn_mp_reach() -> Result<(), BgpMessageWritingError> {
                                 None,
                             )),
                         ),
-                    ],
+                    ]
+                    .into_boxed_slice(),
                 }),
             )
             .unwrap(),
@@ -1101,7 +1105,8 @@ fn test_evpn_withdraw() -> Result<(), BgpMessageWritingError> {
                                 None,
                             )),
                         ),
-                    ],
+                    ]
+                    .into_boxed_slice(),
                 }),
             )
             .unwrap(),

@@ -695,7 +695,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 Ok(MpReach::Ipv4Unicast {
                     next_hop,
                     next_hop_local,
-                    nlri,
+                    nlri: nlri.into_boxed_slice(),
                 })
             }
             Ok(addr_type @ AddressType::Ipv4Multicast) => {
@@ -711,7 +711,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 Ok(MpReach::Ipv4Multicast {
                     next_hop,
                     next_hop_local,
-                    nlri,
+                    nlri: nlri.into_boxed_slice(),
                 })
             }
             Ok(addr_type @ AddressType::Ipv4NlriMplsLabels) => {
@@ -732,7 +732,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 Ok(MpReach::Ipv4NlriMplsLabels {
                     next_hop,
                     next_hop_local,
-                    nlri,
+                    nlri: nlri.into_boxed_slice(),
                 })
             }
             Ok(addr_type @ AddressType::Ipv4MplsLabeledVpn) => {
@@ -749,7 +749,10 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     )?;
                     nlri.push(v);
                 }
-                Ok(MpReach::Ipv4MplsVpnUnicast { next_hop, nlri })
+                Ok(MpReach::Ipv4MplsVpnUnicast {
+                    next_hop,
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::Ipv6Unicast) => {
                 let next_hop_len = mp_buf.read_u8()?;
@@ -771,7 +774,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 Ok(MpReach::Ipv6Unicast {
                     next_hop_global,
                     next_hop_local,
-                    nlri,
+                    nlri: nlri.into_boxed_slice(),
                 })
             }
             Ok(addr_type @ AddressType::Ipv6Multicast) => {
@@ -794,7 +797,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 Ok(MpReach::Ipv6Multicast {
                     next_hop_global,
                     next_hop_local,
-                    nlri,
+                    nlri: nlri.into_boxed_slice(),
                 })
             }
             Ok(addr_type @ AddressType::Ipv6NlriMplsLabels) => {
@@ -815,7 +818,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 Ok(MpReach::Ipv6NlriMplsLabels {
                     next_hop,
                     next_hop_local,
-                    nlri,
+                    nlri: nlri.into_boxed_slice(),
                 })
             }
             Ok(addr_type @ AddressType::Ipv6MplsLabeledVpn) => {
@@ -832,7 +835,10 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     )?;
                     nlri.push(v);
                 }
-                Ok(MpReach::Ipv6MplsVpnUnicast { next_hop, nlri })
+                Ok(MpReach::Ipv6MplsVpnUnicast {
+                    next_hop,
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::L2VpnBgpEvpn) => {
                 let next_hop = parse_ip_next_hop(&mut mp_buf, addr_type)?;
@@ -843,7 +849,10 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = L2EvpnAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpReach::L2Evpn { next_hop, nlri })
+                Ok(MpReach::L2Evpn {
+                    next_hop,
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::RouteTargetConstrains) => {
                 let next_hop = parse_ip_next_hop(&mut mp_buf, addr_type)?;
@@ -854,7 +863,10 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = RouteTargetMembershipAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpReach::RouteTargetMembership { next_hop, nlri })
+                Ok(MpReach::RouteTargetMembership {
+                    next_hop,
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::BgpLs) => {
                 let next_hop = parse_ip_next_hop(&mut mp_buf, addr_type)?;
@@ -865,7 +877,10 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = BgpLsNlri::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpReach::BgpLs { next_hop, nlri })
+                Ok(MpReach::BgpLs {
+                    next_hop,
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::BgpLsVpn) => {
                 let next_hop = parse_labeled_next_hop(&mut mp_buf, addr_type)?;
@@ -876,12 +891,15 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = BgpLsVpnNlri::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpReach::BgpLsVpn { next_hop, nlri })
+                Ok(MpReach::BgpLsVpn {
+                    next_hop,
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(_) | Err(_) => Ok(MpReach::Unknown {
                 afi,
                 safi,
-                value: mp_buf.read_bytes(mp_buf.remaining())?.to_vec(),
+                value: mp_buf.read_bytes(mp_buf.remaining())?.into(),
             }),
         }
     }
@@ -1036,7 +1054,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = Ipv4UnicastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::Ipv4Unicast { nlri })
+                Ok(MpUnreach::Ipv4Unicast {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::Ipv4Multicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1045,7 +1065,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = Ipv4MulticastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::Ipv4Multicast { nlri })
+                Ok(MpUnreach::Ipv4Multicast {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::Ipv4NlriMplsLabels) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1059,7 +1081,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     )?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::Ipv4NlriMplsLabels { nlri })
+                Ok(MpUnreach::Ipv4NlriMplsLabels {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::Ipv4MplsLabeledVpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1073,7 +1097,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     )?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::Ipv4MplsVpnUnicast { nlri })
+                Ok(MpUnreach::Ipv4MplsVpnUnicast {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::Ipv6Unicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1082,7 +1108,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = Ipv6UnicastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::Ipv6Unicast { nlri })
+                Ok(MpUnreach::Ipv6Unicast {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::Ipv6Multicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1091,7 +1119,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = Ipv6MulticastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::Ipv6Multicast { nlri })
+                Ok(MpUnreach::Ipv6Multicast {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::Ipv6NlriMplsLabels) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1105,7 +1135,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     )?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::Ipv6NlriMplsLabels { nlri })
+                Ok(MpUnreach::Ipv6NlriMplsLabels {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::Ipv6MplsLabeledVpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1119,7 +1151,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     )?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::Ipv6MplsVpnUnicast { nlri })
+                Ok(MpUnreach::Ipv6MplsVpnUnicast {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::L2VpnBgpEvpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1128,7 +1162,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = L2EvpnAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::L2Evpn { nlri })
+                Ok(MpUnreach::L2Evpn {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::RouteTargetConstrains) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1137,7 +1173,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = RouteTargetMembershipAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::RouteTargetMembership { nlri })
+                Ok(MpUnreach::RouteTargetMembership {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::BgpLs) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1146,7 +1184,9 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = BgpLsNlri::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::BgpLs { nlri })
+                Ok(MpUnreach::BgpLs {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(addr_type @ AddressType::BgpLsVpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
@@ -1155,12 +1195,14 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     let v = BgpLsVpnNlri::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
                 }
-                Ok(MpUnreach::BgpLsVpn { nlri })
+                Ok(MpUnreach::BgpLsVpn {
+                    nlri: nlri.into_boxed_slice(),
+                })
             }
             Ok(_) | Err(_) => Ok(MpUnreach::Unknown {
                 afi,
                 safi,
-                nlri: mp_buf.read_bytes(mp_buf.remaining())?.to_vec(),
+                nlri: mp_buf.read_bytes(mp_buf.remaining())?.into(),
             }),
         }
     }

@@ -344,7 +344,7 @@ pub mod tests {
                             Ipv6Addr::new(0x2001, 0xdb8, 0x90, 0, 0, 0, 0, 1),
                             None,
                         )),
-                        nlri: vec![Ipv4MplsVpnUnicastAddress::new(
+                        nlri: Box::new([Ipv4MplsVpnUnicastAddress::new(
                             None,
                             RouteDistinguisher::As4Administrator {
                                 asn4: 4226809946,
@@ -355,7 +355,7 @@ pub mod tests {
                                 Ipv4Net::new(Ipv4Addr::new(192, 0, 2, 12), 32).unwrap(),
                             )
                             .unwrap(),
-                        )],
+                        )]),
                     }),
                 )
                 .unwrap(),
@@ -483,13 +483,13 @@ pub mod tests {
                     PathAttributeValue::MpReach(MpReach::Ipv4Unicast {
                         next_hop: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
                         next_hop_local: None,
-                        nlri: vec![Ipv4UnicastAddress::new(
+                        nlri: Box::new([Ipv4UnicastAddress::new(
                             None,
                             Ipv4Unicast::from_net(
                                 Ipv4Net::new(Ipv4Addr::new(203, 0, 113, 53), 32).unwrap(),
                             )
                             .unwrap(),
-                        )],
+                        )]),
                     }),
                 )
                 .unwrap(),

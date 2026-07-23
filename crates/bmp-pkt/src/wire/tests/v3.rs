@@ -1658,7 +1658,8 @@ fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingE
                                     Ipv4Net::from_str("203.0.113.254/31").unwrap(),
                                 )
                                 .unwrap(),
-                            ],
+                            ]
+                            .into_boxed_slice(),
                         }),
                     )
                     .unwrap(),

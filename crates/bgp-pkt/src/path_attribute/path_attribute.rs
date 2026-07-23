@@ -1057,73 +1057,73 @@ pub enum MpReach {
         next_hop: IpAddr,
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
-        nlri: Vec<Ipv4UnicastAddress>,
+        nlri: Box<[Ipv4UnicastAddress]>,
     },
     Ipv4Multicast {
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
-        nlri: Vec<Ipv4MulticastAddress>,
+        nlri: Box<[Ipv4MulticastAddress]>,
     },
     Ipv4NlriMplsLabels {
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
-        nlri: Vec<Ipv4NlriMplsLabelsAddress>,
+        nlri: Box<[Ipv4NlriMplsLabelsAddress]>,
     },
     Ipv4MplsVpnUnicast {
         next_hop: LabeledNextHop,
-        nlri: Vec<Ipv4MplsVpnUnicastAddress>,
+        nlri: Box<[Ipv4MplsVpnUnicastAddress]>,
     },
     Ipv6Unicast {
         next_hop_global: Ipv6Addr,
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
-        nlri: Vec<Ipv6UnicastAddress>,
+        nlri: Box<[Ipv6UnicastAddress]>,
     },
     Ipv6Multicast {
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6))]
         next_hop_global: Ipv6Addr,
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
-        nlri: Vec<Ipv6MulticastAddress>,
+        nlri: Box<[Ipv6MulticastAddress]>,
     },
     Ipv6NlriMplsLabels {
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
-        nlri: Vec<Ipv6NlriMplsLabelsAddress>,
+        nlri: Box<[Ipv6NlriMplsLabelsAddress]>,
     },
     Ipv6MplsVpnUnicast {
         next_hop: LabeledNextHop,
-        nlri: Vec<Ipv6MplsVpnUnicastAddress>,
+        nlri: Box<[Ipv6MplsVpnUnicastAddress]>,
     },
     L2Evpn {
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
-        nlri: Vec<L2EvpnAddress>,
+        nlri: Box<[L2EvpnAddress]>,
     },
     RouteTargetMembership {
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
-        nlri: Vec<RouteTargetMembershipAddress>,
+        nlri: Box<[RouteTargetMembershipAddress]>,
     },
     BgpLs {
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
         next_hop: IpAddr,
-        nlri: Vec<BgpLsNlri>,
+        nlri: Box<[BgpLsNlri]>,
     },
     BgpLsVpn {
         next_hop: LabeledNextHop,
-        nlri: Vec<BgpLsVpnNlri>,
+        nlri: Box<[BgpLsVpnNlri]>,
     },
     Unknown {
         afi: AddressFamily,
         safi: SubsequentAddressFamily,
-        value: Vec<u8>,
+        value: Box<[u8]>,
     },
 }
 
@@ -1237,45 +1237,45 @@ impl PathAttributeValueProperties for MpReach {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum MpUnreach {
     Ipv4Unicast {
-        nlri: Vec<Ipv4UnicastAddress>,
+        nlri: Box<[Ipv4UnicastAddress]>,
     },
     Ipv4Multicast {
-        nlri: Vec<Ipv4MulticastAddress>,
+        nlri: Box<[Ipv4MulticastAddress]>,
     },
     Ipv4NlriMplsLabels {
-        nlri: Vec<Ipv4NlriMplsLabelsAddress>,
+        nlri: Box<[Ipv4NlriMplsLabelsAddress]>,
     },
     Ipv4MplsVpnUnicast {
-        nlri: Vec<Ipv4MplsVpnUnicastAddress>,
+        nlri: Box<[Ipv4MplsVpnUnicastAddress]>,
     },
     Ipv6Unicast {
-        nlri: Vec<Ipv6UnicastAddress>,
+        nlri: Box<[Ipv6UnicastAddress]>,
     },
     Ipv6Multicast {
-        nlri: Vec<Ipv6MulticastAddress>,
+        nlri: Box<[Ipv6MulticastAddress]>,
     },
     Ipv6NlriMplsLabels {
-        nlri: Vec<Ipv6NlriMplsLabelsAddress>,
+        nlri: Box<[Ipv6NlriMplsLabelsAddress]>,
     },
     Ipv6MplsVpnUnicast {
-        nlri: Vec<Ipv6MplsVpnUnicastAddress>,
+        nlri: Box<[Ipv6MplsVpnUnicastAddress]>,
     },
     L2Evpn {
-        nlri: Vec<L2EvpnAddress>,
+        nlri: Box<[L2EvpnAddress]>,
     },
     RouteTargetMembership {
-        nlri: Vec<RouteTargetMembershipAddress>,
+        nlri: Box<[RouteTargetMembershipAddress]>,
     },
     BgpLs {
-        nlri: Vec<BgpLsNlri>,
+        nlri: Box<[BgpLsNlri]>,
     },
     BgpLsVpn {
-        nlri: Vec<BgpLsVpnNlri>,
+        nlri: Box<[BgpLsVpnNlri]>,
     },
     Unknown {
         afi: AddressFamily,
         safi: SubsequentAddressFamily,
-        nlri: Vec<u8>,
+        nlri: Box<[u8]>,
     },
 }
 
@@ -1540,17 +1540,17 @@ mod tests {
         let ipv4_unicast = MpReach::Ipv4Unicast {
             next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
             next_hop_local: None,
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let ipv4_multicast = MpReach::Ipv4Multicast {
             next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
             next_hop_local: None,
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let ipv4_nlri_mpls_labels = MpReach::Ipv4NlriMplsLabels {
             next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
             next_hop_local: None,
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let ipv4_mpls_vpn_unicast = MpReach::Ipv4MplsVpnUnicast {
             next_hop: LabeledNextHop::Ipv4(LabeledIpv4NextHop::new(
@@ -1560,23 +1560,23 @@ mod tests {
                 },
                 Ipv4Addr::new(192, 168, 1, 1),
             )),
-            nlri: vec![],
+            nlri: Box::new([]),
         };
 
         let ipv6_unicast = MpReach::Ipv6Unicast {
             next_hop_global: Ipv6Addr::LOCALHOST,
             next_hop_local: None,
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let ipv6_multicast = MpReach::Ipv6Multicast {
             next_hop_global: Ipv6Addr::LOCALHOST,
             next_hop_local: None,
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let ipv6_nlri_mpls_labels = MpReach::Ipv6NlriMplsLabels {
             next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
             next_hop_local: None,
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let ipv6_mpls_vpn_unicast = MpReach::Ipv6MplsVpnUnicast {
             next_hop: LabeledNextHop::Ipv4(LabeledIpv4NextHop::new(
@@ -1586,20 +1586,20 @@ mod tests {
                 },
                 Ipv4Addr::new(192, 168, 1, 1),
             )),
-            nlri: vec![],
+            nlri: Box::new([]),
         };
 
         let l2_evpn = MpReach::L2Evpn {
             next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let rt = MpReach::RouteTargetMembership {
             next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let bgp_ls = MpReach::BgpLs {
             next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let bgp_ls_vpn = MpReach::BgpLsVpn {
             next_hop: LabeledNextHop::Ipv4(LabeledIpv4NextHop::new(
@@ -1609,12 +1609,12 @@ mod tests {
                 },
                 Ipv4Addr::new(192, 168, 1, 1),
             )),
-            nlri: vec![],
+            nlri: Box::new([]),
         };
         let unknown = MpReach::Unknown {
             afi: AddressFamily::AppleTalk,
             safi: SubsequentAddressFamily::Unicast,
-            value: vec![],
+            value: Box::new([]),
         };
 
         assert_eq!(ipv4_unicast.address_type(), Ok(AddressType::Ipv4Unicast));
@@ -1756,24 +1756,24 @@ mod tests {
 
     #[test]
     fn test_mp_unreach_address() {
-        let ipv4_unicast = MpUnreach::Ipv4Unicast { nlri: vec![] };
-        let ipv4_multicast = MpUnreach::Ipv4Multicast { nlri: vec![] };
-        let ipv4_nlri_mpls_labels = MpUnreach::Ipv4NlriMplsLabels { nlri: vec![] };
-        let ipv4_mpls_vpn_unicast = MpUnreach::Ipv4MplsVpnUnicast { nlri: vec![] };
+        let ipv4_unicast = MpUnreach::Ipv4Unicast { nlri: Box::new([]) };
+        let ipv4_multicast = MpUnreach::Ipv4Multicast { nlri: Box::new([]) };
+        let ipv4_nlri_mpls_labels = MpUnreach::Ipv4NlriMplsLabels { nlri: Box::new([]) };
+        let ipv4_mpls_vpn_unicast = MpUnreach::Ipv4MplsVpnUnicast { nlri: Box::new([]) };
 
-        let ipv6_unicast = MpUnreach::Ipv6Unicast { nlri: vec![] };
-        let ipv6_multicast = MpUnreach::Ipv6Multicast { nlri: vec![] };
-        let ipv6_nlri_mpls_labels = MpUnreach::Ipv6NlriMplsLabels { nlri: vec![] };
-        let ipv6_mpls_vpn_unicast = MpUnreach::Ipv6MplsVpnUnicast { nlri: vec![] };
+        let ipv6_unicast = MpUnreach::Ipv6Unicast { nlri: Box::new([]) };
+        let ipv6_multicast = MpUnreach::Ipv6Multicast { nlri: Box::new([]) };
+        let ipv6_nlri_mpls_labels = MpUnreach::Ipv6NlriMplsLabels { nlri: Box::new([]) };
+        let ipv6_mpls_vpn_unicast = MpUnreach::Ipv6MplsVpnUnicast { nlri: Box::new([]) };
 
-        let l2_evpn = MpUnreach::L2Evpn { nlri: vec![] };
-        let rt = MpUnreach::RouteTargetMembership { nlri: vec![] };
-        let bgp_ls = MpUnreach::BgpLs { nlri: vec![] };
-        let bgp_ls_vpn = MpUnreach::BgpLsVpn { nlri: vec![] };
+        let l2_evpn = MpUnreach::L2Evpn { nlri: Box::new([]) };
+        let rt = MpUnreach::RouteTargetMembership { nlri: Box::new([]) };
+        let bgp_ls = MpUnreach::BgpLs { nlri: Box::new([]) };
+        let bgp_ls_vpn = MpUnreach::BgpLsVpn { nlri: Box::new([]) };
         let unknown = MpUnreach::Unknown {
             afi: AddressFamily::AppleTalk,
             safi: SubsequentAddressFamily::Unicast,
-            nlri: vec![],
+            nlri: Box::new([]),
         };
 
         assert_eq!(ipv4_unicast.address_type(), Ok(AddressType::Ipv4Unicast));

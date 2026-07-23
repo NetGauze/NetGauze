@@ -1259,7 +1259,7 @@ fn test_mp_reach_nlri_ipv6() -> Result<(), MpReachWritingError> {
     let good = MpReach::Ipv6Unicast {
         next_hop_global: Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x1),
         next_hop_local: Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xc001, 0xbff, 0xfe7e, 0)),
-        nlri: vec![
+        nlri: Box::new([
             Ipv6UnicastAddress::new(
                 None,
                 Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:2::/64").unwrap()).unwrap(),
@@ -1272,13 +1272,13 @@ fn test_mp_reach_nlri_ipv6() -> Result<(), MpReachWritingError> {
                 None,
                 Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1::/64").unwrap()).unwrap(),
             ),
-        ],
+        ]),
     };
 
     let unknown_address_type = MpReach::Unknown {
         afi: AddressFamily::AppleTalk,
         safi: SubsequentAddressFamily::Unicast,
-        value: unknown_address_type_wire[4..].to_vec(),
+        value: unknown_address_type_wire[4..].into(),
     };
 
     let invalid_afi = MpReachParsingError::UndefinedAddressFamily {
@@ -1377,19 +1377,19 @@ fn test_mp_reach_nlri_ipv4_ipv6_next_hop() -> Result<(), MpReachWritingError> {
     let good_no_link_local = MpReach::Ipv4Unicast {
         next_hop: IpAddr::V6(Ipv6Addr::new(0x2001, 0x0db8, 0x91, 0, 0, 0, 0, 0x1)),
         next_hop_local: None,
-        nlri: vec![Ipv4UnicastAddress::new(
+        nlri: Box::new([Ipv4UnicastAddress::new(
             None,
             Ipv4Unicast::from_net(Ipv4Net::from_str("192.0.2.13/32").unwrap()).unwrap(),
-        )],
+        )]),
     };
 
     let good_link_local = MpReach::Ipv4Unicast {
         next_hop: IpAddr::V6(Ipv6Addr::new(0x2001, 0x0db8, 0x91, 0, 0, 0, 0, 0x1)),
         next_hop_local: Some(Ipv6Addr::from_str("FE80::AB8").unwrap()),
-        nlri: vec![Ipv4UnicastAddress::new(
+        nlri: Box::new([Ipv4UnicastAddress::new(
             None,
             Ipv4Unicast::from_net(Ipv4Net::from_str("192.0.2.13/32").unwrap()).unwrap(),
-        )],
+        )]),
     };
 
     test_parsed_completely_with_three_inputs_bytes_reader(
@@ -1431,27 +1431,23 @@ fn test_mp_reach_nlri_ipv4_mpls_labels_ipv6_next_hop() -> Result<(), MpReachWrit
     let good_no_link_local = MpReach::Ipv4NlriMplsLabels {
         next_hop: IpAddr::V6(Ipv6Addr::new(0x2001, 0x0db8, 0x91, 0, 0, 0, 0, 0x1)),
         next_hop_local: None,
-        nlri: vec![
-            Ipv4NlriMplsLabelsAddress::from(
-                None,
-                vec![MplsLabel::new([1, 3, 0])],
-                Ipv4Net::from_str("192.0.2.13/32").unwrap(),
-            )
-            .unwrap(),
-        ],
+        nlri: Box::new([Ipv4NlriMplsLabelsAddress::from(
+            None,
+            vec![MplsLabel::new([1, 3, 0])],
+            Ipv4Net::from_str("192.0.2.13/32").unwrap(),
+        )
+        .unwrap()]),
     };
 
     let good_link_local = MpReach::Ipv4NlriMplsLabels {
         next_hop: IpAddr::V6(Ipv6Addr::new(0x2001, 0x0db8, 0x91, 0, 0, 0, 0, 0x1)),
         next_hop_local: Some(Ipv6Addr::from_str("FE80::AB8").unwrap()),
-        nlri: vec![
-            Ipv4NlriMplsLabelsAddress::from(
-                None,
-                vec![MplsLabel::new([1, 3, 0])],
-                Ipv4Net::from_str("192.0.2.13/32").unwrap(),
-            )
-            .unwrap(),
-        ],
+        nlri: Box::new([Ipv4NlriMplsLabelsAddress::from(
+            None,
+            vec![MplsLabel::new([1, 3, 0])],
+            Ipv4Net::from_str("192.0.2.13/32").unwrap(),
+        )
+        .unwrap()]),
     };
 
     test_parsed_completely_with_three_inputs_bytes_reader(
@@ -1494,10 +1490,10 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_unicast() -> Result<(), PathAttr
         PathAttributeValue::MpReach(MpReach::Ipv4Unicast {
             next_hop: IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20)),
             next_hop_local: None,
-            nlri: vec![Ipv4UnicastAddress::new(
+            nlri: Box::new([Ipv4UnicastAddress::new(
                 None,
                 Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.0.0/16").unwrap()).unwrap(),
-            )],
+            )]),
         }),
     )
     .unwrap();
@@ -1554,9 +1550,9 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_multicast() -> Result<(), PathAt
         PathAttributeValue::MpReach(MpReach::Ipv4Multicast {
             next_hop: IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20)),
             next_hop_local: None,
-            nlri: vec![Ipv4MulticastAddress::new_no_path_id(
+            nlri: Box::new([Ipv4MulticastAddress::new_no_path_id(
                 Ipv4Multicast::from_net(Ipv4Net::from_str("224.0.0.0/16").unwrap()).unwrap(),
-            )],
+            )]),
         }),
     )
     .unwrap();
@@ -1632,7 +1628,8 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_unicast() -> Result<(), PathAttr
                     None,
                     Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1::/64").unwrap()).unwrap(),
                 ),
-            ],
+            ]
+            .into_boxed_slice(),
         }),
     )
     .unwrap();
@@ -1705,7 +1702,8 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAt
                 Ipv6MulticastAddress::new_no_path_id(
                     Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1::/64").unwrap()).unwrap(),
                 ),
-            ],
+            ]
+            .into_boxed_slice(),
         }),
     )
     .unwrap();
@@ -1768,7 +1766,8 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_unicast() -> Result<(), PathAt
                     Ipv6Unicast::from_net(Ipv6Net::from_str("fdfd:0:0:8bea::/64").unwrap())
                         .unwrap(),
                 ),
-            ],
+            ]
+            .into_boxed_slice(),
         }),
     )
     .unwrap();
@@ -1829,7 +1828,8 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast()
                     Ipv6Multicast::from_net(Ipv6Net::from_str("fffd:0:0:8bea::/64").unwrap())
                         .unwrap(),
                 ),
-            ],
+            ]
+            .into_boxed_slice(),
         }),
     )
     .unwrap();
@@ -1883,7 +1883,8 @@ fn test_mp_reach_labeled_vpn_ipv4() -> Result<(), PathAttributeWritingError> {
             RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
             vec![MplsLabel::new([0, 65, 1])],
             Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
-        )],
+        )]
+        .into_boxed_slice(),
     };
     assert_eq!(mp_reach.address_type(), Ok(AddressType::Ipv4MplsLabeledVpn));
     assert_eq!(
@@ -1930,7 +1931,8 @@ fn test_mp_reach_multi_labels_vp_ipv4() -> Result<(), PathAttributeWritingError>
             RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
             vec![MplsLabel::new([0, 65, 0]), MplsLabel::new([0, 65, 1])],
             Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
-        )],
+        )]
+        .into_boxed_slice(),
     };
     assert_eq!(mp_reach.address_type(), Ok(AddressType::Ipv4MplsLabeledVpn));
     assert_eq!(
@@ -2071,7 +2073,8 @@ fn test_mp_reach_labeled_vpn_ipv6() -> Result<(), PathAttributeWritingError> {
                 vec![MplsLabel::new([0xe0, 0x08, 0x01])],
                 Ipv6Unicast::from_net(Ipv6Net::from_str("fd01:cafe:2:3::/64").unwrap()).unwrap(),
             ),
-        ],
+        ]
+        .into_boxed_slice(),
     };
 
     assert_eq!(mp_reach.address_type(), Ok(AddressType::Ipv6MplsLabeledVpn));
@@ -2124,7 +2127,8 @@ fn test_mp_reach_nlri_mpls_labels_ipv6() -> Result<(), PathAttributeWritingError
                     Ipv6Net::from_str("fc00::3/128").unwrap(),
                 )
                 .unwrap(),
-            ],
+            ]
+            .into_boxed_slice(),
         }),
     )
     .unwrap();
@@ -2512,7 +2516,8 @@ fn test_path_attr_route_target_membership() -> Result<(), PathAttributeWritingEr
                     vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc4],
                 )),
             ),
-        ],
+        ]
+        .into_boxed_slice(),
     };
     assert_eq!(
         mp_reach.address_type(),
@@ -2578,7 +2583,8 @@ fn test_path_attr_mp_unreach_route_target_membership() -> Result<(), PathAttribu
                     vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xa3],
                 )),
             ),
-        ],
+        ]
+        .into_boxed_slice(),
     };
 
     let good = PathAttribute::from(
@@ -2660,14 +2666,12 @@ fn test_ipv4_nlri_mpls_labels_address() -> Result<(), PathAttributeWritingError>
         PathAttributeValue::MpReach(MpReach::Ipv4NlriMplsLabels {
             next_hop: IpAddr::V4(Ipv4Addr::new(198, 51, 100, 71)),
             next_hop_local: None,
-            nlri: vec![
-                Ipv4NlriMplsLabelsAddress::from(
-                    None,
-                    vec![MplsLabel::new([16, 3, 49])],
-                    Ipv4Net::from_str("203.0.113.254/31").unwrap(),
-                )
-                .unwrap(),
-            ],
+            nlri: Box::new([Ipv4NlriMplsLabelsAddress::from(
+                None,
+                vec![MplsLabel::new([16, 3, 49])],
+                Ipv4Net::from_str("203.0.113.254/31").unwrap(),
+            )
+            .unwrap()]),
         }),
     )
     .unwrap();
@@ -2709,7 +2713,8 @@ pub fn test_segment_identifier_label_index() -> Result<(), BgpMessageWritingErro
                             Ipv4Net::new(Ipv4Addr::new(203, 0, 113, 90), 32).unwrap(),
                         )
                         .unwrap(),
-                    )],
+                    )]
+                    .into_boxed_slice(),
                 }),
             )
             .unwrap(),

@@ -66,7 +66,7 @@ fn test_wire() -> Result<(), PathAttributeWritingError> {
         true,
         PathAttributeValue::MpReach(MpReach::BgpLs {
             next_hop: IpAddr::V6(Ipv6Addr::from_str("2001:db8:1::1").unwrap()),
-            nlri: vec![
+            nlri: Box::new([
                 BgpLsNlri::new(
                     None,
                     BgpLsNlriValue::Node(BgpLsNlriNode::new(
@@ -91,7 +91,7 @@ fn test_wire() -> Result<(), PathAttributeWritingError> {
                         ])),
                     )),
                 ),
-            ],
+            ]),
         }),
     )
     .unwrap();
@@ -269,7 +269,7 @@ pub fn test_bgp_ls_mp_reach() -> Result<(), MpReachWritingError> {
 
     let good = MpReach::BgpLs {
         next_hop: IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)),
-        nlri: vec![ls_nlri.clone(), ls_nlri.clone(), ls_nlri],
+        nlri: Box::new([ls_nlri.clone(), ls_nlri.clone(), ls_nlri]),
     };
 
     test_parsed_completely_with_three_inputs_bytes_reader(
@@ -329,7 +329,7 @@ pub fn test_bgp_ls_vpn_mp_reach() -> Result<(), MpReachWritingError> {
             RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
             Ipv4Addr::new(1, 2, 3, 4),
         )),
-        nlri: vec![ls_nlri.clone(), ls_nlri.clone(), ls_nlri],
+        nlri: Box::new([ls_nlri.clone(), ls_nlri.clone(), ls_nlri]),
     };
 
     test_parsed_completely_with_three_inputs_bytes_reader(
@@ -385,7 +385,7 @@ pub fn test_bgp_ls_vpn_mp_unreach() -> Result<(), MpUnreachWritingError> {
     );
 
     let good = MpUnreach::BgpLsVpn {
-        nlri: vec![ls_nlri.clone(), ls_nlri.clone(), ls_nlri],
+        nlri: Box::new([ls_nlri.clone(), ls_nlri.clone(), ls_nlri]),
     };
 
     let mut add_path_map = HashMap::new();
