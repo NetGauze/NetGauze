@@ -651,33 +651,72 @@ pub enum MpReachParsingError {
     BgpLsNlriParsingError(#[from] BgpLsNlriParsingError),
 }
 
-/// Counts how many elements a per-element `parse_one` closure can
-/// successfully consume from `cur` before running out of bytes or hitting
-/// a parse error, without materializing or retaining the parsed values.
-/// `cur` is taken by value (`SliceReader` is `Copy`), so this never
-/// disturbs the caller's own cursor. Used to size a `Vec::with_capacity`
-/// exactly for NLRI lists, whose element sizes vary too much by type
-/// (labels, route distinguishers, path IDs) for a cheap header-only count
-/// — this reuses the exact same per-element parser the real loop below
-/// uses, so there's no duplicated wire-format knowledge to drift out of
-/// sync.
+/// Counts NLRI elements framed as: an optional 4-byte ADD-PATH path
+/// identifier, followed by a 1-byte length *in bits*, followed by
+/// `ceil(bits/8)` bytes of payload — the shared wire shape of every
+/// prefix-style NLRI this crate parses. `max_bytes` caps the payload skip
+/// the same way the real parser does: `Ipv4Net`/`Ipv6Net::parse` never
+/// reads past the address family's own width (4/16 bytes) regardless of
+/// what the length byte claims, while the MPLS-labeled, MPLS-VPN, and
+/// Route Target membership variants have no such cap — their length byte
+/// already covers a label stack/route distinguisher/prefix combined, so
+/// pass `u8::MAX` (a no-op with `.min()`, since `ceil(u8::MAX/8)` is 32
+/// regardless). Whatever internal structure lives inside that
+/// already-known-size window never needs to be understood here — the
+/// outer length byte alone determines how many bytes to skip, so this
+/// never allocates and never touches the real per-element parser.
 ///
-/// Purely advisory: a parse error just stops the count early rather than
-/// propagating, so it never changes what error the real parsing loop
-/// reports — only the capacity hint.
+/// Purely advisory: a truncated or malformed buffer just stops the count
+/// early rather than returning an error, so it never changes what error
+/// the real parsing loop reports — only the capacity hint.
 #[inline]
-fn count_elements<'a, T, E>(
-    mut cur: SliceReader<'a>,
-    mut parse_one: impl FnMut(&mut SliceReader<'a>) -> Result<T, E>,
-) -> usize {
+fn count_prefix_style_elements(mut cur: SliceReader<'_>, add_path: bool, max_bytes: u8) -> usize {
     let mut count = 0usize;
-    while !cur.is_empty() {
-        match parse_one(&mut cur) {
-            Ok(_) => count += 1,
-            Err(_) => break,
+    loop {
+        if cur.is_empty() {
+            return count;
         }
+        if add_path && cur.take_slice(4).is_err() {
+            return count;
+        }
+        let Ok(bit_len) = cur.read_u8() else {
+            return count;
+        };
+        let byte_len = bit_len.div_ceil(8).min(max_bytes);
+        if cur.take_slice(byte_len as usize).is_err() {
+            return count;
+        }
+        count += 1;
     }
-    count
+}
+
+/// Counts EVPN NLRI elements: an optional 4-byte ADD-PATH path identifier
+/// followed by RFC 7432's route framing (1-byte route type, 1-byte
+/// length, `length` bytes of route-type-specific payload — the same
+/// outer shape regardless of which route type it is).
+///
+/// Purely advisory, same contract as [`count_prefix_style_elements`].
+#[inline]
+fn count_l2evpn_elements(mut cur: SliceReader<'_>, add_path: bool) -> usize {
+    let mut count = 0usize;
+    loop {
+        if cur.is_empty() {
+            return count;
+        }
+        if add_path && cur.take_slice(4).is_err() {
+            return count;
+        }
+        let Ok(_route_type) = cur.read_u8() else {
+            return count;
+        };
+        let Ok(len) = cur.read_u8() else {
+            return count;
+        };
+        if cur.take_slice(len as usize).is_err() {
+            return count;
+        }
+        count += 1;
+    }
 }
 
 impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<AddressType, bool>>
@@ -716,9 +755,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     parse_ip4_or_ipv6_next_hop(&mut mp_buf, addr_type)?;
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv4UnicastAddress::parse(c, add_path)
-                }));
+                let mut nlri = Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, 4));
                 while !mp_buf.is_empty() {
                     let v = Ipv4UnicastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -734,9 +771,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     parse_ip4_or_ipv6_next_hop(&mut mp_buf, addr_type)?;
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv4MulticastAddress::parse(c, add_path)
-                }));
+                let mut nlri = Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, 4));
                 while !mp_buf.is_empty() {
                     let v = Ipv4MulticastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -752,14 +787,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     parse_ip4_or_ipv6_next_hop(&mut mp_buf, addr_type)?;
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv4NlriMplsLabelsAddress::parse(
-                        c,
-                        add_path,
-                        false,
-                        *multiple_labels.get(&addr_type).unwrap_or(&1),
-                    )
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = Ipv4NlriMplsLabelsAddress::parse(
                         &mut mp_buf,
@@ -779,14 +808,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 let next_hop = parse_labeled_next_hop(&mut mp_buf, addr_type)?;
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv4MplsVpnUnicastAddress::parse(
-                        c,
-                        add_path,
-                        false,
-                        *multiple_labels.get(&addr_type).unwrap_or(&1),
-                    )
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = Ipv4MplsVpnUnicastAddress::parse(
                         &mut mp_buf,
@@ -813,9 +836,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 };
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv6UnicastAddress::parse(c, add_path)
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, 16));
                 while !mp_buf.is_empty() {
                     let v = Ipv6UnicastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -838,9 +860,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 };
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv6MulticastAddress::parse(c, add_path)
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, 16));
                 while !mp_buf.is_empty() {
                     let v = Ipv6MulticastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -856,14 +877,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                     parse_ip4_or_ipv6_next_hop(&mut mp_buf, addr_type)?;
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv6NlriMplsLabelsAddress::parse(
-                        c,
-                        add_path,
-                        false,
-                        *multiple_labels.get(&addr_type).unwrap_or(&1),
-                    )
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = Ipv6NlriMplsLabelsAddress::parse(
                         &mut mp_buf,
@@ -883,14 +898,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 let next_hop = parse_labeled_next_hop(&mut mp_buf, addr_type)?;
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv6MplsVpnUnicastAddress::parse(
-                        c,
-                        add_path,
-                        false,
-                        *multiple_labels.get(&addr_type).unwrap_or(&1),
-                    )
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = Ipv6MplsVpnUnicastAddress::parse(
                         &mut mp_buf,
@@ -909,9 +918,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 let next_hop = parse_ip_next_hop(&mut mp_buf, addr_type)?;
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    L2EvpnAddress::parse(c, add_path)
-                }));
+                let mut nlri = Vec::with_capacity(count_l2evpn_elements(mp_buf, add_path));
                 while !mp_buf.is_empty() {
                     let v = L2EvpnAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -925,9 +932,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
                 let next_hop = parse_ip_next_hop(&mut mp_buf, addr_type)?;
                 let _ = mp_buf.read_u8()?;
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    RouteTargetMembershipAddress::parse(c, add_path)
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = RouteTargetMembershipAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -1123,9 +1129,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
         match AddressType::from_afi_safi(afi, safi) {
             Ok(addr_type @ AddressType::Ipv4Unicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv4UnicastAddress::parse(c, add_path)
-                }));
+                let mut nlri = Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, 4));
                 while !mp_buf.is_empty() {
                     let v = Ipv4UnicastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -1136,9 +1140,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
             }
             Ok(addr_type @ AddressType::Ipv4Multicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv4MulticastAddress::parse(c, add_path)
-                }));
+                let mut nlri = Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, 4));
                 while !mp_buf.is_empty() {
                     let v = Ipv4MulticastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -1149,14 +1151,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
             }
             Ok(addr_type @ AddressType::Ipv4NlriMplsLabels) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv4NlriMplsLabelsAddress::parse(
-                        c,
-                        add_path,
-                        false,
-                        *multiple_labels.get(&addr_type).unwrap_or(&1),
-                    )
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = Ipv4NlriMplsLabelsAddress::parse(
                         &mut mp_buf,
@@ -1172,14 +1168,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
             }
             Ok(addr_type @ AddressType::Ipv4MplsLabeledVpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv4MplsVpnUnicastAddress::parse(
-                        c,
-                        add_path,
-                        false,
-                        *multiple_labels.get(&addr_type).unwrap_or(&1),
-                    )
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = Ipv4MplsVpnUnicastAddress::parse(
                         &mut mp_buf,
@@ -1195,9 +1185,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
             }
             Ok(addr_type @ AddressType::Ipv6Unicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv6UnicastAddress::parse(c, add_path)
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, 16));
                 while !mp_buf.is_empty() {
                     let v = Ipv6UnicastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -1208,9 +1197,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
             }
             Ok(addr_type @ AddressType::Ipv6Multicast) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv6MulticastAddress::parse(c, add_path)
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, 16));
                 while !mp_buf.is_empty() {
                     let v = Ipv6MulticastAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -1221,14 +1209,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
             }
             Ok(addr_type @ AddressType::Ipv6NlriMplsLabels) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv6NlriMplsLabelsAddress::parse(
-                        c,
-                        add_path,
-                        false,
-                        *multiple_labels.get(&addr_type).unwrap_or(&1),
-                    )
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = Ipv6NlriMplsLabelsAddress::parse(
                         &mut mp_buf,
@@ -1244,14 +1226,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
             }
             Ok(addr_type @ AddressType::Ipv6MplsLabeledVpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    Ipv6MplsVpnUnicastAddress::parse(
-                        c,
-                        add_path,
-                        false,
-                        *multiple_labels.get(&addr_type).unwrap_or(&1),
-                    )
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = Ipv6MplsVpnUnicastAddress::parse(
                         &mut mp_buf,
@@ -1267,9 +1243,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
             }
             Ok(addr_type @ AddressType::L2VpnBgpEvpn) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    L2EvpnAddress::parse(c, add_path)
-                }));
+                let mut nlri = Vec::with_capacity(count_l2evpn_elements(mp_buf, add_path));
                 while !mp_buf.is_empty() {
                     let v = L2EvpnAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
@@ -1280,9 +1254,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
             }
             Ok(addr_type @ AddressType::RouteTargetConstrains) => {
                 let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
-                let mut nlri = Vec::with_capacity(count_elements(mp_buf, |c| {
-                    RouteTargetMembershipAddress::parse(c, add_path)
-                }));
+                let mut nlri =
+                    Vec::with_capacity(count_prefix_style_elements(mp_buf, add_path, u8::MAX));
                 while !mp_buf.is_empty() {
                     let v = RouteTargetMembershipAddress::parse(&mut mp_buf, add_path)?;
                     nlri.push(v);
