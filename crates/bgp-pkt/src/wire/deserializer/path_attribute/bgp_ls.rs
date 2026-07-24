@@ -123,12 +123,12 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
             BgpLsAttributeType::NodeNameTlv => {
                 let offset = data.offset();
                 let str_buf = data.read_bytes(tlv_length as usize)?;
-                let str = String::from_utf8(str_buf.to_vec()).map_err(|e| {
-                    BgpLsAttributeParsingError::Utf8Error {
+                let str = String::from_utf8(str_buf.to_vec())
+                    .map_err(|e| BgpLsAttributeParsingError::Utf8Error {
                         offset,
                         error: e.to_string(),
-                    }
-                })?;
+                    })?
+                    .into_boxed_str();
                 BgpLsAttributeValue::NodeNameTlv(str)
             }
             BgpLsAttributeType::IsIsArea => {
@@ -216,12 +216,12 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
             BgpLsAttributeType::LinkName => {
                 let offset = data.offset();
                 let str_buf = data.read_bytes(tlv_length as usize)?;
-                let str = String::from_utf8(str_buf.to_vec()).map_err(|e| {
-                    BgpLsAttributeParsingError::Utf8Error {
+                let str = String::from_utf8(str_buf.to_vec())
+                    .map_err(|e| BgpLsAttributeParsingError::Utf8Error {
                         offset,
                         error: e.to_string(),
-                    }
-                })?;
+                    })?
+                    .into_boxed_str();
                 BgpLsAttributeValue::LinkName(str)
             }
             BgpLsAttributeType::IgpFlags => {

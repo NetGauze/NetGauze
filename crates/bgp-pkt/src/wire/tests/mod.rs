@@ -467,7 +467,7 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
             )])),
             // FQDN
             BgpOpenMessageParameter::Capabilities(Box::new([BgpCapability::Fqdn(
-                FqdnCapability::new("r2".into(), String::new()),
+                FqdnCapability::new("r2".into(), "".into()),
             )])),
             BgpOpenMessageParameter::Capabilities(Box::new([
                 BgpCapability::GracefulRestartCapability(GracefulRestartCapability::new(

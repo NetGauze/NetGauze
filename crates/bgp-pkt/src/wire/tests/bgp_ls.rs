@@ -120,9 +120,7 @@ pub fn test_bgp_ls_attr_parse() -> Result<(), BgpLsAttributeWritingError> {
         17, 4, 74, 0, 13, 77, 121, 32, 83, 117, 112, 101, 114, 32, 76, 105, 110, 107,
     ];
 
-    let good = BgpLsAttribute::new(vec![BgpLsAttributeValue::LinkName(
-        "My Super Link".to_string(),
-    )]);
+    let good = BgpLsAttribute::new(vec![BgpLsAttributeValue::LinkName("My Super Link".into())]);
 
     test_parsed_completely_with_one_input_bytes_reader(&good_wire, false, &good);
     test_write_with_one_input(&good, false, &good_wire)?;

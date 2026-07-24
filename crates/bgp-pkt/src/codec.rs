@@ -74,10 +74,10 @@ impl<Peer> BgpCodecInitializer<Peer> for BgpCodec {
 #[derive(Debug, PartialEq, thiserror::Error, Serialize, Deserialize)]
 pub enum BgpCodecDecoderError {
     #[error("IO error while reading BGP stream: {0}")]
-    IoError(String),
+    IoError(Box<str>),
 
     #[error("incomplete BGP message, awaiting more data{}",
-            match .0 { Some(n) => format!(" ({n} more byte(s) needed)"), None => String::new() })]
+            match .0 { Some(n) => format!(" ({n} more byte(s) needed)"), None => "".into() })]
     Incomplete(Option<usize>),
 
     #[error("{0}")]
@@ -86,7 +86,7 @@ pub enum BgpCodecDecoderError {
 
 impl From<std::io::Error> for BgpCodecDecoderError {
     fn from(error: std::io::Error) -> Self {
-        Self::IoError(error.to_string())
+        Self::IoError(error.to_string().into_boxed_str())
     }
 }
 
