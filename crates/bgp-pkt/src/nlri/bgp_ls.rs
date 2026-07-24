@@ -805,7 +805,6 @@ impl BgpLsNlriLink {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MultiTopologyIdData(Box<[MultiTopologyId]>);
 
-
 impl MultiTopologyIdData {
     pub fn new(ids: impl Into<Box<[MultiTopologyId]>>) -> Self {
         Self(ids.into())
