@@ -805,11 +805,6 @@ impl BgpLsNlriLink {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MultiTopologyIdData(Box<[MultiTopologyId]>);
 
-impl From<Vec<MultiTopologyId>> for MultiTopologyIdData {
-    fn from(value: Vec<MultiTopologyId>) -> Self {
-        Self(value.into_boxed_slice())
-    }
-}
 
 impl MultiTopologyIdData {
     pub fn new(ids: impl Into<Box<[MultiTopologyId]>>) -> Self {
