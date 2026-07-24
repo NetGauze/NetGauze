@@ -437,8 +437,8 @@ pub enum FqdnCapabilityParsingError {
     #[error("invalid UTF-8 in FQDN {field} at byte offset {offset}: {error}")]
     InvalidUtf8 {
         offset: usize,
-        field: String,
-        error: String,
+        field: Box<str>,
+        error: Box<str>,
     },
 }
 
@@ -448,17 +448,17 @@ impl<'a> ParseFrom<'a> for FqdnCapability {
         let len = cur.read_u8()?;
         let mut value_buf = cur.take_slice(len as usize)?;
 
-        let mut read_name = |field: &str| -> Result<String, FqdnCapabilityParsingError> {
+        let mut read_name = |field: &str| -> Result<Box<str>, FqdnCapabilityParsingError> {
             let name_len = value_buf.read_u8()?;
             let offset = value_buf.offset();
             let bytes = value_buf.read_bytes(name_len as usize)?;
-            String::from_utf8(bytes.to_vec()).map_err(|error| {
-                FqdnCapabilityParsingError::InvalidUtf8 {
+            String::from_utf8(bytes.to_vec())
+                .map_err(|error| FqdnCapabilityParsingError::InvalidUtf8 {
                     offset,
-                    field: field.to_string(),
-                    error: error.to_string(),
-                }
-            })
+                    field: field.to_string().into_boxed_str(),
+                    error: error.to_string().into_boxed_str(),
+                })
+                .map(|x| x.into_boxed_str())
         };
 
         let hostname = read_name("hostname")?;

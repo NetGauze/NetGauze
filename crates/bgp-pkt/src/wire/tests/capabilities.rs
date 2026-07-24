@@ -464,7 +464,7 @@ fn test_long_lived_graceful_restart_bad_length() {
 #[test]
 fn test_fqdn_capability() -> Result<(), BGPCapabilityWritingError> {
     let good_wire = [0x49, 0x04, 0x02, 0x72, 0x31, 0x00];
-    let good = BgpCapability::Fqdn(FqdnCapability::new("r1".into(), String::new()));
+    let good = BgpCapability::Fqdn(FqdnCapability::new("r1".into(), "".into()));
 
     // Both names populated
     let with_domain_wire = [
@@ -475,7 +475,7 @@ fn test_fqdn_capability() -> Result<(), BGPCapabilityWritingError> {
 
     // Both names empty is legal: two zero-length fields
     let empty_wire = [0x49, 0x02, 0x00, 0x00];
-    let empty = BgpCapability::Fqdn(FqdnCapability::new(String::new(), String::new()));
+    let empty = BgpCapability::Fqdn(FqdnCapability::new("".into(), "".into()));
 
     // The draft specifies UTF-8, so non-ASCII names must round-trip
     let utf8_wire = [
@@ -503,8 +503,8 @@ fn test_fqdn_capability_invalid_utf8() {
     let bad =
         BgpCapabilityParsingError::FqdnCapabilityError(FqdnCapabilityParsingError::InvalidUtf8 {
             offset: 3,
-            field: "hostname".to_string(),
-            error: "invalid utf-8 sequence of 1 bytes from index 1".to_string(),
+            field: "hostname".into(),
+            error: "invalid utf-8 sequence of 1 bytes from index 1".into(),
         });
     test_parse_error_bytes_reader::<BgpCapability, BgpCapabilityParsingError>(&bad_wire, &bad);
 }

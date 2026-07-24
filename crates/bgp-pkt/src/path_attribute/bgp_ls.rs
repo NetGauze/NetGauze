@@ -194,7 +194,7 @@ pub enum BgpLsAttributeValue {
     /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     /// ```
     /// see [RFC7752 Section 3.3.2.7](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.7)
-    LinkName(String),
+    LinkName(Box<str>),
 
     /* Prefix Attribute TLV */
     /// ```text
@@ -372,7 +372,7 @@ pub enum BgpLsAttributeValue {
     /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     /// ```
     /// see [RFC7752 Section 3.3.2.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.4)
-    NodeNameTlv(String),
+    NodeNameTlv(Box<str>),
 
     /// ```text
     ///  0                   1                   2                   3

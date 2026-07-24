@@ -448,15 +448,15 @@ impl LongLivedGracefulRestartAddressFamily {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FqdnCapability {
-    hostname: String,
-    domain_name: String,
+    hostname: Box<str>,
+    domain_name: Box<str>,
 }
 
 impl FqdnCapability {
     /// Both lengths are carried in a single octet
     pub const MAX_NAME_LEN: usize = u8::MAX as usize;
 
-    pub const fn new(hostname: String, domain_name: String) -> Self {
+    pub const fn new(hostname: Box<str>, domain_name: Box<str>) -> Self {
         Self {
             hostname,
             domain_name,
