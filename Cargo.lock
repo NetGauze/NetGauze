@@ -3012,6 +3012,7 @@ dependencies = [
  "bytes",
  "chrono",
  "ciborium",
+ "criterion",
  "either",
  "netgauze-locate",
  "netgauze-netconf-proto",

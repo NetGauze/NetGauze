@@ -23,6 +23,7 @@ netgauze-serde-macros = { workspace = true, optional = true }
 netgauze-netconf-proto = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
+criterion = { workspace = true, optional = true }                        # Dev dep for bench
 
 serde = { workspace = true, features = ["derive"] }
 nom = { workspace = true, optional = true }
@@ -40,6 +41,7 @@ either = { workspace = true }
 default = ["serde", "codec"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
 codec = ["tokio-util"]
+bench = ["criterion", "codec"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
@@ -49,3 +51,8 @@ serde_json = { workspace = true }
 rstest = { workspace = true }
 pcap-parser = { workspace = true, features = ["data"] }
 ciborium = { workspace = true }
+
+[[bench]]
+name = "serde_benchmark"
+harness = false
+required-features = ["bench"]
