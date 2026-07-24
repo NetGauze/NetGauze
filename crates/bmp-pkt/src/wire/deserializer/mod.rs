@@ -28,6 +28,35 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
+/// Counts the type+length+value tuples in a buffer using the 2-byte-type,
+/// 2-byte-length TLV framing shared by BMP's Initiation, Termination,
+/// Route Mirroring, Peer-Up, and Peer-Down information TLVs. Takes the
+/// reader by value (`SliceReader` is `Copy`), so it peeks without
+/// disturbing the caller's cursor, and never allocates.
+///
+/// Purely advisory: a malformed buffer stops the count early rather than
+/// returning an error, so it only ever affects the capacity hint, never
+/// what the real parsing loop reports.
+#[inline]
+pub(crate) fn count_tlvs_t16_l16(mut cur: SliceReader<'_>) -> usize {
+    let mut count = 0usize;
+    loop {
+        if cur.is_empty() {
+            return count;
+        }
+        let Ok(_tlv_type) = cur.read_u16_be() else {
+            return count;
+        };
+        let Ok(tlv_length) = cur.read_u16_be() else {
+            return count;
+        };
+        if cur.take_slice(tlv_length as usize).is_err() {
+            return count;
+        }
+        count += 1;
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 pub enum BmpMessageParsingError {
     #[error("while parsing BMP message: {0}")]

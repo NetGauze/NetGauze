@@ -988,11 +988,11 @@ fn convert_initiation(
 
     for info in msg.information() {
         match info {
-            v3::InitiationInformation::String(s) => bmp_init_info_string = Some(s.clone()),
+            v3::InitiationInformation::String(s) => bmp_init_info_string = Some(s.to_string()),
             v3::InitiationInformation::SystemDescription(s) => {
-                bmp_init_info_sysdescr = Some(s.clone())
+                bmp_init_info_sysdescr = Some(s.to_string())
             }
-            v3::InitiationInformation::SystemName(s) => bmp_init_info_sysname = Some(s.clone()),
+            v3::InitiationInformation::SystemName(s) => bmp_init_info_sysname = Some(s.to_string()),
             other => {
                 let reserved = bmp_init_info_reserved.get_or_insert_with(String::new);
                 if !reserved.is_empty() {
@@ -1036,7 +1036,7 @@ fn convert_termination(
 
     for info in msg.information() {
         match info {
-            v3::TerminationInformation::String(s) => bmp_term_info_string = Some(s.clone()),
+            v3::TerminationInformation::String(s) => bmp_term_info_string = Some(s.to_string()),
             v3::TerminationInformation::Reason(code) => {
                 bmp_term_info_reason = Some(code.to_string())
             }
@@ -1085,12 +1085,12 @@ fn convert_peer_up(
 
     for info in msg.information() {
         match info {
-            v3::InitiationInformation::String(s) => bmp_peer_up_info_string = Some(s.clone()),
+            v3::InitiationInformation::String(s) => bmp_peer_up_info_string = Some(s.to_string()),
             v3::InitiationInformation::VrfTableName(s) => {
-                bmp_peer_up_info_vrf_table_name = Some(s.clone())
+                bmp_peer_up_info_vrf_table_name = Some(s.to_string())
             }
             v3::InitiationInformation::AdminLabel(s) => {
-                bmp_peer_up_info_admin_label = Some(s.clone())
+                bmp_peer_up_info_admin_label = Some(s.to_string())
             }
             other => {
                 let reserved = bmp_peer_up_info_reserved.get_or_insert_with(String::new);

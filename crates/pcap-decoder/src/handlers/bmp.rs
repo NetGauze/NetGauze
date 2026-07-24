@@ -116,9 +116,9 @@ mod tests {
                 flow_key,
                 BmpMessage::V3(BmpMessageValue::Initiation(InitiationMessage::new(vec![
                     InitiationInformation::SystemDescription(
-                        "Cisco IOS XR Software, Version 5.2.2.21I[Default]\nCopyright (c) 2014 by Cisco Systems, Inc.".to_string()
+                        "Cisco IOS XR Software, Version 5.2.2.21I[Default]\nCopyright (c) 2014 by Cisco Systems, Inc.".into()
                     ),
-                    InitiationInformation::SystemName("xr3".to_string())
+                    InitiationInformation::SystemName("xr3".into())
                 ])))
             ))]),
         );
@@ -173,9 +173,9 @@ mod tests {
                 flow_key,
                 BmpMessage::V3(BmpMessageValue::Initiation(InitiationMessage::new(vec![
                     InitiationInformation::SystemDescription(
-                        "Cisco IOS XR Software, Version 5.2.2.21I[Default]\nCopyright (c) 2014 by Cisco Systems, Inc.".to_string()
+                        "Cisco IOS XR Software, Version 5.2.2.21I[Default]\nCopyright (c) 2014 by Cisco Systems, Inc.".into()
                     ),
-                    InitiationInformation::SystemName("xr3".to_string())
+                    InitiationInformation::SystemName("xr3".into())
                 ])))
             ))]),
         );
@@ -223,9 +223,9 @@ mod tests {
 
         let expected_initiation = InitiationMessage::new(vec![
             InitiationInformation::SystemDescription(
-                "Cisco IOS XR Software, Version 5.2.2.21I[Default]\nCopyright (c) 2014 by Cisco Systems, Inc.".to_string()
+                "Cisco IOS XR Software, Version 5.2.2.21I[Default]\nCopyright (c) 2014 by Cisco Systems, Inc.".into()
             ),
-            InitiationInformation::SystemName("xr3".to_string())
+            InitiationInformation::SystemName("xr3".into())
         ]);
 
         assert_eq!(
