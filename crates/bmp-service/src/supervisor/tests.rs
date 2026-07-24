@@ -26,7 +26,7 @@ use tokio_util::codec::FramedWrite;
 fn create_test_message() -> BmpMessage {
     BmpMessage::V3(netgauze_bmp_pkt::v3::BmpMessageValue::Initiation(
         InitiationMessage::new(vec![InitiationInformation::SystemDescription(
-            "NetGauze Test Actor".to_string(),
+            "NetGauze Test Actor".into(),
         )]),
     ))
 }

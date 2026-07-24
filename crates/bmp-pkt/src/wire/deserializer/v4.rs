@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::iana::BmpMessageType;
-use crate::wire::deserializer::BmpParsingContext;
+use crate::wire::deserializer::{BmpParsingContext, count_tlvs_t16_l16};
 use crate::{BmpPeerType, PeerHeader, PeerKey, v3, v4};
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::wire::deserializer::capabilities::BgpCapabilityParsingError;
@@ -109,19 +109,19 @@ impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v4::BmpMessageVal
             }
             BmpMessageType::Experimental251 => {
                 let value = cur.read_bytes(cur.remaining())?;
-                v4::BmpMessageValue::Experimental251(value.to_vec())
+                v4::BmpMessageValue::Experimental251(value.into())
             }
             BmpMessageType::Experimental252 => {
                 let value = cur.read_bytes(cur.remaining())?;
-                v4::BmpMessageValue::Experimental252(value.to_vec())
+                v4::BmpMessageValue::Experimental252(value.into())
             }
             BmpMessageType::Experimental253 => {
                 let value = cur.read_bytes(cur.remaining())?;
-                v4::BmpMessageValue::Experimental253(value.to_vec())
+                v4::BmpMessageValue::Experimental253(value.into())
             }
             BmpMessageType::Experimental254 => {
                 let value = cur.read_bytes(cur.remaining())?;
-                v4::BmpMessageValue::Experimental254(value.to_vec())
+                v4::BmpMessageValue::Experimental254(value.into())
             }
         };
         Ok(msg)
@@ -141,7 +141,7 @@ impl<'a> ParseFrom<'a> for v4::PeerDownTlv {
             read_tlv_header_t16_l16::<PeerDownTlvParsingError>(cur)?;
         Ok(Self::Unknown {
             code: tlv_type,
-            value: value.read_bytes(value.remaining())?.to_vec(),
+            value: value.read_bytes(value.remaining())?.into(),
         })
     }
 }
@@ -303,7 +303,7 @@ impl<'a> ParseFromWithTwoInputs<'a, &mut BgpParsingContext, bool> for v4::RouteM
                 v4::RouteMonitoringTlvType::VrfTableName => {
                     let offset = data.offset();
                     match String::from_utf8(data.as_slice().to_vec()) {
-                        Ok(s) => v4::RouteMonitoringTlvValue::VrfTableName(s),
+                        Ok(s) => v4::RouteMonitoringTlvValue::VrfTableName(s.into_boxed_str()),
                         Err(error) => {
                             return Err(RouteMonitoringTlvParsingError::FromUtf8Error {
                                 offset,
@@ -321,7 +321,7 @@ impl<'a> ParseFromWithTwoInputs<'a, &mut BgpParsingContext, bool> for v4::RouteM
                     while !data.is_empty() {
                         values.push(data.read_u16_be()?);
                     }
-                    v4::RouteMonitoringTlvValue::GroupTlv(values)
+                    v4::RouteMonitoringTlvValue::GroupTlv(values.into())
                 }
                 v4::RouteMonitoringTlvType::StatelessParsing => {
                     let bgp_capability = BgpCapability::parse(&mut data)?;
@@ -335,7 +335,7 @@ impl<'a> ParseFromWithTwoInputs<'a, &mut BgpParsingContext, bool> for v4::RouteM
             },
             None => v4::RouteMonitoringTlvValue::Unknown {
                 code: tlv_type,
-                value: data.as_slice().to_vec(),
+                value: data.as_slice().into(),
             },
         };
 
@@ -376,7 +376,7 @@ impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v4::PeerDownNotif
         let bgp_ctx = ctx.entry(peer_key).or_default();
         bgp_ctx.set_asn4(peer_header.is_asn4());
         let reason = v3::PeerDownNotificationReason::parse(cur, bgp_ctx)?;
-        let mut tlvs = Vec::new();
+        let mut tlvs = Vec::with_capacity(count_tlvs_t16_l16(*cur));
         while !cur.is_empty() {
             let tlv = v4::PeerDownTlv::parse(cur)?;
             tlvs.push(tlv);

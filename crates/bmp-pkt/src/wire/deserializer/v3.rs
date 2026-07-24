@@ -23,7 +23,7 @@ use netgauze_bgp_pkt::wire::deserializer::{BgpMessageParsingError, BgpParsingCon
 use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
 
 use crate::iana::*;
-use crate::wire::deserializer::BmpParsingContext;
+use crate::wire::deserializer::{BmpParsingContext, count_tlvs_t16_l16};
 use crate::{BmpPeerType, CounterU32, GaugeU64, PeerHeader, PeerKey, v3};
 use netgauze_parse_utils::error::ParseError;
 use netgauze_parse_utils::reader::SliceReader;
@@ -106,19 +106,19 @@ impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v3::BmpMessageVal
             }
             BmpMessageType::Experimental251 => {
                 let value = cur.read_bytes(cur.remaining())?;
-                v3::BmpMessageValue::Experimental251(value.to_vec())
+                v3::BmpMessageValue::Experimental251(value.into())
             }
             BmpMessageType::Experimental252 => {
                 let value = cur.read_bytes(cur.remaining())?;
-                v3::BmpMessageValue::Experimental252(value.to_vec())
+                v3::BmpMessageValue::Experimental252(value.into())
             }
             BmpMessageType::Experimental253 => {
                 let value = cur.read_bytes(cur.remaining())?;
-                v3::BmpMessageValue::Experimental253(value.to_vec())
+                v3::BmpMessageValue::Experimental253(value.into())
             }
             BmpMessageType::Experimental254 => {
                 let value = cur.read_bytes(cur.remaining())?;
-                v3::BmpMessageValue::Experimental254(value.to_vec())
+                v3::BmpMessageValue::Experimental254(value.into())
             }
         };
         Ok(msg)
@@ -135,7 +135,7 @@ impl<'a> ParseFrom<'a> for v3::InitiationMessage {
     type Error = InitiationMessageParsingError;
 
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
-        let mut information = Vec::new();
+        let mut information = Vec::with_capacity(count_tlvs_t16_l16(*cur));
         while !cur.is_empty() {
             let info = v3::InitiationInformation::parse(cur)?;
             information.push(info);
@@ -177,7 +177,7 @@ impl<'a> ParseFrom<'a> for v3::InitiationInformation {
             InitiationInformationTlvType::String => {
                 let offset = buf.offset();
                 match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
-                    Ok(s) => Ok(v3::InitiationInformation::String(s)),
+                    Ok(s) => Ok(v3::InitiationInformation::String(s.into_boxed_str())),
                     Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
                         offset,
                         error: error.to_string(),
@@ -187,7 +187,9 @@ impl<'a> ParseFrom<'a> for v3::InitiationInformation {
             InitiationInformationTlvType::SystemDescription => {
                 let offset = buf.offset();
                 match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
-                    Ok(s) => Ok(v3::InitiationInformation::SystemDescription(s)),
+                    Ok(s) => Ok(v3::InitiationInformation::SystemDescription(
+                        s.into_boxed_str(),
+                    )),
                     Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
                         offset,
                         error: error.to_string(),
@@ -197,7 +199,7 @@ impl<'a> ParseFrom<'a> for v3::InitiationInformation {
             InitiationInformationTlvType::SystemName => {
                 let offset = buf.offset();
                 match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
-                    Ok(s) => Ok(v3::InitiationInformation::SystemName(s)),
+                    Ok(s) => Ok(v3::InitiationInformation::SystemName(s.into_boxed_str())),
                     Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
                         offset,
                         error: error.to_string(),
@@ -207,7 +209,7 @@ impl<'a> ParseFrom<'a> for v3::InitiationInformation {
             InitiationInformationTlvType::VrfTableName => {
                 let offset = buf.offset();
                 match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
-                    Ok(s) => Ok(v3::InitiationInformation::VrfTableName(s)),
+                    Ok(s) => Ok(v3::InitiationInformation::VrfTableName(s.into_boxed_str())),
                     Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
                         offset,
                         error: error.to_string(),
@@ -217,7 +219,7 @@ impl<'a> ParseFrom<'a> for v3::InitiationInformation {
             InitiationInformationTlvType::AdminLabel => {
                 let offset = buf.offset();
                 match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
-                    Ok(s) => Ok(v3::InitiationInformation::AdminLabel(s)),
+                    Ok(s) => Ok(v3::InitiationInformation::AdminLabel(s.into_boxed_str())),
                     Err(error) => Err(InitiationInformationParsingError::FromUtf8Error {
                         offset,
                         error: error.to_string(),
@@ -226,22 +228,22 @@ impl<'a> ParseFrom<'a> for v3::InitiationInformation {
             }
             InitiationInformationTlvType::Experimental65531 => {
                 Ok(v3::InitiationInformation::Experimental65531(
-                    buf.read_bytes(buf.remaining())?.to_vec(),
+                    buf.read_bytes(buf.remaining())?.into(),
                 ))
             }
             InitiationInformationTlvType::Experimental65532 => {
                 Ok(v3::InitiationInformation::Experimental65532(
-                    buf.read_bytes(buf.remaining())?.to_vec(),
+                    buf.read_bytes(buf.remaining())?.into(),
                 ))
             }
             InitiationInformationTlvType::Experimental65533 => {
                 Ok(v3::InitiationInformation::Experimental65533(
-                    buf.read_bytes(buf.remaining())?.to_vec(),
+                    buf.read_bytes(buf.remaining())?.into(),
                 ))
             }
             InitiationInformationTlvType::Experimental65534 => {
                 Ok(v3::InitiationInformation::Experimental65534(
-                    buf.read_bytes(buf.remaining())?.to_vec(),
+                    buf.read_bytes(buf.remaining())?.into(),
                 ))
             }
         }
@@ -502,7 +504,7 @@ impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v3::PeerUpNotific
         let bgp_ctx = ctx.entry(peer_key).or_default();
         bgp_ctx.set_asn4(peer_header.is_asn4());
         let received_message = BgpMessage::parse(cur, bgp_ctx)?;
-        let mut information = Vec::new();
+        let mut information = Vec::with_capacity(count_tlvs_t16_l16(*cur));
         while !cur.is_empty() {
             let info = v3::InitiationInformation::parse(cur)?;
             information.push(info);
@@ -618,22 +620,22 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for v3::PeerDownNotif
             }
             PeerDownReasonCode::Experimental251 => {
                 Ok(v3::PeerDownNotificationReason::Experimental251(
-                    cur.take_slice(cur.remaining())?.as_slice().to_vec(),
+                    cur.take_slice(cur.remaining())?.as_slice().into(),
                 ))
             }
             PeerDownReasonCode::Experimental252 => {
                 Ok(v3::PeerDownNotificationReason::Experimental252(
-                    cur.take_slice(cur.remaining())?.as_slice().to_vec(),
+                    cur.take_slice(cur.remaining())?.as_slice().into(),
                 ))
             }
             PeerDownReasonCode::Experimental253 => {
                 Ok(v3::PeerDownNotificationReason::Experimental253(
-                    cur.take_slice(cur.remaining())?.as_slice().to_vec(),
+                    cur.take_slice(cur.remaining())?.as_slice().into(),
                 ))
             }
             PeerDownReasonCode::Experimental254 => {
                 Ok(v3::PeerDownNotificationReason::Experimental254(
-                    cur.take_slice(cur.remaining())?.as_slice().to_vec(),
+                    cur.take_slice(cur.remaining())?.as_slice().into(),
                 ))
             }
         }
@@ -657,7 +659,7 @@ impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v3::RouteMirrorin
         let peer_key = PeerKey::from_peer_header(&peer_header);
         let bgp_ctx = ctx.entry(peer_key).or_default();
         bgp_ctx.set_asn4(peer_header.is_asn4());
-        let mut mirrored = Vec::new();
+        let mut mirrored = Vec::with_capacity(count_tlvs_t16_l16(*cur));
         while !cur.is_empty() {
             let element = v3::RouteMirroringValue::parse(cur, bgp_ctx)?;
             mirrored.push(element);
@@ -731,19 +733,19 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for v3::RouteMirrorin
             }
             RouteMirroringTlvType::Experimental65531 => {
                 let data = buf.take_slice(length as usize)?;
-                v3::RouteMirroringValue::Experimental65531(data.as_slice().to_vec())
+                v3::RouteMirroringValue::Experimental65531(data.as_slice().into())
             }
             RouteMirroringTlvType::Experimental65532 => {
                 let data = buf.take_slice(length as usize)?;
-                v3::RouteMirroringValue::Experimental65532(data.as_slice().to_vec())
+                v3::RouteMirroringValue::Experimental65532(data.as_slice().into())
             }
             RouteMirroringTlvType::Experimental65533 => {
                 let data = buf.take_slice(length as usize)?;
-                v3::RouteMirroringValue::Experimental65533(data.as_slice().to_vec())
+                v3::RouteMirroringValue::Experimental65533(data.as_slice().into())
             }
             RouteMirroringTlvType::Experimental65534 => {
                 let data = buf.take_slice(length as usize)?;
-                v3::RouteMirroringValue::Experimental65534(data.as_slice().to_vec())
+                v3::RouteMirroringValue::Experimental65534(data.as_slice().into())
             }
         };
         if !buf.is_empty() {
@@ -770,7 +772,7 @@ impl<'a> ParseFrom<'a> for v3::TerminationMessage {
     type Error = TerminationMessageParsingError;
 
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
-        let mut information = Vec::new();
+        let mut information = Vec::with_capacity(count_tlvs_t16_l16(*cur));
         while !cur.is_empty() {
             let info = v3::TerminationInformation::parse(cur)?;
             information.push(info);
@@ -823,7 +825,7 @@ impl<'a> ParseFrom<'a> for v3::TerminationInformation {
             TerminationInformationTlvType::String => {
                 let offset = buf.offset();
                 match String::from_utf8(buf.read_bytes(buf.remaining())?.to_vec()) {
-                    Ok(s) => v3::TerminationInformation::String(s),
+                    Ok(s) => v3::TerminationInformation::String(s.into_boxed_str()),
                     Err(error) => {
                         return Err(TerminationInformationParsingError::FromUtf8Error {
                             offset,
@@ -849,22 +851,22 @@ impl<'a> ParseFrom<'a> for v3::TerminationInformation {
             }
             TerminationInformationTlvType::Experimental65531 => {
                 v3::TerminationInformation::Experimental65531(
-                    buf.read_bytes(buf.remaining())?.to_vec(),
+                    buf.read_bytes(buf.remaining())?.into(),
                 )
             }
             TerminationInformationTlvType::Experimental65532 => {
                 v3::TerminationInformation::Experimental65532(
-                    buf.read_bytes(buf.remaining())?.to_vec(),
+                    buf.read_bytes(buf.remaining())?.into(),
                 )
             }
             TerminationInformationTlvType::Experimental65533 => {
                 v3::TerminationInformation::Experimental65533(
-                    buf.read_bytes(buf.remaining())?.to_vec(),
+                    buf.read_bytes(buf.remaining())?.into(),
                 )
             }
             TerminationInformationTlvType::Experimental65534 => {
                 v3::TerminationInformation::Experimental65534(
-                    buf.read_bytes(buf.remaining())?.to_vec(),
+                    buf.read_bytes(buf.remaining())?.into(),
                 )
             }
         };
@@ -896,7 +898,11 @@ impl<'a> ParseFrom<'a> for v3::StatisticsReportMessage {
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let peer_header = PeerHeader::parse(cur)?;
         let stats_count = cur.read_u32_be()?;
-        let mut counters = Vec::new();
+        // Clamp the declared count against the smallest possible counter
+        // (a 4-byte T16/L16 header) so a malformed count can't request a
+        // huge allocation up front.
+        let capacity = (stats_count as usize).min(cur.remaining() / 4);
+        let mut counters = Vec::with_capacity(capacity);
         for _ in 0..stats_count {
             let counter = v3::StatisticsCounter::parse(cur)?;
             counters.push(counter);
@@ -1173,20 +1179,20 @@ impl<'a> ParseFrom<'a> for v3::StatisticsCounter {
                     v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(address_type, GaugeU64::new(value))
                 }
                 BmpStatisticsType::Experimental65531 => {
-                    v3::StatisticsCounter::Experimental65531(buf.take_slice(buf.remaining())?.as_slice().to_vec())
+                    v3::StatisticsCounter::Experimental65531(buf.take_slice(buf.remaining())?.as_slice().into())
                 }
                 BmpStatisticsType::Experimental65532 => {
-                    v3::StatisticsCounter::Experimental65532(buf.take_slice(buf.remaining())?.as_slice().to_vec())
+                    v3::StatisticsCounter::Experimental65532(buf.take_slice(buf.remaining())?.as_slice().into())
                 }
                 BmpStatisticsType::Experimental65533 => {
-                    v3::StatisticsCounter::Experimental65533(buf.take_slice(buf.remaining())?.as_slice().to_vec())
+                    v3::StatisticsCounter::Experimental65533(buf.take_slice(buf.remaining())?.as_slice().into())
                 }
                 BmpStatisticsType::Experimental65534 => {
-                    v3::StatisticsCounter::Experimental65534(buf.take_slice(buf.remaining())?.as_slice().to_vec())
+                    v3::StatisticsCounter::Experimental65534(buf.take_slice(buf.remaining())?.as_slice().into())
                 }
             },
             Err(code) => {
-                v3::StatisticsCounter::Unknown(code.0, buf.take_slice(buf.remaining())?.as_slice().to_vec())
+                v3::StatisticsCounter::Unknown(code.0, buf.take_slice(buf.remaining())?.as_slice().into())
             }
         };
         if !buf.is_empty() {

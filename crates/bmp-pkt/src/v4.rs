@@ -36,17 +36,17 @@ pub enum BmpMessageValue {
     Initiation(v3::InitiationMessage),
     Termination(v3::TerminationMessage),
     RouteMirroring(v3::RouteMirroringMessage),
-    Experimental251(Vec<u8>),
-    Experimental252(Vec<u8>),
-    Experimental253(Vec<u8>),
-    Experimental254(Vec<u8>),
+    Experimental251(Box<[u8]>),
+    Experimental252(Box<[u8]>),
+    Experimental253(Box<[u8]>),
+    Experimental254(Box<[u8]>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum PeerDownTlv {
-    Unknown { code: u16, value: Vec<u8> },
+    Unknown { code: u16, value: Box<[u8]> },
 }
 
 impl PeerDownTlv {
@@ -173,11 +173,11 @@ pub enum RouteMonitoringTlvType {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteMonitoringTlvValue {
     StatelessParsing(BgpCapability),
-    GroupTlv(Vec<u16>),
-    VrfTableName(String),
+    GroupTlv(Box<[u16]>),
+    VrfTableName(Box<str>),
     BgpUpdate(BgpMessage),
     PathMarking(PathMarking),
-    Unknown { code: u16, value: Vec<u8> },
+    Unknown { code: u16, value: Box<[u8]> },
 }
 
 /// Path Status TLV [draft-ietf-grow-bmp-path-marking-tlv](https://datatracker.ietf.org/doc/html/draft-ietf-grow-bmp-path-marking-tlv)
@@ -403,14 +403,14 @@ impl From<RouteMonitoringTlvError> for RouteMonitoringError {
 pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
     update_pdu: RouteMonitoringTlv,
-    tlvs: Vec<RouteMonitoringTlv>,
+    tlvs: Box<[RouteMonitoringTlv]>,
 }
 
 impl RouteMonitoringMessage {
     pub fn build(
         peer_header: PeerHeader,
         update_pdu: BgpMessage,
-        tlvs: Vec<RouteMonitoringTlv>,
+        tlvs: impl Into<Box<[RouteMonitoringTlv]>>,
     ) -> Result<Self, RouteMonitoringError> {
         let update_pdu =
             RouteMonitoringTlv::build(0, RouteMonitoringTlvValue::BgpUpdate(update_pdu))?;
@@ -418,7 +418,7 @@ impl RouteMonitoringMessage {
         Ok(Self {
             peer_header,
             update_pdu,
-            tlvs,
+            tlvs: tlvs.into(),
         })
     }
 
@@ -439,7 +439,7 @@ impl RouteMonitoringMessage {
         }
     }
 
-    pub const fn tlvs(&self) -> &Vec<RouteMonitoringTlv> {
+    pub const fn tlvs(&self) -> &[RouteMonitoringTlv] {
         &self.tlvs
     }
 }
@@ -450,14 +450,14 @@ impl RouteMonitoringMessage {
 pub struct PeerDownNotificationMessage {
     peer_header: PeerHeader,
     reason: v3::PeerDownNotificationReason,
-    tlvs: Vec<PeerDownTlv>,
+    tlvs: Box<[PeerDownTlv]>,
 }
 
 impl PeerDownNotificationMessage {
     pub fn build(
         peer_header: PeerHeader,
         reason: v3::PeerDownNotificationReason,
-        tlvs: Vec<PeerDownTlv>,
+        tlvs: impl Into<Box<[PeerDownTlv]>>,
     ) -> Result<Self, v3::PeerDownNotificationMessageError> {
         match &reason {
             v3::PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(msg)
@@ -491,7 +491,7 @@ impl PeerDownNotificationMessage {
         Ok(Self {
             peer_header,
             reason,
-            tlvs,
+            tlvs: tlvs.into(),
         })
     }
 
@@ -503,7 +503,7 @@ impl PeerDownNotificationMessage {
         &self.reason
     }
 
-    pub const fn tlvs(&self) -> &Vec<PeerDownTlv> {
+    pub const fn tlvs(&self) -> &[PeerDownTlv] {
         &self.tlvs
     }
 }

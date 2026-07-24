@@ -369,7 +369,7 @@ mod tests {
     fn good_termination_wire() -> ([u8; 14], BmpMessage) {
         let wire = [3, 0, 0, 0, 14, 5, 0, 0, 0, 4, b't', b'e', b's', b't'];
         let msg = BmpMessage::V3(v3::BmpMessageValue::Termination(
-            v3::TerminationMessage::new(vec![TerminationInformation::String("test".to_string())]),
+            v3::TerminationMessage::new(vec![TerminationInformation::String("test".into())]),
         ));
         (wire, msg)
     }
@@ -499,8 +499,8 @@ mod tests {
     fn test_codec() -> Result<(), BmpMessageWritingError> {
         let msg = BmpMessage::V3(v3::BmpMessageValue::Initiation(v3::InitiationMessage::new(
             vec![
-                InitiationInformation::SystemDescription("test11".to_string()),
-                InitiationInformation::SystemName("PE2".to_string()),
+                InitiationInformation::SystemDescription("test11".into()),
+                InitiationInformation::SystemName("PE2".into()),
             ],
         )));
         let mut code = BmpCodec::default();
@@ -628,7 +628,7 @@ mod tests {
         ));
 
         let terminate = BmpMessage::V3(v3::BmpMessageValue::Termination(
-            v3::TerminationMessage::new(vec![TerminationInformation::String("test".to_string())]),
+            v3::TerminationMessage::new(vec![TerminationInformation::String("test".into())]),
         ));
 
         let mut codec = BmpCodec::default();

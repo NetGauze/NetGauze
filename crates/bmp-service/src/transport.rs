@@ -150,7 +150,7 @@ mod tests {
     async fn read() {
         let good_wire = [3, 0, 0, 0, 14, 5, 0, 0, 0, 4, 116, 101, 115, 116];
         let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
-            TerminationInformation::String("test".to_string()),
+            TerminationInformation::String("test".into()),
         ])));
         let bad_wire1 = [0x03, 0x00, 0x00, 0x00, 0x01, 0xff];
         let bad_wire2 = [0xff];

@@ -36,10 +36,10 @@ pub enum BmpMessageValue {
     Initiation(InitiationMessage),
     Termination(TerminationMessage),
     RouteMirroring(RouteMirroringMessage),
-    Experimental251(Vec<u8>),
-    Experimental252(Vec<u8>),
-    Experimental253(Vec<u8>),
-    Experimental254(Vec<u8>),
+    Experimental251(Box<[u8]>),
+    Experimental252(Box<[u8]>),
+    Experimental253(Box<[u8]>),
+    Experimental254(Box<[u8]>),
 }
 
 impl BmpMessageValue {
@@ -74,15 +74,17 @@ impl BmpMessageValue {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct InitiationMessage {
-    information: Vec<InitiationInformation>,
+    information: Box<[InitiationInformation]>,
 }
 
 impl InitiationMessage {
-    pub const fn new(information: Vec<InitiationInformation>) -> Self {
-        Self { information }
+    pub fn new(information: impl Into<Box<[InitiationInformation]>>) -> Self {
+        Self {
+            information: information.into(),
+        }
     }
 
-    pub const fn information(&self) -> &Vec<InitiationInformation> {
+    pub const fn information(&self) -> &[InitiationInformation] {
         &self.information
     }
 }
@@ -106,15 +108,15 @@ impl InitiationMessage {
 pub enum InitiationInformation {
     /// The Information field contains a free-form UTF-8 string whose length is
     /// given by the Information Length field.
-    String(String),
+    String(Box<str>),
 
     /// The Information field contains an ASCII string whose value MUST be set
     /// to be equal to the value of the sysDescr MIB-II [RFC1213](https://datatracker.ietf.org/doc/html/rfc1213).
-    SystemDescription(String),
+    SystemDescription(Box<str>),
 
     /// The Information field contains an ASCII string whose value MUST be set
     /// to be equal to the value of the sysName MIB-II [RFC1213](https://datatracker.ietf.org/doc/html/rfc1213).
-    SystemName(String),
+    SystemName(Box<str>),
 
     /// The Information field contains a UTF-8 string whose value MUST be
     /// equal to the value of the VRF or table name (e.g., RD instance name)
@@ -122,7 +124,7 @@ pub enum InitiationInformation {
     /// bytes.
     ///
     /// See [RFC9069](https://datatracker.ietf.org/doc/html/rfc9069)
-    VrfTableName(String),
+    VrfTableName(Box<str>),
 
     /// The Information field contains a free-form UTF-8 string whose byte
     /// length is given by the Information Length field. The value is
@@ -133,12 +135,12 @@ pub enum InitiationInformation {
     /// their order.
     ///
     /// See [RFC8671](https://datatracker.ietf.org/doc/html/rfc8671)
-    AdminLabel(String),
+    AdminLabel(Box<str>),
 
-    Experimental65531(Vec<u8>),
-    Experimental65532(Vec<u8>),
-    Experimental65533(Vec<u8>),
-    Experimental65534(Vec<u8>),
+    Experimental65531(Box<[u8]>),
+    Experimental65532(Box<[u8]>),
+    Experimental65533(Box<[u8]>),
+    Experimental65534(Box<[u8]>),
 }
 
 impl InitiationInformation {
@@ -174,15 +176,17 @@ impl InitiationInformation {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct TerminationMessage {
-    information: Vec<TerminationInformation>,
+    information: Box<[TerminationInformation]>,
 }
 
 impl TerminationMessage {
-    pub const fn new(information: Vec<TerminationInformation>) -> Self {
-        Self { information }
+    pub fn new(information: impl Into<Box<[TerminationInformation]>>) -> Self {
+        Self {
+            information: information.into(),
+        }
     }
 
-    pub const fn information(&self) -> &Vec<TerminationInformation> {
+    pub const fn information(&self) -> &[TerminationInformation] {
         &self.information
     }
 }
@@ -203,12 +207,12 @@ impl TerminationMessage {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TerminationInformation {
-    String(String),
+    String(Box<str>),
     Reason(PeerTerminationCode),
-    Experimental65531(Vec<u8>),
-    Experimental65532(Vec<u8>),
-    Experimental65533(Vec<u8>),
-    Experimental65534(Vec<u8>),
+    Experimental65531(Box<[u8]>),
+    Experimental65532(Box<[u8]>),
+    Experimental65533(Box<[u8]>),
+    Experimental65534(Box<[u8]>),
 }
 
 impl TerminationInformation {
@@ -283,14 +287,14 @@ impl RouteMonitoringMessage {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RouteMirroringMessage {
     peer_header: PeerHeader,
-    mirrored: Vec<RouteMirroringValue>,
+    mirrored: Box<[RouteMirroringValue]>,
 }
 
 impl RouteMirroringMessage {
-    pub const fn new(peer_header: PeerHeader, mirrored: Vec<RouteMirroringValue>) -> Self {
+    pub fn new(peer_header: PeerHeader, mirrored: impl Into<Box<[RouteMirroringValue]>>) -> Self {
         Self {
             peer_header,
-            mirrored,
+            mirrored: mirrored.into(),
         }
     }
 
@@ -298,7 +302,7 @@ impl RouteMirroringMessage {
         &self.peer_header
     }
 
-    pub const fn mirrored(&self) -> &Vec<RouteMirroringValue> {
+    pub const fn mirrored(&self) -> &[RouteMirroringValue] {
         &self.mirrored
     }
 }
@@ -308,7 +312,7 @@ impl RouteMirroringMessage {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum MirroredBgpMessage {
     Parsed(BgpMessage),
-    Raw(Vec<u8>),
+    Raw(Box<[u8]>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -323,10 +327,10 @@ pub enum RouteMirroringValue {
     /// A 2-byte code that provides information about the mirrored message or
     /// message stream.
     Information(RouteMirroringInformation),
-    Experimental65531(Vec<u8>),
-    Experimental65532(Vec<u8>),
-    Experimental65533(Vec<u8>),
-    Experimental65534(Vec<u8>),
+    Experimental65531(Box<[u8]>),
+    Experimental65532(Box<[u8]>),
+    Experimental65533(Box<[u8]>),
+    Experimental65534(Box<[u8]>),
 }
 
 impl RouteMirroringValue {
@@ -376,7 +380,7 @@ pub struct PeerUpNotificationMessage {
     remote_port: Option<u16>,
     sent_message: BgpMessage,
     received_message: BgpMessage,
-    information: Vec<InitiationInformation>,
+    information: Box<[InitiationInformation]>,
 }
 
 /// Runtime errors when constructing a [`PeerUpNotificationMessage`]
@@ -401,7 +405,7 @@ impl PeerUpNotificationMessage {
         remote_port: Option<u16>,
         sent_message: BgpMessage,
         received_message: BgpMessage,
-        information: Vec<InitiationInformation>,
+        information: impl Into<Box<[InitiationInformation]>>,
     ) -> Result<Self, PeerUpNotificationMessageError> {
         if sent_message.get_type() != BgpMessageType::Open {
             return Err(PeerUpNotificationMessageError::UnexpectedSentMessageType(
@@ -422,7 +426,7 @@ impl PeerUpNotificationMessage {
             remote_port,
             sent_message,
             received_message,
-            information,
+            information: information.into(),
         })
     }
 
@@ -450,7 +454,7 @@ impl PeerUpNotificationMessage {
         &self.received_message
     }
 
-    pub const fn information(&self) -> &Vec<InitiationInformation> {
+    pub const fn information(&self) -> &[InitiationInformation] {
         &self.information
     }
 }
@@ -581,10 +585,10 @@ pub enum PeerDownNotificationReason {
     /// included if it was in the Peer Up.
     LocalSystemClosedTlvDataFollows(InitiationInformation),
 
-    Experimental251(Vec<u8>),
-    Experimental252(Vec<u8>),
-    Experimental253(Vec<u8>),
-    Experimental254(Vec<u8>),
+    Experimental251(Box<[u8]>),
+    Experimental252(Box<[u8]>),
+    Experimental253(Box<[u8]>),
+    Experimental254(Box<[u8]>),
 }
 
 impl PeerDownNotificationReason {
@@ -630,14 +634,14 @@ impl PeerDownNotificationReason {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StatisticsReportMessage {
     peer_header: PeerHeader,
-    counters: Vec<StatisticsCounter>,
+    counters: Box<[StatisticsCounter]>,
 }
 
 impl StatisticsReportMessage {
-    pub const fn new(peer_header: PeerHeader, counters: Vec<StatisticsCounter>) -> Self {
+    pub fn new(peer_header: PeerHeader, counters: impl Into<Box<[StatisticsCounter]>>) -> Self {
         Self {
             peer_header,
-            counters,
+            counters: counters.into(),
         }
     }
 
@@ -645,7 +649,7 @@ impl StatisticsReportMessage {
         &self.peer_header
     }
 
-    pub const fn counters(&self) -> &Vec<StatisticsCounter> {
+    pub const fn counters(&self) -> &[StatisticsCounter] {
         &self.counters
     }
 }
@@ -711,11 +715,11 @@ pub enum StatisticsCounter {
     NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki(AddressType, GaugeU64),
     NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki(AddressType, GaugeU64),
     NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(AddressType, GaugeU64),
-    Experimental65531(Vec<u8>),
-    Experimental65532(Vec<u8>),
-    Experimental65533(Vec<u8>),
-    Experimental65534(Vec<u8>),
-    Unknown(u16, Vec<u8>),
+    Experimental65531(Box<[u8]>),
+    Experimental65532(Box<[u8]>),
+    Experimental65533(Box<[u8]>),
+    Experimental65534(Box<[u8]>),
+    Unknown(u16, Box<[u8]>),
 }
 
 impl StatisticsCounter {

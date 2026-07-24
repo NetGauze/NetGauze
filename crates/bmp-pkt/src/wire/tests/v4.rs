@@ -107,14 +107,14 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
             vec![
                 RouteMonitoringTlv::build(
                     0,
-                    RouteMonitoringTlvValue::VrfTableName("global".to_string()),
+                    RouteMonitoringTlvValue::VrfTableName("global".into()),
                 )
                 .unwrap(),
                 RouteMonitoringTlv::build(
                     0,
                     RouteMonitoringTlvValue::Unknown {
                         code: 9,
-                        value: vec![0x00, 0x00, 0x00, 0x0a],
+                        value: vec![0x00, 0x00, 0x00, 0x0a].into(),
                     },
                 )
                 .unwrap(),
@@ -194,19 +194,19 @@ fn test_bmp_v4_route_monitoring_with_groups() -> Result<(), BmpMessageWritingErr
             vec![
                 RouteMonitoringTlv::build(
                     BMPV4_TLV_GROUP_GBIT + 1024,
-                    RouteMonitoringTlvValue::GroupTlv(vec![1, 2, 3, 4]),
+                    RouteMonitoringTlvValue::GroupTlv(vec![1, 2, 3, 4].into()),
                 )
                 .unwrap(),
                 RouteMonitoringTlv::build(
                     0,
-                    RouteMonitoringTlvValue::VrfTableName("global".to_string()),
+                    RouteMonitoringTlvValue::VrfTableName("global".into()),
                 )
                 .unwrap(),
                 RouteMonitoringTlv::build(
                     0,
                     RouteMonitoringTlvValue::Unknown {
                         code: 9,
-                        value: vec![0x00, 0x00, 0x00, 0x0a],
+                        value: vec![0x00, 0x00, 0x00, 0x0a].into(),
                     },
                 )
                 .unwrap(),
@@ -437,7 +437,7 @@ fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
             v3::PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
             vec![PeerDownTlv::Unknown {
                 code: 16,
-                value: vec![0, 1, 2, 3, 4, 5, 6, 7],
+                value: vec![0, 1, 2, 3, 4, 5, 6, 7].into(),
             }],
         )
         .unwrap(),
@@ -553,11 +553,8 @@ fn test_bmp_v4_path_marking() -> Result<(), BmpMessageWritingError> {
                 ],
             )),
             vec![
-                RouteMonitoringTlv::build(
-                    0,
-                    RouteMonitoringTlvValue::VrfTableName("C10".to_string()),
-                )
-                .unwrap(),
+                RouteMonitoringTlv::build(0, RouteMonitoringTlvValue::VrfTableName("C10".into()))
+                    .unwrap(),
                 RouteMonitoringTlv::build(
                     0,
                     RouteMonitoringTlvValue::PathMarking(PathMarking::new(
@@ -681,11 +678,8 @@ fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritin
                 ],
             )),
             vec![
-                RouteMonitoringTlv::build(
-                    0,
-                    RouteMonitoringTlvValue::VrfTableName("C10".to_string()),
-                )
-                .unwrap(),
+                RouteMonitoringTlv::build(0, RouteMonitoringTlvValue::VrfTableName("C10".into()))
+                    .unwrap(),
                 RouteMonitoringTlv::build(
                     0,
                     RouteMonitoringTlvValue::PathMarking(PathMarking::new(
@@ -828,10 +822,10 @@ fn test_bmp_value_experimental_messages() -> Result<(), BmpMessageValueWritingEr
         0x50, 0x45, 0x32,
     ];
 
-    let good_251 = BmpMessageValue::Experimental251(good_251_wire[1..].to_vec());
-    let good_252 = BmpMessageValue::Experimental252(good_252_wire[1..].to_vec());
-    let good_253 = BmpMessageValue::Experimental253(good_253_wire[1..].to_vec());
-    let good_254 = BmpMessageValue::Experimental254(good_254_wire[1..].to_vec());
+    let good_251 = BmpMessageValue::Experimental251(good_251_wire[1..].into());
+    let good_252 = BmpMessageValue::Experimental252(good_252_wire[1..].into());
+    let good_253 = BmpMessageValue::Experimental253(good_253_wire[1..].into());
+    let good_254 = BmpMessageValue::Experimental254(good_254_wire[1..].into());
 
     test_parsed_completely_with_one_input_bytes_reader(
         &good_251_wire,
@@ -874,18 +868,10 @@ fn test_bmp_experimental() -> Result<(), BmpMessageWritingError> {
     ];
     let good_254_wire = [0x04, 0x00, 0x00, 0x00, 0x06, 0xfe];
 
-    let good_251 = BmpMessage::V4(BmpMessageValue::Experimental251(
-        good_251_wire[6..].to_vec(),
-    ));
-    let good_252 = BmpMessage::V4(BmpMessageValue::Experimental252(
-        good_252_wire[6..].to_vec(),
-    ));
-    let good_253 = BmpMessage::V4(BmpMessageValue::Experimental253(
-        good_253_wire[6..].to_vec(),
-    ));
-    let good_254 = BmpMessage::V4(BmpMessageValue::Experimental254(
-        good_254_wire[6..].to_vec(),
-    ));
+    let good_251 = BmpMessage::V4(BmpMessageValue::Experimental251(good_251_wire[6..].into()));
+    let good_252 = BmpMessage::V4(BmpMessageValue::Experimental252(good_252_wire[6..].into()));
+    let good_253 = BmpMessage::V4(BmpMessageValue::Experimental253(good_253_wire[6..].into()));
+    let good_254 = BmpMessage::V4(BmpMessageValue::Experimental254(good_254_wire[6..].into()));
 
     test_parsed_completely_with_one_input_bytes_reader(
         &good_251_wire,

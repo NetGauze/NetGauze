@@ -336,15 +336,15 @@ fn test_initiation_information() -> Result<(), InitiationInformationWritingError
     let bad_eof_wire = [];
     let bad_undefined_type_wire = [0xff, 0xff];
 
-    let good_string = InitiationInformation::String("AB".to_string());
-    let good_sys_descr = InitiationInformation::SystemDescription("AB".to_string());
-    let good_sys_name = InitiationInformation::SystemName("AB".to_string());
-    let good_vrf_table = InitiationInformation::VrfTableName("AB".to_string());
-    let good_admin_label = InitiationInformation::AdminLabel("AB".to_string());
-    let good_experimental_65531 = InitiationInformation::Experimental65531(vec![0x01, 0x02]);
-    let good_experimental_65532 = InitiationInformation::Experimental65532(vec![0x01, 0x02]);
-    let good_experimental_65533 = InitiationInformation::Experimental65533(vec![0x01, 0x02]);
-    let good_experimental_65534 = InitiationInformation::Experimental65534(vec![0x01, 0x02]);
+    let good_string = InitiationInformation::String("AB".into());
+    let good_sys_descr = InitiationInformation::SystemDescription("AB".into());
+    let good_sys_name = InitiationInformation::SystemName("AB".into());
+    let good_vrf_table = InitiationInformation::VrfTableName("AB".into());
+    let good_admin_label = InitiationInformation::AdminLabel("AB".into());
+    let good_experimental_65531 = InitiationInformation::Experimental65531(vec![0x01, 0x02].into());
+    let good_experimental_65532 = InitiationInformation::Experimental65532(vec![0x01, 0x02].into());
+    let good_experimental_65533 = InitiationInformation::Experimental65533(vec![0x01, 0x02].into());
+    let good_experimental_65534 = InitiationInformation::Experimental65534(vec![0x01, 0x02].into());
 
     let bad_eof = InitiationInformationParsingError::Parse(ParseError::UnexpectedEof {
         offset: 0,
@@ -396,8 +396,8 @@ fn test_initiation_message() -> Result<(), InitiationMessageWritingError> {
     let bad_info_wire = [0xff, 0xff];
 
     let good = InitiationMessage::new(vec![
-        InitiationInformation::SystemDescription("AB".to_string()),
-        InitiationInformation::SystemName("CD".to_string()),
+        InitiationInformation::SystemDescription("AB".into()),
+        InitiationInformation::SystemName("CD".into()),
     ]);
 
     let bad_info = InitiationMessageParsingError::InitiationInformationError(
@@ -430,8 +430,8 @@ fn test_bmp_value_initiation_message() -> Result<(), BmpMessageValueWritingError
     ];
 
     let good = BmpMessageValue::Initiation(InitiationMessage::new(vec![
-        InitiationInformation::SystemDescription("test11".to_string()),
-        InitiationInformation::SystemName("PE2".to_string()),
+        InitiationInformation::SystemDescription("test11".into()),
+        InitiationInformation::SystemName("PE2".into()),
     ]));
     let bad_information = BmpMessageValueParsingError::InitiationMessageError(
         InitiationMessageParsingError::InitiationInformationError(
@@ -913,12 +913,12 @@ fn test_peer_down_reason() -> Result<(), PeerDownNotificationReasonWritingError>
     let good_remote_no_data = PeerDownNotificationReason::RemoteSystemClosedNoData;
     let good_peer_de_configured = PeerDownNotificationReason::PeerDeConfigured;
     let good_local_system_closed = PeerDownNotificationReason::LocalSystemClosedTlvDataFollows(
-        InitiationInformation::VrfTableName("vrf1".to_string()),
+        InitiationInformation::VrfTableName("vrf1".into()),
     );
-    let good_experimental_251 = PeerDownNotificationReason::Experimental251(vec![1, 3]);
-    let good_experimental_252 = PeerDownNotificationReason::Experimental252(vec![1, 3]);
-    let good_experimental_253 = PeerDownNotificationReason::Experimental253(vec![1, 3]);
-    let good_experimental_254 = PeerDownNotificationReason::Experimental254(vec![1, 3]);
+    let good_experimental_251 = PeerDownNotificationReason::Experimental251(vec![1, 3].into());
+    let good_experimental_252 = PeerDownNotificationReason::Experimental252(vec![1, 3].into());
+    let good_experimental_253 = PeerDownNotificationReason::Experimental253(vec![1, 3].into());
+    let good_experimental_254 = PeerDownNotificationReason::Experimental254(vec![1, 3].into());
 
     let bad_local_pdu_bgp = PeerDownNotificationReasonParsingError::BgpMessageError(
         BgpMessageParsingError::UndefinedBgpMessageType {
@@ -1196,10 +1196,10 @@ fn test_router_mirroring_value() -> Result<(), RouteMirroringValueWritingError> 
     let good_bgp =
         RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(BgpMessage::KeepAlive));
     let good_information = RouteMirroringValue::Information(RouteMirroringInformation::ErroredPdu);
-    let good_experimental_65531 = RouteMirroringValue::Experimental65531(vec![1, 2]);
-    let good_experimental_65532 = RouteMirroringValue::Experimental65532(vec![1, 2]);
-    let good_experimental_65533 = RouteMirroringValue::Experimental65533(vec![1, 2]);
-    let good_experimental_65534 = RouteMirroringValue::Experimental65534(vec![1, 2]);
+    let good_experimental_65531 = RouteMirroringValue::Experimental65531(vec![1, 2].into());
+    let good_experimental_65532 = RouteMirroringValue::Experimental65532(vec![1, 2].into());
+    let good_experimental_65533 = RouteMirroringValue::Experimental65533(vec![1, 2].into());
+    let good_experimental_65534 = RouteMirroringValue::Experimental65534(vec![1, 2].into());
 
     test_parsed_completely_with_one_input_bytes_reader(
         &good_bgp_wire,
@@ -1284,16 +1284,16 @@ fn test_termination_information() -> Result<(), TerminationInformationWritingErr
     let good_experimental_65533_wire = [0xff, 0xfd, 0, 4, 116, 101, 115, 116];
     let good_experimental_65534_wire = [0xff, 0xfe, 0, 4, 116, 101, 115, 116];
 
-    let good_string = TerminationInformation::String("test".to_string());
+    let good_string = TerminationInformation::String("test".into());
     let good_reason = TerminationInformation::Reason(PeerTerminationCode::AdministrativelyClosed);
     let good_experimental_65531 =
-        TerminationInformation::Experimental65531(vec![116, 101, 115, 116]);
+        TerminationInformation::Experimental65531(vec![116, 101, 115, 116].into());
     let good_experimental_65532 =
-        TerminationInformation::Experimental65532(vec![116, 101, 115, 116]);
+        TerminationInformation::Experimental65532(vec![116, 101, 115, 116].into());
     let good_experimental_65533 =
-        TerminationInformation::Experimental65533(vec![116, 101, 115, 116]);
+        TerminationInformation::Experimental65533(vec![116, 101, 115, 116].into());
     let good_experimental_65534 =
-        TerminationInformation::Experimental65534(vec![116, 101, 115, 116]);
+        TerminationInformation::Experimental65534(vec![116, 101, 115, 116].into());
 
     test_parsed_completely_bytes_reader(&good_string_wire, &good_string);
     test_parsed_completely_bytes_reader(&good_reason_wire, &good_reason);
@@ -1314,7 +1314,7 @@ fn test_termination_information() -> Result<(), TerminationInformationWritingErr
 #[test]
 fn test_termination_message() -> Result<(), TerminationMessageWritingError> {
     let good_wire = [0, 0, 0, 4, 116, 101, 115, 116];
-    let good = TerminationMessage::new(vec![TerminationInformation::String("test".to_string())]);
+    let good = TerminationMessage::new(vec![TerminationInformation::String("test".into())]);
 
     test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
@@ -1326,7 +1326,7 @@ fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
     let good_wire = [3, 0, 0, 0, 14, 5, 0, 0, 0, 4, 116, 101, 115, 116];
 
     let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
-        TerminationInformation::String("test".to_string()),
+        TerminationInformation::String("test".into()),
     ])));
 
     test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut Default::default(), &good);
@@ -1342,7 +1342,7 @@ fn test_bmp_termination_with_reason() -> Result<(), BmpMessageWritingError> {
     ];
 
     let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
-        TerminationInformation::String("config removed".to_string()),
+        TerminationInformation::String("config removed".into()),
         TerminationInformation::Reason(PeerTerminationCode::AdministrativelyClosed),
     ])));
 
@@ -1387,7 +1387,7 @@ fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
                 )),
                 StatisticsCounter::NumberOfDuplicateWithdraws(CounterU32::new(0)),
                 StatisticsCounter::NumberOfUpdatesSubjectedToTreatAsWithdraw(CounterU32::new(6)),
-                StatisticsCounter::Experimental65531(vec![0, 0, 0, 0]),
+                StatisticsCounter::Experimental65531(vec![0, 0, 0, 0].into()),
             ],
         ),
     ));
@@ -1696,10 +1696,10 @@ fn test_bmp_value_experimental_messages() -> Result<(), BmpMessageValueWritingEr
         0x50, 0x45, 0x32,
     ];
 
-    let good_251 = BmpMessageValue::Experimental251(good_251_wire[1..].to_vec());
-    let good_252 = BmpMessageValue::Experimental252(good_252_wire[1..].to_vec());
-    let good_253 = BmpMessageValue::Experimental253(good_253_wire[1..].to_vec());
-    let good_254 = BmpMessageValue::Experimental254(good_254_wire[1..].to_vec());
+    let good_251 = BmpMessageValue::Experimental251(good_251_wire[1..].into());
+    let good_252 = BmpMessageValue::Experimental252(good_252_wire[1..].into());
+    let good_253 = BmpMessageValue::Experimental253(good_253_wire[1..].into());
+    let good_254 = BmpMessageValue::Experimental254(good_254_wire[1..].into());
 
     test_parsed_completely_with_one_input_bytes_reader(
         &good_251_wire,
@@ -1742,18 +1742,10 @@ fn test_bmp_experimental() -> Result<(), BmpMessageWritingError> {
     ];
     let good_254_wire = [0x03, 0x00, 0x00, 0x00, 0x06, 0xfe];
 
-    let good_251 = BmpMessage::V3(BmpMessageValue::Experimental251(
-        good_251_wire[6..].to_vec(),
-    ));
-    let good_252 = BmpMessage::V3(BmpMessageValue::Experimental252(
-        good_252_wire[6..].to_vec(),
-    ));
-    let good_253 = BmpMessage::V3(BmpMessageValue::Experimental253(
-        good_253_wire[6..].to_vec(),
-    ));
-    let good_254 = BmpMessage::V3(BmpMessageValue::Experimental254(
-        good_254_wire[6..].to_vec(),
-    ));
+    let good_251 = BmpMessage::V3(BmpMessageValue::Experimental251(good_251_wire[6..].into()));
+    let good_252 = BmpMessage::V3(BmpMessageValue::Experimental252(good_252_wire[6..].into()));
+    let good_253 = BmpMessage::V3(BmpMessageValue::Experimental253(good_253_wire[6..].into()));
+    let good_254 = BmpMessage::V3(BmpMessageValue::Experimental254(good_254_wire[6..].into()));
 
     test_parsed_completely_with_one_input_bytes_reader(
         &good_251_wire,
