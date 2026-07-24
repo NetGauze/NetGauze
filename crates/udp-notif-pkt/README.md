@@ -86,3 +86,9 @@ match variant {
     // ... handle other notification types
 }
 ```
+
+### Run serde microbenchmark
+
+```bash
+cargo bench -p netgauze-udp-notif-pkt --features bench --bench serde_benchmark
+```
