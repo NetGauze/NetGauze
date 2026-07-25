@@ -15,26 +15,16 @@
 
 use crate::raw::{MediaTypeNames, UdpNotifOption, UdpNotifPacket};
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 use std::io::Write;
 
-#[derive(
-    WritingError,
-    strum_macros::Display,
-    Eq,
-    PartialEq,
-    Clone,
-    Debug,
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum UdpNotifOptionWritingError {
-    #[strum(to_string = "UDP-Notif options serialization I/O error: {0}")]
-    StdIOError(#[from_std_io_error] String),
+    #[error("UDP-Notif options serialization I/O error: {0}")]
+    StdIOError(String),
 }
 
-impl std::error::Error for UdpNotifOptionWritingError {}
+impl_from_io_error!(UdpNotifOptionWritingError);
 
 impl WritablePdu<UdpNotifOptionWritingError> for UdpNotifOption {
     // One octet for type and another for length
@@ -74,31 +64,22 @@ impl WritablePdu<UdpNotifOptionWritingError> for UdpNotifOption {
     }
 }
 
-#[derive(
-    WritingError,
-    strum_macros::Display,
-    Eq,
-    PartialEq,
-    Clone,
-    Debug,
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum UdpNotifPacketWritingError {
-    #[strum(to_string = "UDP-Notif serialization I/O error: {0}")]
-    StdIOError(#[from_std_io_error] String),
+    #[error("UDP-Notif serialization I/O error: {0}")]
+    StdIOError(String),
 
-    #[strum(to_string = "UDP-Notif serialization invalid header length: {0}")]
+    #[error("UDP-Notif serialization invalid header length: {0}")]
     InvalidHeaderLength(usize),
 
-    #[strum(to_string = "UDP-Notif serialization invalid message length: {0}")]
+    #[error("UDP-Notif serialization invalid message length: {0}")]
     InvalidMessageLength(usize),
 
-    #[strum(to_string = "{0}")]
+    #[error("{0}")]
     OptionError(#[from] UdpNotifOptionWritingError),
 }
 
-impl std::error::Error for UdpNotifPacketWritingError {}
+impl_from_io_error!(UdpNotifPacketWritingError);
 
 impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
     const BASE_LENGTH: usize = 12;

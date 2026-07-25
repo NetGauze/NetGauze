@@ -14,14 +14,14 @@
 // limitations under the License.
 
 use crate::raw::{MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
-use crate::wire::deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError};
+use crate::wire::deserialize::UdpNotifPacketParsingError;
 use crate::wire::serialize::UdpNotifPacketWritingError;
 use bytes::Bytes;
-use netgauze_parse_utils::Span;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::test_helpers::{
-    test_parse_error, test_parsed, test_parsed_completely, test_write,
+    test_parse_error_bytes_reader, test_parsed_completely_bytes_reader, test_write,
 };
-use nom::AsBytes;
+use netgauze_parse_utils::traits::ParseFrom;
 use std::collections::HashMap;
 
 #[cfg(feature = "codec")]
@@ -45,13 +45,13 @@ fn test_simple() -> Result<(), UdpNotifPacketWritingError> {
         Bytes::from(&[0xff, 0xff][..]),
     );
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
 
 #[test]
-fn test_invalid_s_flat() -> Result<(), UdpNotifPacketWritingError> {
+fn test_invalid_s_flat() {
     let bad_wire = [
         0x31, // version 1, private space set, Media type: 1 = YANG data JSON
         0x0c, // Header length
@@ -61,16 +61,14 @@ fn test_invalid_s_flat() -> Result<(), UdpNotifPacketWritingError> {
         0xff, 0xff, // dummy payload
     ];
 
-    let error = LocatedUdpNotifPacketParsingError::new(
-        Span::new(&bad_wire),
-        UdpNotifPacketParsingError::InvalidSFlag,
+    test_parse_error_bytes_reader::<UdpNotifPacket, UdpNotifPacketParsingError>(
+        &bad_wire,
+        &UdpNotifPacketParsingError::InvalidSFlag,
     );
-    test_parse_error::<UdpNotifPacket, LocatedUdpNotifPacketParsingError<'_>>(&bad_wire, &error);
-    Ok(())
 }
 
 #[test]
-fn test_invalid_version() -> Result<(), UdpNotifPacketWritingError> {
+fn test_invalid_version() {
     let bad_wire = [
         0x01, // version 0, no private space, Media type: 1 = YANG data JSON
         0x0c, // Header length
@@ -80,16 +78,14 @@ fn test_invalid_version() -> Result<(), UdpNotifPacketWritingError> {
         0xff, 0xff, // dummy payload
     ];
 
-    let error = LocatedUdpNotifPacketParsingError::new(
-        Span::new(&bad_wire),
-        UdpNotifPacketParsingError::InvalidVersion(0),
+    test_parse_error_bytes_reader::<UdpNotifPacket, UdpNotifPacketParsingError>(
+        &bad_wire,
+        &UdpNotifPacketParsingError::InvalidVersion(0),
     );
-    test_parse_error::<UdpNotifPacket, LocatedUdpNotifPacketParsingError<'_>>(&bad_wire, &error);
-    Ok(())
 }
 
 #[test]
-fn test_invalid_header_length() -> Result<(), UdpNotifPacketWritingError> {
+fn test_invalid_header_length() {
     let bad_wire = [
         0x21, // version 0, no private space, Media type: 1 = YANG data JSON
         0xff, // Header length
@@ -99,12 +95,10 @@ fn test_invalid_header_length() -> Result<(), UdpNotifPacketWritingError> {
         0xff, 0xff, // dummy payload
     ];
 
-    let error = LocatedUdpNotifPacketParsingError::new(
-        Span::new(&bad_wire),
-        UdpNotifPacketParsingError::InvalidHeaderLength(0xff),
+    test_parse_error_bytes_reader::<UdpNotifPacket, UdpNotifPacketParsingError>(
+        &bad_wire,
+        &UdpNotifPacketParsingError::InvalidHeaderLength(0xff),
     );
-    test_parse_error::<UdpNotifPacket, LocatedUdpNotifPacketParsingError<'_>>(&bad_wire, &error);
-    Ok(())
 }
 
 #[test]
@@ -154,14 +148,18 @@ fn test_segment() -> Result<(), UdpNotifPacketWritingError> {
         )]),
         Bytes::from(&[0xee, 0xee, 0xee, 0xee, 0xdd, 0xdd, 0xdd, 0xdd][..]),
     );
-    let (remaining, _) = test_parsed(&good_wire, &good_pkt1);
-    test_write(
-        &good_pkt1,
-        &good_wire[..(good_wire.len() - remaining.len())],
-    )?;
 
-    let (remaining, _) = test_parsed(remaining.as_bytes(), &good_pkt2);
-    assert!(remaining.is_empty());
+    // Two back-to-back messages in one buffer: parse each in turn off the
+    // same reader and check the consumed span round-trips.
+    let mut reader = SliceReader::new(&good_wire);
+    let parsed1 = UdpNotifPacket::parse(&mut reader).expect("first segment failed to parse");
+    assert_eq!(parsed1, good_pkt1);
+    let consumed = reader.offset();
+    test_write(&good_pkt1, &good_wire[..consumed])?;
+
+    let parsed2 = UdpNotifPacket::parse(&mut reader).expect("second segment failed to parse");
+    assert_eq!(parsed2, good_pkt2);
+    assert!(reader.is_empty());
     test_write(&good_pkt2, &good_wire[20..])?;
     Ok(())
 }
@@ -188,7 +186,7 @@ fn test_private_encoding() -> Result<(), UdpNotifPacketWritingError> {
         Bytes::from(&[0xff, 0xff, 0xff, 0xff][..]),
     );
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_bytes_reader(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -204,9 +202,8 @@ fn test_private_encoding_pen_not_present() {
         0xff, 0xff, // dummy payload
     ];
 
-    let error = LocatedUdpNotifPacketParsingError::new(
-        unsafe { Span::new_from_raw_offset(2, &bad_wire[2..]) },
-        UdpNotifPacketParsingError::PrivateEncodingOptionIsNotPresent,
+    test_parse_error_bytes_reader::<UdpNotifPacket, UdpNotifPacketParsingError>(
+        &bad_wire,
+        &UdpNotifPacketParsingError::PrivateEncodingOptionIsNotPresent,
     );
-    test_parse_error::<UdpNotifPacket, LocatedUdpNotifPacketParsingError<'_>>(&bad_wire, &error);
 }

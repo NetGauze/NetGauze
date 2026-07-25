@@ -15,12 +15,15 @@
 
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use netgauze_parse_utils::{ReadablePdu, Span};
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFrom;
 use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
 
 fuzz_target!(|data: &[u8]| {
-    let mut buf = Span::new(data);
-    while let Ok((retbuf, _msg)) = UdpNotifPacket::from_wire(buf) {
-        buf = retbuf;
+    let mut reader = SliceReader::new(data);
+    while !reader.is_empty() {
+        if UdpNotifPacket::parse(&mut reader).is_err() {
+            break;
+        }
     }
 });
