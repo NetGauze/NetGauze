@@ -113,7 +113,8 @@ impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
             return Err(UdpNotifPacketWritingError::InvalidHeaderLength(header_len));
         }
         writer.write_u8(header_len as u8)?;
-        let message_len = header_len + self.payload().len();
+        let payload = self.payload();
+        let message_len = header_len + payload.len();
         if message_len > u16::MAX as usize {
             return Err(UdpNotifPacketWritingError::InvalidMessageLength(
                 message_len,
@@ -125,7 +126,7 @@ impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
         for option in self.options() {
             option.1.write(writer)?;
         }
-        writer.write_all(&self.payload())?;
+        writer.write_all(&payload)?;
         Ok(())
     }
 }
