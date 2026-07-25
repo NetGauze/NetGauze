@@ -285,11 +285,14 @@ mod tests {
                 sync_on_start: Some(true),
                 excluded_change: None,
             }),
-            Some(vec![YangPushModuleVersion::new(
-                "openconfig-interfaces".into(),
-                Some("2025-06-10".into()),
-                None,
-            )]),
+            Some(
+                vec![YangPushModuleVersion::new(
+                    "openconfig-interfaces".into(),
+                    Some("2025-06-10".into()),
+                    None,
+                )]
+                .into(),
+            ),
             None,
             json!({}),
         );
@@ -297,7 +300,7 @@ mod tests {
             DateTime::parse_from_rfc3339("2025-04-17T15:20:14.840Z")
                 .unwrap()
                 .with_timezone(&Utc),
-            Some("ipf-zbl1327-r-daisy-91".to_string()),
+            Some("ipf-zbl1327-r-daisy-91".into()),
             Some(0),
             Some(NotificationVariant::SubscriptionStarted(sub_started)),
             json!({"another-time": "2025-01-01T15:20:14.840Z"}),
@@ -511,7 +514,7 @@ mod tests {
             DateTime::parse_from_rfc3339("2025-03-04T07:11:33.252679191+00:00")
                 .unwrap()
                 .with_timezone(&Utc),
-            Some("some-router".to_string()),
+            Some("some-router".into()),
             Some(5),
             None,
             json!({}),
