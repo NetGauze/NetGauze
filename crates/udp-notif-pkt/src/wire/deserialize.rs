@@ -83,7 +83,21 @@ pub enum UdpNotifPacketParsingError {
     PrivateEncodingOptionIsNotPresent,
 }
 
-impl<'a> ParseFrom<'a> for UdpNotifPacket {
+/// Everything a UDP-Notif message carries except its payload. Parsing the
+/// fixed header + options is shared between the borrowing [`ParseFrom`]
+/// path (which must copy the payload out of the borrowed slice) and the
+/// owned-[`Bytes`] implementation (which slices the payload zero-copy).
+struct UdpNotifHeader {
+    media_type: MediaType,
+    publisher_id: u32,
+    message_id: u32,
+    options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
+    /// Number of payload bytes that follow the header at the reader's
+    /// current position.
+    payload_len: usize,
+}
+
+impl<'a> ParseFrom<'a> for UdpNotifHeader {
     type Error = UdpNotifPacketParsingError;
 
     fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
@@ -125,7 +139,7 @@ impl<'a> ParseFrom<'a> for UdpNotifPacket {
 
         let mut options = HashMap::new();
         // As per UDP-Notif RFC: When S is set, MT represents a private space to be
-        // freely used for non standard encodings. When S is set, the Private
+        // freely used for non-standard encodings. When S is set, the Private
         // Encoding Option SHOULD be present in the UDP-Notif message header.
         let mut private_is_correct = !s_flag;
         while !header_buf.is_empty() {
@@ -139,13 +153,54 @@ impl<'a> ParseFrom<'a> for UdpNotifPacket {
             return Err(UdpNotifPacketParsingError::PrivateEncodingOptionIsNotPresent);
         }
 
-        // TODO: find more efficient way without need to do a memory copy
-        let payload = Bytes::from(cur.read_bytes(payload_len)?.to_vec());
-        Ok(UdpNotifPacket::new(
+        Ok(UdpNotifHeader {
             media_type,
             publisher_id,
             message_id,
             options,
+            payload_len,
+        })
+    }
+}
+
+impl<'a> ParseFrom<'a> for UdpNotifPacket {
+    type Error = UdpNotifPacketParsingError;
+
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let header = UdpNotifHeader::parse(cur)?;
+        // No owning buffer here (the reader only borrows a `&[u8]`), so the
+        // payload must be copied out. Callers with an owned `Bytes` should use
+        // [`UdpNotifPacket::from_bytes`] to slice it zero-copy instead.
+        let payload = Bytes::copy_from_slice(cur.read_bytes(header.payload_len)?);
+        Ok(UdpNotifPacket::new(
+            header.media_type,
+            header.publisher_id,
+            header.message_id,
+            header.options,
+            payload,
+        ))
+    }
+}
+
+impl UdpNotifPacket {
+    /// Parse a complete UDP-Notif packet out of an owned [`Bytes`] buffer,
+    /// slicing the payload zero-copy (a refcount bump on the shared
+    /// allocation) instead of copying it. `buf` must start at the packet
+    /// header; any bytes beyond the declared message length are ignored.
+    pub fn from_bytes(buf: Bytes) -> Result<Self, UdpNotifPacketParsingError> {
+        // Parse the header off a borrow, then release the borrow (offsets are
+        // `Copy`) so the payload can be sliced out of the owning `buf`.
+        let (header, payload_start) = {
+            let mut cur = SliceReader::new(&buf);
+            let header = UdpNotifHeader::parse(&mut cur)?;
+            (header, cur.offset())
+        };
+        let payload = buf.slice(payload_start..payload_start + header.payload_len);
+        Ok(UdpNotifPacket::new(
+            header.media_type,
+            header.publisher_id,
+            header.message_id,
+            header.options,
             payload,
         ))
     }
