@@ -14,12 +14,13 @@
 // limitations under the License.
 
 use crate::raw::{MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
-use crate::wire::deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError};
+use crate::wire::deserialize::UdpNotifPacketParsingError;
 use crate::wire::serialize::UdpNotifPacketWritingError;
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
-use netgauze_parse_utils::{LocatedParsingError, ReadablePdu, Span, WritablePdu};
-use nom::error::ErrorKind;
+use netgauze_parse_utils::WritablePdu;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFrom;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::io;
@@ -184,16 +185,9 @@ pub enum UdpPacketCodecError {
     WritingError(UdpNotifPacketWritingError),
 }
 
-impl<'a> From<nom::Err<LocatedUdpNotifPacketParsingError<'a>>> for UdpPacketCodecError {
-    fn from(err: nom::Err<LocatedUdpNotifPacketParsingError<'a>>) -> Self {
-        match err {
-            nom::Err::Incomplete(_) => {
-                Self::UdpNotifError(UdpNotifPacketParsingError::NomError(ErrorKind::Eof))
-            }
-            nom::Err::Error(err) | nom::Err::Failure(err) => {
-                Self::UdpNotifError(err.error().clone())
-            }
-        }
+impl From<UdpNotifPacketParsingError> for UdpPacketCodecError {
+    fn from(err: UdpNotifPacketParsingError) -> Self {
+        Self::UdpNotifError(err)
     }
 }
 
@@ -320,11 +314,12 @@ impl Decoder for UdpPacketCodec {
         // consume the entire UDP packet before parsing the message
         // to avoid the parsing errors to continue if one message is corrupted
         let pkt_buf = buf.split_to(buf.len());
-        match UdpNotifPacket::from_wire(Span::new(pkt_buf.chunk())) {
-            Ok((span, pkt)) => {
+        let mut reader = SliceReader::new(pkt_buf.chunk());
+        match UdpNotifPacket::parse(&mut reader) {
+            Ok(pkt) => {
                 self.in_message = false;
                 // Check that the message length matches the actual length of the message
-                if span.location_offset() != msg_len as usize || !span.is_empty() {
+                if reader.offset() != msg_len as usize || !reader.is_empty() {
                     return Err(UdpPacketCodecError::InvalidMessageLength(msg_len));
                 }
                 self.try_reassemble_segments(pkt)
