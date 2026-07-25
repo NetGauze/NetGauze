@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::raw::{MediaType, MediaTypeNames, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
+use crate::raw::{MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use bytes::Bytes;
 use netgauze_parse_utils::error::ParseError;
 use netgauze_parse_utils::reader::SliceReader;
@@ -67,6 +67,9 @@ pub enum UdpNotifPacketParsingError {
     #[error("Invalid UDP-Notif version {0}")]
     InvalidVersion(u8),
 
+    /// No longer produced: when the S-flag is set every MT value is valid,
+    /// because the whole field is private space. Retained so that previously
+    /// serialized errors still deserialize.
     #[error("UDP-Notif with invalid S-Flag")]
     InvalidSFlag,
 
@@ -79,6 +82,9 @@ pub enum UdpNotifPacketParsingError {
     #[error("UDP-Notif with invalid message length {0}")]
     InvalidMessageLength(u16),
 
+    /// No longer produced: the "Private Encoding Option" this checked for was
+    /// removed from the draft, private encoding being signalled by the S-flag
+    /// alone. Retained so that previously serialized errors still deserialize.
     #[error("S Flag is set without private encoding option")]
     PrivateEncodingOptionIsNotPresent,
 }
@@ -117,11 +123,11 @@ impl<'a> ParseFrom<'a> for UdpNotifHeader {
         if version != 1 {
             return Err(UdpNotifPacketParsingError::InvalidVersion(version));
         }
+        // The S-flag selects which space the MT field is read against: when
+        // set, all 16 values are private and their meaning is agreed
+        // out-of-band, so no value is invalid here.
         let s_flag = (first_octet & 0b00010000) != 0;
-        let media_type: MediaType = (first_octet & 0b00001111).into();
-        if s_flag && MediaTypeNames::from(media_type) != MediaTypeNames::Unknown {
-            return Err(UdpNotifPacketParsingError::InvalidSFlag);
-        }
+        let media_type = MediaType::from_wire(first_octet & 0b00001111, s_flag);
 
         let header_len = cur.read_u8()?;
         if header_len < 2 {
@@ -137,20 +143,16 @@ impl<'a> ParseFrom<'a> for UdpNotifHeader {
         let publisher_id = header_buf.read_u32_be()?;
         let message_id = header_buf.read_u32_be()?;
 
+        // Private encoding is signalled by the S-flag alone; there is no
+        // option to look for. Earlier revisions of the draft defined a
+        // "Private Encoding Option", but it was removed and the IANA
+        // UDP-Notif Option Types registry now assigns only 0 (Reserved) and
+        // 1 (Segmentation). Type 2 is still parsed, as an unknown option, for
+        // compatibility with senders built against those revisions.
         let mut options = HashMap::new();
-        // As per UDP-Notif RFC: When S is set, MT represents a private space to be
-        // freely used for non-standard encodings. When S is set, the Private
-        // Encoding Option SHOULD be present in the UDP-Notif message header.
-        let mut private_is_correct = !s_flag;
         while !header_buf.is_empty() {
             let option = UdpNotifOption::parse(&mut header_buf)?;
-            if s_flag && option.code() == UdpNotifOptionCode::PrivateEncoding {
-                private_is_correct = true;
-            }
             options.insert(option.code(), option);
-        }
-        if !private_is_correct {
-            return Err(UdpNotifPacketParsingError::PrivateEncodingOptionIsNotPresent);
         }
 
         Ok(UdpNotifHeader {

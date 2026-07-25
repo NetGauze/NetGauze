@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::raw::{MediaTypeNames, UdpNotifOption, UdpNotifPacket};
+use crate::raw::{UdpNotifOption, UdpNotifPacket};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 use std::io::Write;
@@ -97,7 +97,10 @@ impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), UdpNotifPacketWritingError> {
         let version: u8 = 0x01;
         let mut first_byte: u8 = version << 5;
-        if MediaTypeNames::from(self.media_type()) == MediaTypeNames::Unknown {
+        // The S-flag says which space the MT value belongs to, so it follows
+        // the media type itself rather than whether the value is registered:
+        // an unregistered value in the standard space keeps S clear.
+        if self.media_type().is_private() {
             first_byte |= 0x10;
         }
         let mt: u8 = self.media_type().into();
