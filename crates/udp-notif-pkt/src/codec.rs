@@ -17,10 +17,8 @@ use crate::raw::{MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use crate::wire::deserialize::UdpNotifPacketParsingError;
 use crate::wire::serialize::UdpNotifPacketWritingError;
 use byteorder::{ByteOrder, NetworkEndian};
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{BufMut, BytesMut};
 use netgauze_parse_utils::WritablePdu;
-use netgauze_parse_utils::reader::SliceReader;
-use netgauze_parse_utils::traits::ParseFrom;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::io;
@@ -314,14 +312,19 @@ impl Decoder for UdpPacketCodec {
         // consume the entire UDP packet before parsing the message
         // to avoid the parsing errors to continue if one message is corrupted
         let pkt_buf = buf.split_to(buf.len());
-        let mut reader = SliceReader::new(pkt_buf.chunk());
-        match UdpNotifPacket::parse(&mut reader) {
+        // The datagram must be exactly the declared message length; any
+        // trailing bytes mean a malformed/padded packet. (`from_bytes`
+        // consumes exactly `msg_len` bytes on success, so this is the same
+        // check the old cursor-remaining assertion performed.)
+        if pkt_buf.len() != msg_len as usize {
+            self.in_message = false;
+            return Err(UdpPacketCodecError::InvalidMessageLength(msg_len));
+        }
+        // `from_bytes` slices the payload zero-copy out of the owned buffer
+        // instead of copying it.
+        match UdpNotifPacket::from_bytes(pkt_buf.freeze()) {
             Ok(pkt) => {
                 self.in_message = false;
-                // Check that the message length matches the actual length of the message
-                if reader.offset() != msg_len as usize || !reader.is_empty() {
-                    return Err(UdpPacketCodecError::InvalidMessageLength(msg_len));
-                }
                 self.try_reassemble_segments(pkt)
             }
             Err(err) => {
