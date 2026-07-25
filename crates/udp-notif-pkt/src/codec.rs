@@ -254,6 +254,14 @@ impl UdpPacketCodec {
         Ok(Some((header_len, message_length)))
     }
 
+    /// Segment number and last-segment flag for `options`.
+    ///
+    /// It is the *absence of the Segmentation Option* that marks a message as
+    /// unsegmented, and therefore complete in a single datagram, whichever
+    /// other options the header happens to carry is irrelevant. Such a message
+    /// is reported as segment 0 with the last-segment flag set, so the caller
+    /// delivers it immediately instead of waiting for segments that will never
+    /// arrive.
     #[inline]
     fn extract_segment_info(options: &HashMap<UdpNotifOptionCode, UdpNotifOption>) -> (u16, bool) {
         options
@@ -265,7 +273,7 @@ impl UdpPacketCodec {
                     unreachable!()
                 }
             })
-            .unwrap_or((0, options.is_empty()))
+            .unwrap_or((0, true))
     }
 
     #[inline]
@@ -395,6 +403,63 @@ mod tests {
         let mut buf = BytesMut::new();
         codec.encode(pkt, &mut buf).expect("encode failed");
         assert_eq!(buf, expected);
+    }
+
+    /// A message without a Segmentation Option is complete in one datagram
+    /// and must be delivered, even when the header carries other options.
+    /// Regression: the unsegmented case used to be inferred from "the header
+    /// has no options at all", so any other option made the codec treat a
+    /// complete message as segment 0 of a series that never arrives, and it
+    /// was silently swallowed until the reassembly timeout.
+    #[test]
+    fn test_decode_unsegmented_with_other_option() {
+        let mut codec = UdpPacketCodec::default();
+        let value: Vec<u8> = vec![
+            0x21, // version 1, no private space, Media type: 1 = YANG data JSON
+            0x10, // Header length (12 + 4 for the option below)
+            0x00, 0x14, // Message length
+            0x01, 0x00, 0x00, 0x01, // Publisher ID
+            0x02, 0x00, 0x00, 0x02, // Message ID
+            0x03, 0x04, 0xaa, 0xbb, // an option that is NOT the Segmentation Option
+            0xff, 0xff, 0xff, 0xff, // dummy payload
+        ];
+        let pkt = UdpNotifPacket::new(
+            MediaType::YangDataJson,
+            0x01000001,
+            0x02000002,
+            HashMap::from([(
+                UdpNotifOptionCode::Unknown(3),
+                UdpNotifOption::Unknown {
+                    typ: 3,
+                    value: vec![0xaa, 0xbb].into(),
+                },
+            )]),
+            Bytes::from(&[0xff, 0xff, 0xff, 0xff][..]),
+        );
+        let mut buf = BytesMut::from(&value[..]);
+
+        assert_eq!(codec.decode(&mut buf), Ok(Some(pkt)));
+        // Nothing should have been parked awaiting reassembly.
+        assert!(codec.incomplete_messages.is_empty());
+    }
+
+    /// The no-options case must keep working; it is the common one.
+    #[test]
+    fn test_decode_unsegmented_without_options() {
+        let mut codec = UdpPacketCodec::default();
+        let value: Vec<u8> = vec![
+            0x21, // version 1, no private space, Media type: 1 = YANG data JSON
+            0x0c, // Header length
+            0x00, 0x0e, // Message length
+            0x01, 0x00, 0x00, 0x01, // Publisher ID
+            0x02, 0x00, 0x00, 0x02, // Message ID
+            0xff, 0xff, // dummy payload
+        ];
+        let mut buf = BytesMut::from(&value[..]);
+
+        let decoded = codec.decode(&mut buf).expect("decode failed");
+        assert!(decoded.is_some());
+        assert!(codec.incomplete_messages.is_empty());
     }
 
     #[test]
