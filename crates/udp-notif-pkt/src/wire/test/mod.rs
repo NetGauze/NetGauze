@@ -181,7 +181,7 @@ fn test_private_encoding() -> Result<(), UdpNotifPacketWritingError> {
         0x02000002,
         HashMap::from([(
             UdpNotifOptionCode::PrivateEncoding,
-            UdpNotifOption::PrivateEncoding(vec![0xdd, 0xee]),
+            UdpNotifOption::PrivateEncoding(vec![0xdd, 0xee].into()),
         )]),
         Bytes::from(&[0xff, 0xff, 0xff, 0xff][..]),
     );

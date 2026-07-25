@@ -50,10 +50,10 @@ impl<'a> ParseFrom<'a> for UdpNotifOption {
                 let last = (low & 0x01) != 0;
                 Ok(UdpNotifOption::Segment { number, last })
             }
-            2 => Ok(UdpNotifOption::PrivateEncoding(value_buf.to_vec())),
+            2 => Ok(UdpNotifOption::PrivateEncoding(value_buf.into())),
             typ => Ok(UdpNotifOption::Unknown {
                 typ,
-                value: value_buf.to_vec(),
+                value: value_buf.into(),
             }),
         }
     }

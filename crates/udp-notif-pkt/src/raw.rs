@@ -103,8 +103,8 @@ impl From<u8> for UdpNotifOptionCode {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum UdpNotifOption {
     Segment { number: u16, last: bool },
-    PrivateEncoding(Vec<u8>),
-    Unknown { typ: u8, value: Vec<u8> },
+    PrivateEncoding(Box<[u8]>),
+    Unknown { typ: u8, value: Box<[u8]> },
 }
 
 impl UdpNotifOption {
