@@ -51,20 +51,55 @@ fn test_simple() -> Result<(), UdpNotifPacketWritingError> {
 }
 
 #[test]
-fn test_invalid_s_flat() {
-    let bad_wire = [
-        0x31, // version 1, private space set, Media type: 1 = YANG data JSON
+/// When the S-flag is set the whole 4-bit MT space is private, so a low
+/// value such as 1 does *not* mean `yang-data+json` — it means whatever the
+/// two endpoints agreed. It must decode as [`MediaType::Private`] and round
+/// trip, rather than being rejected for colliding with a registered value.
+fn test_private_encoding_low_media_type() -> Result<(), UdpNotifPacketWritingError> {
+    let good_wire = [
+        0x31, // version 1, private space set, Media type: 1 (private meaning)
         0x0c, // Header length
         0x00, 0x0e, // Message length
         0x01, 0x00, 0x00, 0x01, // Publisher ID
         0x02, 0x00, 0x00, 0x02, // Message ID
         0xff, 0xff, // dummy payload
     ];
-
-    test_parse_error_bytes_reader::<UdpNotifPacket, UdpNotifPacketParsingError>(
-        &bad_wire,
-        &UdpNotifPacketParsingError::InvalidSFlag,
+    let good = UdpNotifPacket::new(
+        MediaType::Private(1),
+        0x01000001,
+        0x02000002,
+        HashMap::new(),
+        Bytes::from(&[0xff, 0xff][..]),
     );
+
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+/// An unregistered value in the *standard* space (S-flag clear) stays
+/// [`MediaType::Unknown`] and must keep the S-flag clear when written back.
+fn test_unknown_standard_media_type_keeps_s_flag_clear() -> Result<(), UdpNotifPacketWritingError> {
+    let good_wire = [
+        0x2a, // version 1, S-flag clear, Media type: 10 (unregistered)
+        0x0c, // Header length
+        0x00, 0x0e, // Message length
+        0x01, 0x00, 0x00, 0x01, // Publisher ID
+        0x02, 0x00, 0x00, 0x02, // Message ID
+        0xff, 0xff, // dummy payload
+    ];
+    let good = UdpNotifPacket::new(
+        MediaType::Unknown(0xa),
+        0x01000001,
+        0x02000002,
+        HashMap::new(),
+        Bytes::from(&[0xff, 0xff][..]),
+    );
+
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
 }
 
 #[test]
@@ -176,7 +211,7 @@ fn test_private_encoding() -> Result<(), UdpNotifPacketWritingError> {
         0xff, 0xff, 0xff, 0xff, // dummy payload
     ];
     let good = UdpNotifPacket::new(
-        MediaType::Unknown(0xa),
+        MediaType::Private(0xa),
         0x01000001,
         0x02000002,
         HashMap::from([(
@@ -192,8 +227,12 @@ fn test_private_encoding() -> Result<(), UdpNotifPacketWritingError> {
 }
 
 #[test]
-fn test_private_encoding_pen_not_present() {
-    let bad_wire = [
+/// Private encoding is signalled by the S-flag alone. The draft's earlier
+/// "Private Encoding Option" was removed (the IANA registry now assigns only
+/// 0 Reserved and 1 Segmentation), so a private message carrying no options
+/// at all is well formed and must decode.
+fn test_private_encoding_without_options() -> Result<(), UdpNotifPacketWritingError> {
+    let good_wire = [
         0x3a, // version 1, private space, Media type: 10 (just arbitrary picked)
         0x0c, // Header length
         0x00, 0x0e, // Message length
@@ -201,9 +240,15 @@ fn test_private_encoding_pen_not_present() {
         0x02, 0x00, 0x00, 0x02, // Message ID
         0xff, 0xff, // dummy payload
     ];
-
-    test_parse_error_bytes_reader::<UdpNotifPacket, UdpNotifPacketParsingError>(
-        &bad_wire,
-        &UdpNotifPacketParsingError::PrivateEncodingOptionIsNotPresent,
+    let good = UdpNotifPacket::new(
+        MediaType::Private(0xa),
+        0x01000001,
+        0x02000002,
+        HashMap::new(),
+        Bytes::from(&[0xff, 0xff][..]),
     );
+
+    test_parsed_completely_bytes_reader(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
 }

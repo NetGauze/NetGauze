@@ -28,6 +28,17 @@ use strum_macros::Display;
 pub const UDP_NOTIF_V1: u8 = 1;
 
 /// Media Type of the UDP Notif paylaod
+///
+/// The 4-bit MT field is interpreted against one of two disjoint spaces,
+/// selected by the S-flag of the message header
+/// ([draft-ietf-netconf-udp-notif](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-udp-notif) Section 3.3):
+///
+/// - S-flag clear: the standard space, i.e. the values registered with IANA.
+/// - S-flag set: a private space, where *all* 16 values are available and their
+///   meaning is agreed out-of-band between publisher and receiver. These are
+///   represented by [`MediaType::Private`], deliberately distinct from the
+///   standard variants so that a private payload is never mistaken for (say)
+///   `yang-data+json` just because it happens to use value 1.
 #[derive(
     Display,
     Debug,
@@ -53,11 +64,21 @@ pub enum MediaType {
     /// media type application/yang-data+cbor
     YangDataCbor,
 
+    /// A value in the standard space that is not (yet) registered with IANA.
     Unknown(u8),
+
+    /// A value in the private space, i.e. carried with the S-flag set. The
+    /// meaning of the value is not defined by the specification.
+    Private(u8),
 }
 
-impl From<u8> for MediaType {
-    fn from(value: u8) -> Self {
+impl MediaType {
+    /// Interpret a raw 4-bit MT field. `private` is the S-flag of the message
+    /// header, which selects which space `value` belongs to.
+    pub const fn from_wire(value: u8, private: bool) -> Self {
+        if private {
+            return MediaType::Private(value);
+        }
         match value {
             0 => MediaType::Reserved,
             1 => MediaType::YangDataJson,
@@ -65,6 +86,20 @@ impl From<u8> for MediaType {
             3 => MediaType::YangDataCbor,
             value => MediaType::Unknown(value),
         }
+    }
+
+    /// Whether this media type belongs to the private space, i.e. whether the
+    /// S-flag must be set when serializing it.
+    pub const fn is_private(&self) -> bool {
+        matches!(self, MediaType::Private(_))
+    }
+}
+
+impl From<u8> for MediaType {
+    /// Interpret `value` in the standard space. Use [`MediaType::from_wire`]
+    /// when the S-flag is known.
+    fn from(value: u8) -> Self {
+        MediaType::from_wire(value, false)
     }
 }
 
@@ -75,7 +110,7 @@ impl From<MediaType> for u8 {
             MediaType::YangDataJson => 1,
             MediaType::YangDataXml => 2,
             MediaType::YangDataCbor => 3,
-            MediaType::Unknown(value) => value,
+            MediaType::Unknown(value) | MediaType::Private(value) => value,
         }
     }
 }
