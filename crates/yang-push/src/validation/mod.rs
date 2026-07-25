@@ -1001,7 +1001,7 @@ impl ValidationActor {
     ) -> Option<SubscriptionInfo> {
         let modules = match sub_started.module_version() {
             Some(modules) => {
-                let mut modules = modules.clone();
+                let mut modules = modules.to_vec();
                 modules.push(YangPushModuleVersion::new(
                     "ietf-subscribed-notifications".into(),
                     None,

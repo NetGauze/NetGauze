@@ -40,7 +40,7 @@
 //! │                    NotificationEnvelope                         │
 //! ├─────────────────────────────────────────────────────────────────┤
 //! │  event-time: DateTime<Utc>          (required)                  │
-//! │  hostname: Option<String>           (optional)                  │
+//! │  hostname: Option<Box<str>>           (optional)                │
 //! │  sequence-number: Option<u32>       (optional, RFC 9187)        │
 //! │  contents: Option<NotificationVariant>                          │
 //! │  extra_fields: Value                (YANG augmentations)        │
@@ -58,10 +58,10 @@
 //! │  │  stop-time: Option<DateTime<Utc>>    (optional)           │  │
 //! │  │  transport: Option<Transport>        (optional)           │  │
 //! │  │  encoding: Option<Encoding>          (optional)           │  │
-//! │  │  purpose: Option<String>             (optional)           │  │
+//! │  │  purpose: Option<Box<str>>           (optional)           │  │
 //! │  │  update_trigger: Option<UpdateTrigger> (optional)         │  │
-//! │  │  module_version: Option<Vec<YangPushModuleVersion>>       │  │
-//! │  │  yang_library_content_id: Option<String>                  │  │
+//! │  │  module_version: Option<Box<[YangPushModuleVersion]>>     │  │
+//! │  │  yang_library_content_id: Option<Box<str>>                │  │
 //! │  │  extra_fields: Value                 (YANG augmentations) │  │
 //! │  └───────────────────────────────────────────────────────────┘  │
 //! │                                                                 │
@@ -69,7 +69,7 @@
 //! │  │ SubscriptionTerminated (RFC 8639)                         │  │
 //! │  ├───────────────────────────────────────────────────────────┤  │
 //! │  │  id: SubscriptionId                  (required)           │  │
-//! │  │  reason: String                      (required)           │  │
+//! │  │  reason: Box<str>                      (required)         │  │
 //! │  │  extra_fields: Value                 (YANG augmentations) │  │
 //! │  └───────────────────────────────────────────────────────────┘  │
 //! │                                                                 │
@@ -104,7 +104,7 @@
 //! │                    NotificationLegacy                           │
 //! ├─────────────────────────────────────────────────────────────────┤
 //! │  eventTime: DateTime<Utc>           (required)                  │
-//! │  sysName: Option<String>            (optional, sequencing ext)  │
+//! │  sysName: Option<Box<str>>            (optional, sequencing ext)  │
 //! │  notification: Option<NotificationVariant>                      │
 //! │  extra_fields: Value                (YANG augmentations)        │
 //! ├─────────────────────────────────────────────────────────────────┤
@@ -121,10 +121,10 @@
 //! │  │  stop-time: Option<DateTime<Utc>>    (optional)           │  │
 //! │  │  transport: Option<Transport>        (optional)           │  │
 //! │  │  encoding: Option<Encoding>          (optional)           │  │
-//! │  │  purpose: Option<String>             (optional)           │  │
+//! │  │  purpose: Option<Box<str>>             (optional)         │  │
 //! │  │  update_trigger: Option<UpdateTrigger> (optional)         │  │
-//! │  │  module_version: Option<Vec<YangPushModuleVersion>>       │  │
-//! │  │  yang_library_content_id: Option<String>                  │  │
+//! │  │  module_version: Option<Box<[YangPushModuleVersion]>>     │  │
+//! │  │  yang_library_content_id: Option<Box<str>>                │  │
 //! │  │  extra_fields: Value                 (YANG augmentations) │  │
 //! │  └───────────────────────────────────────────────────────────┘  │
 //! │                                                                 │
@@ -132,7 +132,7 @@
 //! │  │ SubscriptionTerminated (RFC 8639)                         │  │
 //! │  ├───────────────────────────────────────────────────────────┤  │
 //! │  │  id: SubscriptionId                  (required)           │  │
-//! │  │  reason: String                      (required)           │  │
+//! │  │  reason: Box<str>                      (required)         │  │
 //! │  │  extra_fields: Value                 (YANG augmentations) │  │
 //! │  └───────────────────────────────────────────────────────────┘  │
 //! │                                                                 │
@@ -231,7 +231,7 @@ pub struct NotificationEnvelope {
     event_time: DateTime<Utc>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    hostname: Option<String>,
+    hostname: Option<Box<str>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     sequence_number: Option<u32>,
@@ -249,7 +249,7 @@ pub struct NotificationEnvelope {
 impl NotificationEnvelope {
     pub const fn new(
         event_time: DateTime<Utc>,
-        hostname: Option<String>,
+        hostname: Option<Box<str>>,
         sequence_number: Option<u32>,
         contents: Option<NotificationVariant>,
         extra_fields: Value,
@@ -303,7 +303,7 @@ pub struct NotificationLegacy {
 
     #[serde(rename = "ietf-notification-sequencing:sysName")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    sys_name: Option<String>,
+    sys_name: Option<Box<str>>,
 
     #[serde(flatten)]
     notification: Option<NotificationVariant>,
@@ -315,7 +315,7 @@ pub struct NotificationLegacy {
 impl NotificationLegacy {
     pub const fn new(
         event_time: DateTime<Utc>,
-        sys_name: Option<String>,
+        sys_name: Option<Box<str>>,
         notification: Option<NotificationVariant>,
         extra_fields: Value,
     ) -> Self {
@@ -436,7 +436,7 @@ pub struct SubscriptionStartedModified {
     encoding: Option<Encoding>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    purpose: Option<String>,
+    purpose: Option<Box<str>>,
 
     #[serde(
         rename = "ietf-distributed-notif:message-publisher-id",
@@ -449,11 +449,11 @@ pub struct SubscriptionStartedModified {
 
     #[serde(rename = "ietf-yang-push-revision:module-version")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    module_version: Option<Vec<YangPushModuleVersion>>,
+    module_version: Option<Box<[YangPushModuleVersion]>>,
 
     #[serde(rename = "ietf-yang-push-revision:yang-library-content-id")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    yang_library_content_id: Option<String>,
+    yang_library_content_id: Option<Box<str>>,
 
     #[serde(flatten)]
     extra_fields: Value,
@@ -470,11 +470,11 @@ impl SubscriptionStartedModified {
         dependency: Option<SubscriptionId>,
         transport: Option<Transport>,
         encoding: Option<Encoding>,
-        purpose: Option<String>,
+        purpose: Option<Box<str>>,
         message_publisher_id: Option<Box<[u32]>>,
         update_trigger: Option<UpdateTrigger>,
-        module_version: Option<Vec<YangPushModuleVersion>>,
-        yang_library_content_id: Option<String>,
+        module_version: Option<Box<[YangPushModuleVersion]>>,
+        yang_library_content_id: Option<Box<str>>,
         extra_fields: Value,
     ) -> Self {
         Self {
@@ -539,8 +539,8 @@ impl SubscriptionStartedModified {
         self.update_trigger.as_ref()
     }
 
-    pub const fn module_version(&self) -> Option<&Vec<YangPushModuleVersion>> {
-        self.module_version.as_ref()
+    pub fn module_version(&self) -> Option<&[YangPushModuleVersion]> {
+        self.module_version.as_deref()
     }
 
     pub fn yang_library_content_id(&self) -> Option<&str> {
@@ -649,11 +649,11 @@ impl TryFrom<Subscription> for SubscriptionStartedModified {
             value.dependency,
             value.transport,
             value.encoding,
-            value.purpose.map(|p| p.into()),
+            value.purpose,
             value.message_publisher_id,
             value.update_trigger,
-            value.module_version.map(|v| v.into_vec()),
-            value.yang_library_content_id,
+            value.module_version,
+            value.yang_library_content_id.map(Into::into),
             serde_json::json!({}), // No extra fields in this conversion
         );
         Ok(value)
@@ -664,14 +664,14 @@ impl TryFrom<Subscription> for SubscriptionStartedModified {
 pub struct SubscriptionTerminated {
     id: SubscriptionId,
 
-    reason: String,
+    reason: Box<str>,
 
     #[serde(flatten)]
     extra_fields: Value,
 }
 
 impl SubscriptionTerminated {
-    pub const fn new(id: SubscriptionId, reason: String, extra_fields: Value) -> Self {
+    pub const fn new(id: SubscriptionId, reason: Box<str>, extra_fields: Value) -> Self {
         Self {
             id,
             reason,
@@ -1017,26 +1017,29 @@ mod tests {
             dscp: None,
             weighting: None,
             dependency: None,
-            purpose: Some("test-purpose".to_string()),
+            purpose: Some("test-purpose".into()),
             message_publisher_id: None,
             update_trigger: Some(UpdateTrigger::OnChange {
                 dampening_period: Some(CentiSeconds::new(100)),
                 sync_on_start: Some(true),
                 excluded_change: Some(Box::new([ChangeType::Create, ChangeType::Replace])),
             }),
-            module_version: Some(vec![YangPushModuleVersion {
-                name: "example-module".into(),
-                revision: Some("2025-04-25".into()),
-                version: None,
-            }]),
-            yang_library_content_id: Some("content-id".to_string()),
+            module_version: Some(
+                vec![YangPushModuleVersion {
+                    name: "example-module".into(),
+                    revision: Some("2025-04-25".into()),
+                    version: None,
+                }]
+                .into(),
+            ),
+            yang_library_content_id: Some("content-id".into()),
             extra_fields: serde_json::json!({}),
         };
 
         // Create a Notification instance
         let notification = NotificationLegacy {
             event_time,
-            sys_name: Some("example-node".to_string()),
+            sys_name: Some("example-node".into()),
             notification: Some(NotificationVariant::SubscriptionStarted(
                 sub_started.clone(),
             )),
@@ -1057,7 +1060,7 @@ mod tests {
         // Create a NotificationEnvelope instance
         let notification_envelope = NotificationEnvelope {
             event_time,
-            hostname: Some("example-host".to_string()),
+            hostname: Some("example-host".into()),
             sequence_number: Some(12345),
             contents: Some(NotificationVariant::SubscriptionStarted(sub_started)),
             extra_fields: serde_json::json!({}),
@@ -1117,19 +1120,22 @@ mod tests {
             dscp: None,
             weighting: None,
             dependency: None,
-            purpose: Some("test-purpose".to_string()),
+            purpose: Some("test-purpose".into()),
             message_publisher_id: None,
             update_trigger: Some(UpdateTrigger::OnChange {
                 dampening_period: Some(CentiSeconds::new(100)),
                 sync_on_start: Some(true),
                 excluded_change: Some(Box::new([ChangeType::Create, ChangeType::Replace])),
             }),
-            module_version: Some(vec![YangPushModuleVersion {
-                name: "example-module".into(),
-                revision: Some("2025-04-25".into()),
-                version: None,
-            }]),
-            yang_library_content_id: Some("content-id".to_string()),
+            module_version: Some(
+                vec![YangPushModuleVersion {
+                    name: "example-module".into(),
+                    revision: Some("2025-04-25".into()),
+                    version: None,
+                }]
+                .into(),
+            ),
+            yang_library_content_id: Some("content-id".into()),
             extra_fields: serde_json::json!({}),
         };
 
@@ -1150,7 +1156,7 @@ mod tests {
             event_time: DateTime::parse_from_rfc3339("2025-05-12T12:00:00Z")
                 .unwrap()
                 .with_timezone(&Utc),
-            sys_name: Some("example-node".to_string()),
+            sys_name: Some("example-node".into()),
             notification: Some(NotificationVariant::SubscriptionStarted(
                 sub_started.clone(),
             )),
@@ -1175,7 +1181,7 @@ mod tests {
             event_time: DateTime::parse_from_rfc3339("2025-03-04T07:31:36.806021107Z")
                 .unwrap()
                 .with_timezone(&Utc),
-            hostname: Some("example-host".to_string()),
+            hostname: Some("example-host".into()),
             sequence_number: Some(12345),
             contents: Some(NotificationVariant::SubscriptionStarted(sub_started)),
             extra_fields: serde_json::json!({}),
@@ -1227,14 +1233,14 @@ mod tests {
         // Create a SubscriptionTerminated instance
         let sub_terminated = SubscriptionTerminated {
             id: 1,
-            reason: "some-reason".to_string(),
+            reason: "some-reason".into(),
             extra_fields: serde_json::json!({}),
         };
 
         // Create a Notification instance
         let notification = NotificationLegacy {
             event_time,
-            sys_name: Some("example-node".to_string()),
+            sys_name: Some("example-node".into()),
             notification: Some(NotificationVariant::SubscriptionTerminated(
                 sub_terminated.clone(),
             )),
@@ -1255,7 +1261,7 @@ mod tests {
         // Create a NotificationEnvelope instance
         let notification_envelope = NotificationEnvelope {
             event_time,
-            hostname: Some("example-host".to_string()),
+            hostname: Some("example-host".into()),
             sequence_number: Some(12345),
             contents: Some(NotificationVariant::SubscriptionTerminated(sub_terminated)),
             extra_fields: serde_json::json!({}),
@@ -1279,7 +1285,7 @@ mod tests {
         // Create a SubscriptionTerminated instance
         let sub_terminated = SubscriptionTerminated {
             id: 2462462462,
-            reason: "this-is-the-yang-push-sub-terminated-reason".to_string(),
+            reason: "this-is-the-yang-push-sub-terminated-reason".into(),
             extra_fields: serde_json::json!({}),
         };
 
@@ -1400,7 +1406,7 @@ mod tests {
         // Create a Notification instance
         let notification = NotificationLegacy {
             event_time,
-            sys_name: Some("example-node".to_string()),
+            sys_name: Some("example-node".into()),
             notification: Some(NotificationVariant::YangPushUpdate(
                 yang_push_update.clone(),
             )),
@@ -1421,7 +1427,7 @@ mod tests {
         // Create a NotificationEnvelope instance
         let notification_envelope = NotificationEnvelope {
             event_time,
-            hostname: Some("example-host".to_string()),
+            hostname: Some("example-host".into()),
             sequence_number: Some(12345),
             contents: Some(NotificationVariant::YangPushUpdate(yang_push_update)),
             extra_fields: serde_json::json!({}),
@@ -1596,7 +1602,7 @@ mod tests {
                 revision: Some("2025-04-25".into()),
                 version: None,
             }])),
-            yang_library_content_id: Some("content-id".to_string()),
+            yang_library_content_id: Some("content-id".into()),
         };
 
         let expected = SubscriptionStartedModified {
@@ -1621,12 +1627,15 @@ mod tests {
                         .with_timezone(&Utc),
                 ),
             }),
-            module_version: Some(vec![YangPushModuleVersion {
-                name: "example-module".into(),
-                revision: Some("2025-04-25".into()),
-                version: None,
-            }]),
-            yang_library_content_id: Some("content-id".to_string()),
+            module_version: Some(
+                vec![YangPushModuleVersion {
+                    name: "example-module".into(),
+                    revision: Some("2025-04-25".into()),
+                    version: None,
+                }]
+                .into(),
+            ),
+            yang_library_content_id: Some("content-id".into()),
             extra_fields: serde_json::json!({}),
         };
         let converted: Result<SubscriptionStartedModified, SubscriptionConvertError> =
