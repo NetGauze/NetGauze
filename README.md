@@ -103,7 +103,7 @@ Add the crate you need to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-netgauze-bgp-pkt = "0.9"
+netgauze-bgp-pkt = "0.12"
 ```
 
 Parse a BGP message from bytes:
@@ -111,12 +111,13 @@ Parse a BGP message from bytes:
 ```rust
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
-let raw: & [u8] = & [ /* BGP message bytes */ ];
-let span = Span::new(raw);
-let mut ctx = BgpParsingContext::default ();
-let (_remaining, message) = BgpMessage::from_wire(span, & mut ctx).unwrap();
+let raw: &[u8] = &[ /* BGP message bytes */ ];
+let mut reader = SliceReader::new(raw);
+let mut ctx = BgpParsingContext::default();
+let message = BgpMessage::parse(&mut reader, &mut ctx).unwrap();
 ```
 
 ## Design Principles
