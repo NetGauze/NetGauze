@@ -21,7 +21,9 @@ use chrono::{TimeZone, Utc};
 
 use netgauze_flow_pkt::ipfix::*;
 use netgauze_flow_pkt::{DataSetId, FieldSpecifier, ie};
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInput};
+use netgauze_parse_utils::WritablePduWithOneInput;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
 fn main() {
     // Cache to share the templates for decoding data packets
@@ -58,7 +60,7 @@ fn main() {
         ]
     );
     // Deserialize the message from binary format
-    let (_, msg_back) = IpfixPacket::from_wire(Span::new(&buf), &mut templates_map).unwrap();
+    let msg_back = IpfixPacket::parse(&mut SliceReader::new(&buf), &mut templates_map).unwrap();
     assert_eq!(ipfix_template, msg_back);
 
     // IPFIX data packet
@@ -96,6 +98,6 @@ fn main() {
         ]
     );
     // Deserialize the message from binary format
-    let (_, msg_back) = IpfixPacket::from_wire(Span::new(&buf), &mut templates_map).unwrap();
+    let msg_back = IpfixPacket::parse(&mut SliceReader::new(&buf), &mut templates_map).unwrap();
     assert_eq!(ipfix_data, msg_back);
 }

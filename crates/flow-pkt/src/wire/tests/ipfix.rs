@@ -19,8 +19,9 @@ use crate::wire::serializer::ipfix::*;
 use crate::{DataSetId, FieldSpecifier, ie};
 use chrono::{TimeZone, Timelike, Utc};
 use netgauze_iana::tcp::*;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::test_helpers::*;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
@@ -104,28 +105,28 @@ fn test_ipfix_header() -> Result<(), IpfixPacketWritingError> {
         )]))]),
     );
 
-    let bad_version = LocatedIpfixPacketParsingError::new(
-        Span::new(&bad_version_wire),
-        IpfixPacketParsingError::UnsupportedVersion(0),
-    );
-    let bad_length = LocatedIpfixPacketParsingError::new(
-        unsafe { Span::new_from_raw_offset(2, &bad_length_wire[2..]) },
-        IpfixPacketParsingError::InvalidLength(0),
-    );
+    let bad_version = IpfixPacketParsingError::UnsupportedVersion {
+        offset: 0,
+        version: 0,
+    };
+    let bad_length = IpfixPacketParsingError::InvalidLength {
+        offset: 2,
+        length: 0,
+    };
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut templates_map, &good);
     assert!(templates_map.contains_key(&307));
 
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         IpfixPacket,
         &mut TemplatesMap,
-        LocatedIpfixPacketParsingError<'_>,
+        IpfixPacketParsingError,
     >(&bad_version_wire, &mut templates_map, &bad_version);
-    test_parse_error_with_one_input::<
+    test_parse_error_with_one_input_bytes_reader::<
         IpfixPacket,
         &mut TemplatesMap,
-        LocatedIpfixPacketParsingError<'_>,
+        IpfixPacketParsingError,
     >(&bad_length_wire, &mut templates_map, &bad_length);
 
     test_write_with_one_input(&good, None, &good_wire)?;
@@ -184,7 +185,7 @@ fn test_template_packet() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut templates_map, &good);
     assert!(templates_map.contains_key(&307));
 
     test_write_with_one_input(&good, None, &good_wire)?;
@@ -284,7 +285,7 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
             )]),
         }]),
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut templates_map, &good);
     assert_eq!(templates_map.get(&template_id).unwrap().processed_count, 1);
     test_write_with_one_input(&good, Some(&templates_map), &good_wire)?;
     Ok(())
@@ -322,7 +323,7 @@ fn test_options_template_packet() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut templates_map, &good);
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
 }
@@ -458,8 +459,8 @@ fn test_complex_sequence() -> Result<(), IpfixPacketWritingError> {
         0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc3, 0xc8, 0x80, 0xe8,
         0x06, 0x02, 0x04, 0x00];
 
-    let (_, _pkt1) = IpfixPacket::from_wire(Span::new(&pkt1_wire), &mut templates_map).unwrap();
-    let (_, _pkt2)  = IpfixPacket::from_wire(Span::new(&pkt2_wire), &mut templates_map).unwrap();
+    let _pkt1 = IpfixPacket::parse(&mut SliceReader::new(&pkt1_wire), &mut templates_map).unwrap();
+    let _pkt2 = IpfixPacket::parse(&mut SliceReader::new(&pkt2_wire), &mut templates_map).unwrap();
     // TODO: test writing complex packets
     Ok(())
 }
@@ -507,8 +508,8 @@ fn test_example() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    //let (_, pkt1) = IpfixPacket::from_wire(Span::new(&good), &mut templates_map).unwrap();
-    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    //let pkt1 = IpfixPacket::parse(&mut SliceReader::new(&good), &mut templates_map).unwrap();
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut templates_map, &good);
 
     //test_write_with_one_input(&good, None, &good_wire)?;
 
@@ -577,9 +578,17 @@ fn test_with_variable_string_length() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_template_wire,
+        &mut templates_map,
+        &good_template,
+    );
 
-    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_data_wire,
+        &mut templates_map,
+        &good_data,
+    );
     test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
     test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
     Ok(())
@@ -661,8 +670,16 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
-    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_template_wire,
+        &mut templates_map,
+        &good_template,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_data_wire,
+        &mut templates_map,
+        &good_data,
+    );
 
     test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
     test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
@@ -769,8 +786,16 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
-    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_template_wire,
+        &mut templates_map,
+        &good_template,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_data_wire,
+        &mut templates_map,
+        &good_data,
+    );
 
     test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
     test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
@@ -847,8 +872,16 @@ fn test_with_vendor_unknown_fields() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
-    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_template_wire,
+        &mut templates_map,
+        &good_template,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_data_wire,
+        &mut templates_map,
+        &good_data,
+    );
 
     test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
     test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
@@ -970,8 +1003,16 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
-    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_template_wire,
+        &mut templates_map,
+        &good_template,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_data_wire,
+        &mut templates_map,
+        &good_data,
+    );
 
     test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
     test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
@@ -986,7 +1027,10 @@ fn test_zero_length_fields() {
         3, 0, 10, 55, 1, 0, 0, 0, 0, 55, 1, 0, 10, 48, 56, 48, 0, 0, 0, 0, 55, 48, 0, 10, 55,
     ];
     let mut templates_map = HashMap::new();
-    let ret = IpfixPacket::from_wire(Span::new(&good_template_wire), &mut templates_map);
+    let ret = IpfixPacket::parse(
+        &mut SliceReader::new(&good_template_wire),
+        &mut templates_map,
+    );
     assert!(ret.is_err());
 }
 
@@ -1055,8 +1099,16 @@ fn test_with_unknown_pen() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
-    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_template_wire,
+        &mut templates_map,
+        &good_template,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_data_wire,
+        &mut templates_map,
+        &good_data,
+    );
 
     test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
     test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
@@ -1309,8 +1361,16 @@ fn test_with_vendor_unknown_field_complex() -> Result<(), IpfixPacketWritingErro
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
-    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_template_wire,
+        &mut templates_map,
+        &good_template,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &good_data_wire,
+        &mut templates_map,
+        &good_data,
+    );
 
     test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
     test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
@@ -1431,18 +1491,18 @@ fn test_octet_array_variable_len() -> Result<(), IpfixPacketWritingError> {
     let mut templates_map_fixed = HashMap::new();
     let mut templates_map_variable = HashMap::new();
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &template_fixed_size_wire,
         &mut templates_map_fixed,
         &template_fixed_size,
     );
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &template_variable_size_wire,
         &mut templates_map_variable,
         &template_variable_size,
     );
 
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_one_input_bytes_reader(
         &template_variable_size_wire,
         &mut templates_map_variable,
         &template_variable_size,
@@ -1459,8 +1519,16 @@ fn test_octet_array_variable_len() -> Result<(), IpfixPacketWritingError> {
         &template_variable_size_wire,
     )?;
 
-    test_parsed_completely_with_one_input(&data_fixed_wire, &mut templates_map_fixed, &data);
-    test_parsed_completely_with_one_input(&data_variable_wire, &mut templates_map_variable, &data);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &data_fixed_wire,
+        &mut templates_map_fixed,
+        &data,
+    );
+    test_parsed_completely_with_one_input_bytes_reader(
+        &data_variable_wire,
+        &mut templates_map_variable,
+        &data,
+    );
 
     // with no template, then assume fixed size not variable length.
     test_write_with_one_input(&data, Some(&templates_map_empty), &data_fixed_wire)?;
@@ -1620,7 +1688,11 @@ fn test_flow_set_len_bug() -> Result<(), IpfixPacketWritingError> {
     );
 
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&template_wire, &mut templates_map, &template);
+    test_parsed_completely_with_one_input_bytes_reader(
+        &template_wire,
+        &mut templates_map,
+        &template,
+    );
     test_write_with_one_input(&template, Some(&templates_map), &template_wire)?;
 
     test_write_with_one_input(&data, Some(&templates_map), &data_wire)?;
@@ -1666,20 +1738,25 @@ fn test_string_variable_length() -> Result<(), IpfixPacketWritingError> {
     let larger_than_u8 = ie::Field::applicationName(large.into());
     let ie_name = ie::IE::applicationName;
 
-    test_parsed_completely_with_two_inputs(&less_than_u8_wire, &ie_name, u16::MAX, &less_than_u8);
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &less_than_u8_wire,
+        &ie_name,
+        u16::MAX,
+        &less_than_u8,
+    );
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &less_than_u8_wire[1..],
         &ie_name,
         small.len() as u16,
         &less_than_u8,
     );
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &larger_than_u8_wire,
         &ie_name,
         u16::MAX,
         &larger_than_u8,
     );
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &larger_than_u8_wire[4..],
         &ie_name,
         large.len() as u16,
@@ -1737,9 +1814,14 @@ fn test_octet_array_variable_length() -> Result<(), IpfixPacketWritingError> {
     let ie_name = ie::IE::paddingOctets;
 
     // Test parsing with variable length (u16::MAX indicates variable length)
-    test_parsed_completely_with_two_inputs(&less_than_u8_wire, &ie_name, u16::MAX, &less_than_u8);
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &less_than_u8_wire,
+        &ie_name,
+        u16::MAX,
+        &less_than_u8,
+    );
     // Test parsing with fixed length
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &less_than_u8_wire[1..],
         &ie_name,
         small_data.len() as u16,
@@ -1747,14 +1829,14 @@ fn test_octet_array_variable_length() -> Result<(), IpfixPacketWritingError> {
     );
 
     // Test parsing large octet array with variable length
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &larger_than_u8_wire,
         &ie_name,
         u16::MAX,
         &larger_than_u8,
     );
     // Test parsing large octet array with fixed length
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &larger_than_u8_wire[4..],
         &ie_name,
         large_data.len() as u16,
@@ -1840,7 +1922,7 @@ fn test_padding_min_length_issue_360() -> Result<(), IpfixPacketWritingError> {
         ),
     );
 
-    test_parsed_completely_with_one_input(&data_wire, &mut templates_map, &data);
+    test_parsed_completely_with_one_input_bytes_reader(&data_wire, &mut templates_map, &data);
     test_write_with_one_input(&data, None, &data_wire)?;
     test_write_with_one_input(&data, Some(&templates_map), &data_wire)?;
     Ok(())

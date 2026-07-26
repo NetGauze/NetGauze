@@ -20,7 +20,6 @@ mod netflow;
 pub mod pcap_tests;
 
 use chrono::{TimeZone, Timelike, Utc};
-use netgauze_parse_utils::Span;
 use netgauze_parse_utils::test_helpers::*;
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
@@ -50,16 +49,16 @@ fn test_template_record() -> Result<(), TemplateRecordWritingError> {
         ]),
     );
 
-    let bad_template_id = LocatedTemplateRecordParsingError::new(
-        Span::new(&bad_template_id_wire),
-        TemplateRecordParsingError::InvalidTemplateId(0),
-    );
+    let bad_template_id = TemplateRecordParsingError::InvalidTemplateId {
+        offset: 0,
+        template_id: 0,
+    };
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
-    test_parse_error_with_one_input::<
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut templates_map, &good);
+    test_parse_error_with_one_input_bytes_reader::<
         TemplateRecord,
         &mut TemplatesMap,
-        LocatedTemplateRecordParsingError<'_>,
+        TemplateRecordParsingError,
     >(&bad_template_id_wire, &mut templates_map, &bad_template_id);
     test_write(&good, &good_wire)?;
     Ok(())
@@ -69,7 +68,7 @@ fn test_template_record() -> Result<(), TemplateRecordWritingError> {
 fn test_field() -> Result<(), FieldSpecifierWritingError> {
     let good_ipv4_src_wire = [0x00, 0x08, 0x00, 0x04];
     let good_ipv4_src = FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap();
-    test_parsed_completely(&good_ipv4_src_wire, &good_ipv4_src);
+    test_parsed_completely_bytes_reader(&good_ipv4_src_wire, &good_ipv4_src);
     test_write(&good_ipv4_src, &good_ipv4_src_wire)?;
     Ok(())
 }
@@ -78,25 +77,23 @@ fn test_field() -> Result<(), FieldSpecifierWritingError> {
 fn test_u8_value() -> Result<(), ie_ser::FieldWritingError> {
     let value_wire = [123];
     let value = ie::Field::protocolIdentifier(ie::protocolIdentifier::PTP);
-    let invalid_length = ie_desr::LocatedFieldParsingError::new(
-        Span::new(&value_wire),
-        ie_desr::FieldParsingError::InvalidLength {
-            ie_name: "protocolIdentifier".to_string(),
-            length: 2,
-        },
+    let invalid_length = ie_desr::FieldParsingError::InvalidLength {
+        offset: 0,
+        ie_name: "protocolIdentifier".to_string(),
+        length: 2,
+    };
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &value_wire,
+        &ie::IE::protocolIdentifier,
+        1u16,
+        &value,
     );
-    test_parsed_completely_with_two_inputs(&value_wire, &ie::IE::protocolIdentifier, 1u16, &value);
-    test_parse_error_with_two_inputs::<
+    test_parse_error_with_two_inputs_bytes_reader::<
         ie::Field,
         &ie::IE,
         u16,
-        ie_desr::LocatedFieldParsingError<'_>,
-    >(
-        &value_wire,
-        &ie::IE::protocolIdentifier,
-        2,
-        nom::Err::Error(invalid_length),
-    );
+        ie_desr::FieldParsingError,
+    >(&value_wire, &ie::IE::protocolIdentifier, 2, &invalid_length);
     test_write_with_one_input(&value, None, &value_wire)?;
     Ok(())
 }
@@ -105,24 +102,27 @@ fn test_u8_value() -> Result<(), ie_ser::FieldWritingError> {
 fn test_f64_value() -> Result<(), ie_ser::FieldWritingError> {
     let value_wire = [64, 94, 217, 153, 153, 153, 153, 154];
     let value = Field::samplingProbability(ordered_float::OrderedFloat::from(123.4));
-    let invalid_length = ie_desr::LocatedFieldParsingError::new(
-        Span::new(&value_wire),
-        ie_desr::FieldParsingError::InvalidLength {
-            ie_name: "samplingProbability".to_string(),
-            length: 4,
-        },
+    let invalid_length = ie_desr::FieldParsingError::InvalidLength {
+        offset: 0,
+        ie_name: "samplingProbability".to_string(),
+        length: 4,
+    };
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &value_wire,
+        &ie::IE::samplingProbability,
+        8u16,
+        &value,
     );
-    test_parsed_completely_with_two_inputs(&value_wire, &ie::IE::samplingProbability, 8u16, &value);
-    test_parse_error_with_two_inputs::<
+    test_parse_error_with_two_inputs_bytes_reader::<
         ie::Field,
         &ie::IE,
         u16,
-        ie_desr::LocatedFieldParsingError<'_>,
+        ie_desr::FieldParsingError,
     >(
         &value_wire,
         &ie::IE::samplingProbability,
         4,
-        nom::Err::Error(invalid_length),
+        &invalid_length,
     );
     test_write_with_one_input(&value, None, &value_wire)?;
     Ok(())
@@ -132,24 +132,27 @@ fn test_f64_value() -> Result<(), ie_ser::FieldWritingError> {
 fn test_mac_address_value() -> Result<(), ie_ser::FieldWritingError> {
     let value_wire = [0x12, 0xc6, 0x21, 0x12, 0x69, 0x32];
     let value = ie::Field::sourceMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32]);
-    let invalid_length = ie_desr::LocatedFieldParsingError::new(
-        Span::new(&value_wire),
-        ie_desr::FieldParsingError::InvalidLength {
-            ie_name: "sourceMacAddress".to_string(),
-            length: 2,
-        },
+    let invalid_length = ie_desr::FieldParsingError::InvalidLength {
+        offset: 0,
+        ie_name: "sourceMacAddress".to_string(),
+        length: 2,
+    };
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &value_wire,
+        &ie::IE::sourceMacAddress,
+        6u16,
+        &value,
     );
-    test_parsed_completely_with_two_inputs(&value_wire, &ie::IE::sourceMacAddress, 6u16, &value);
-    test_parse_error_with_two_inputs::<
+    test_parse_error_with_two_inputs_bytes_reader::<
         ie::Field,
         &ie::IE,
         u16,
-        ie_desr::LocatedFieldParsingError<'_>,
+        ie_desr::FieldParsingError,
     >(
         &value_wire,
         &ie::IE::sourceMacAddress,
         2u16,
-        nom::Err::Error(invalid_length),
+        &invalid_length,
     );
     test_write_with_one_input(&value, None, &value_wire)?;
     Ok(())
@@ -159,24 +162,27 @@ fn test_mac_address_value() -> Result<(), ie_ser::FieldWritingError> {
 fn test_ipv4_address_value() -> Result<(), ie_ser::FieldWritingError> {
     let good_wire = [0x46, 0x01, 0x73, 0x01];
     let value = ie::Field::sourceIPv4Address(Ipv4Addr::new(70, 1, 115, 1));
-    let invalid_length = ie_desr::LocatedFieldParsingError::new(
-        Span::new(&good_wire),
-        ie_desr::FieldParsingError::InvalidLength {
-            ie_name: "sourceIPv4Address".to_string(),
-            length: 2,
-        },
+    let invalid_length = ie_desr::FieldParsingError::InvalidLength {
+        offset: 0,
+        ie_name: "sourceIPv4Address".to_string(),
+        length: 2,
+    };
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &good_wire,
+        &ie::IE::sourceIPv4Address,
+        4u16,
+        &value,
     );
-    test_parsed_completely_with_two_inputs(&good_wire, &ie::IE::sourceIPv4Address, 4u16, &value);
-    test_parse_error_with_two_inputs::<
+    test_parse_error_with_two_inputs_bytes_reader::<
         ie::Field,
         &ie::IE,
         u16,
-        ie_desr::LocatedFieldParsingError<'_>,
+        ie_desr::FieldParsingError,
     >(
         &good_wire,
         &ie::IE::sourceIPv4Address,
         2u16,
-        nom::Err::Error(invalid_length),
+        &invalid_length,
     );
     test_write_with_one_input(&value, None, &good_wire)?;
     Ok(())
@@ -186,20 +192,28 @@ fn test_ipv4_address_value() -> Result<(), ie_ser::FieldWritingError> {
 fn test_pkg_record_value() -> Result<(), ie_ser::FieldWritingError> {
     let value_wire = [0x12, 0xc6, 0x21, 0x12, 0x69, 0x32];
     let value = ie::Field::sourceMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32]);
-    let invalid_length = nom::Err::Error(ie_desr::LocatedFieldParsingError::new(
-        Span::new(&value_wire),
-        ie_desr::FieldParsingError::InvalidLength {
-            ie_name: "sourceMacAddress".to_string(),
-            length: 2,
-        },
-    ));
-    test_parsed_completely_with_two_inputs(&value_wire, &ie::IE::sourceMacAddress, 6u16, &value);
-    test_parse_error_with_two_inputs::<
+    let invalid_length = ie_desr::FieldParsingError::InvalidLength {
+        offset: 0,
+        ie_name: "sourceMacAddress".to_string(),
+        length: 2,
+    };
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &value_wire,
+        &ie::IE::sourceMacAddress,
+        6u16,
+        &value,
+    );
+    test_parse_error_with_two_inputs_bytes_reader::<
         ie::Field,
         &ie::IE,
         u16,
-        ie_desr::LocatedFieldParsingError<'_>,
-    >(&value_wire, &ie::IE::sourceMacAddress, 2u16, invalid_length);
+        ie_desr::FieldParsingError,
+    >(
+        &value_wire,
+        &ie::IE::sourceMacAddress,
+        2u16,
+        &invalid_length,
+    );
 
     test_write_with_one_input(&value, None, &value_wire)?;
     Ok(())
@@ -214,7 +228,12 @@ fn test_milli_value() -> Result<(), ie_ser::FieldWritingError> {
             .with_nanosecond(519_000_000)
             .unwrap(),
     );
-    test_parsed_completely_with_two_inputs(&good_wire, &ie::IE::flowStartMilliseconds, 8, &good);
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &good_wire,
+        &ie::IE::flowStartMilliseconds,
+        8,
+        &good,
+    );
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
 }
@@ -251,19 +270,19 @@ fn test_time_fraction_value() -> Result<(), ie_ser::FieldWritingError> {
             .unwrap(),
     );
 
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &good_full_wire,
         &ie::IE::flowStartMicroseconds,
         8,
         &good_full,
     );
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &good_half_wire,
         &ie::IE::flowStartMicroseconds,
         8,
         &good_half_rounded,
     );
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &good_zero_wire,
         &ie::IE::flowStartMicroseconds,
         8,
@@ -284,7 +303,7 @@ fn test_string_value() -> Result<(), ie_ser::FieldWritingError> {
 
     let good = ie::Field::interfaceName("lo".into());
 
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &good_wire,
         &ie::IE::interfaceName,
         good_wire.len() as u16,
@@ -298,20 +317,28 @@ fn test_string_value() -> Result<(), ie_ser::FieldWritingError> {
 fn test_record_value() -> Result<(), ie_ser::FieldWritingError> {
     let value_wire = [0x12, 0xc6, 0x21, 0x12, 0x69, 0x32];
     let value = ie::Field::sourceMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32]);
-    let invalid_length = nom::Err::Error(ie_desr::LocatedFieldParsingError::new(
-        Span::new(&value_wire),
-        ie_desr::FieldParsingError::InvalidLength {
-            ie_name: "sourceMacAddress".to_string(),
-            length: 2,
-        },
-    ));
-    test_parsed_completely_with_two_inputs(&value_wire, &ie::IE::sourceMacAddress, 6u16, &value);
-    test_parse_error_with_two_inputs::<
+    let invalid_length = ie_desr::FieldParsingError::InvalidLength {
+        offset: 0,
+        ie_name: "sourceMacAddress".to_string(),
+        length: 2,
+    };
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &value_wire,
+        &ie::IE::sourceMacAddress,
+        6u16,
+        &value,
+    );
+    test_parse_error_with_two_inputs_bytes_reader::<
         ie::Field,
         &ie::IE,
         u16,
-        ie_desr::LocatedFieldParsingError<'_>,
-    >(&value_wire, &ie::IE::sourceMacAddress, 2u16, invalid_length);
+        ie_desr::FieldParsingError,
+    >(
+        &value_wire,
+        &ie::IE::sourceMacAddress,
+        2u16,
+        &invalid_length,
+    );
     test_write_with_one_input(&value, None, &value_wire)?;
     Ok(())
 }
@@ -337,10 +364,10 @@ fn test_data_record_value() -> Result<(), DataRecordWritingError> {
             FieldSpecifier::new(ie::IE::destinationMacAddress, 6).unwrap(),
         ]),
     );
-    test_parsed_completely_with_one_input::<
-        DataRecord,
+    test_parsed_completely_with_one_input_bytes_reader::<
         &DecodingTemplate,
-        LocatedDataRecordParsingError<'_>,
+        DataRecord,
+        DataRecordParsingError,
     >(&value_wire, &fields, &flow);
     test_write_with_one_input(&flow, Some(&fields), &value_wire)?;
     Ok(())
@@ -387,7 +414,7 @@ fn test_set_template() -> Result<(), SetWritingError> {
         ]),
     )]));
     let mut templates_map = HashMap::new();
-    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    test_parsed_completely_with_one_input_bytes_reader(&good_wire, &mut templates_map, &good);
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
 }
@@ -421,14 +448,54 @@ fn test_u64_reduced_size_encoding() -> Result<(), ie_ser::FieldWritingError> {
     let two = ie::Field::packetDeltaCount(0xffee);
     let one = ie::Field::packetDeltaCount(0xff);
 
-    test_parsed_completely_with_two_inputs(&full_wire, &ie::IE::packetDeltaCount, 8, &full);
-    test_parsed_completely_with_two_inputs(&seven_wire, &ie::IE::packetDeltaCount, 7, &seven);
-    test_parsed_completely_with_two_inputs(&six_wire, &ie::IE::packetDeltaCount, 6, &six);
-    test_parsed_completely_with_two_inputs(&five_wire, &ie::IE::packetDeltaCount, 5, &five);
-    test_parsed_completely_with_two_inputs(&four_wire, &ie::IE::packetDeltaCount, 4, &four);
-    test_parsed_completely_with_two_inputs(&three_wire, &ie::IE::packetDeltaCount, 3, &three);
-    test_parsed_completely_with_two_inputs(&two_wire, &ie::IE::packetDeltaCount, 2, &two);
-    test_parsed_completely_with_two_inputs(&one_wire, &ie::IE::packetDeltaCount, 1, &one);
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &full_wire,
+        &ie::IE::packetDeltaCount,
+        8,
+        &full,
+    );
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &seven_wire,
+        &ie::IE::packetDeltaCount,
+        7,
+        &seven,
+    );
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &six_wire,
+        &ie::IE::packetDeltaCount,
+        6,
+        &six,
+    );
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &five_wire,
+        &ie::IE::packetDeltaCount,
+        5,
+        &five,
+    );
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &four_wire,
+        &ie::IE::packetDeltaCount,
+        4,
+        &four,
+    );
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &three_wire,
+        &ie::IE::packetDeltaCount,
+        3,
+        &three,
+    );
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &two_wire,
+        &ie::IE::packetDeltaCount,
+        2,
+        &two,
+    );
+    test_parsed_completely_with_two_inputs_bytes_reader(
+        &one_wire,
+        &ie::IE::packetDeltaCount,
+        1,
+        &one,
+    );
 
     test_write_with_one_input(&full, field_full, &full_wire)?;
     test_write_with_one_input(&seven, field_seven, &seven_wire)?;
@@ -451,35 +518,33 @@ fn test_u256_value() -> Result<(), ie_ser::FieldWritingError> {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00,
     ]));
-    let invalid_length = nom::Err::Error(ie_desr::LocatedFieldParsingError::new(
-        Span::new(&value_wire),
-        ie_desr::FieldParsingError::InvalidLength {
-            ie_name: "ipv6ExtensionHeadersFull".to_string(),
-            length: 33,
-        },
-    ));
-    test_parsed_completely_with_two_inputs(
+    let invalid_length = ie_desr::FieldParsingError::InvalidLength {
+        offset: 0,
+        ie_name: "ipv6ExtensionHeadersFull".to_string(),
+        length: 33,
+    };
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &value_wire,
         &ie::IE::ipv6ExtensionHeadersFull,
         32u16,
         &value,
     );
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_two_inputs_bytes_reader(
         &reduced_wire,
         &ie::IE::ipv6ExtensionHeadersFull,
         8u16,
         &reduced_value,
     );
-    test_parse_error_with_two_inputs::<
+    test_parse_error_with_two_inputs_bytes_reader::<
         ie::Field,
         &ie::IE,
         u16,
-        ie_desr::LocatedFieldParsingError<'_>,
+        ie_desr::FieldParsingError,
     >(
         &value_wire,
         &ie::IE::ipv6ExtensionHeadersFull,
         33u16,
-        invalid_length,
+        &invalid_length,
     );
     test_write_with_one_input(&value, None, &value_wire)?;
     test_write_with_one_input(&reduced_value, Some(8), &reduced_wire)?;
@@ -503,13 +568,13 @@ fn test_u256_value() -> Result<(), ie_ser::FieldWritingError> {
 //     let two = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xffee));
 //     let one = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xff));
 //
-//     test_parsed_completely_with_two_inputs(&four_wire,
+//     test_parsed_completely_with_two_inputs_bytes_reader(&four_wire,
 // &ie::IE::packetDeltaCount, 4, &four);
-//     test_parsed_completely_with_two_inputs(&three_wire,
+//     test_parsed_completely_with_two_inputs_bytes_reader(&three_wire,
 // &ie::IE::packetDeltaCount, 3, &three);
-//     test_parsed_completely_with_two_inputs(&two_wire,
+//     test_parsed_completely_with_two_inputs_bytes_reader(&two_wire,
 // &ie::IE::packetDeltaCount, 2, &two);
-//     test_parsed_completely_with_two_inputs(&one_wire,
+//     test_parsed_completely_with_two_inputs_bytes_reader(&one_wire,
 // &ie::IE::packetDeltaCount, 1, &one);
 //
 //     test_write_with_one_input(&four, field_four, &four_wire)?;
@@ -530,9 +595,9 @@ fn test_u256_value() -> Result<(), ie_ser::FieldWritingError> {
 //     let two = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xffee));
 //     let one = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xff));
 //
-//     test_parsed_completely_with_two_inputs(&two_wire,
+//     test_parsed_completely_with_two_inputs_bytes_reader(&two_wire,
 // &ie::IE::packetDeltaCount, 2, &two);
-//     test_parsed_completely_with_two_inputs(&one_wire,
+//     test_parsed_completely_with_two_inputs_bytes_reader(&one_wire,
 // &ie::IE::packetDeltaCount, 1, &one);
 //
 //     test_write_with_one_input(&two, field_two, &two_wire)?;
@@ -573,49 +638,49 @@ fn test_u256_value() -> Result<(), ie_ser::FieldWritingError> {
 //     let u8_min =
 // ie::Field::mibObjectValueInteger(ie::mibObjectValueInteger(i8::MIN as i32));
 //
-//     test_parsed_completely_with_two_inputs(
+//     test_parsed_completely_with_two_inputs_bytes_reader(
 //         &u32_max_wire,
 //         &ie::IE::mibObjectValueInteger,
 //         4,
 //         &u32_max,
 //     );
-//     test_parsed_completely_with_two_inputs(
+//     test_parsed_completely_with_two_inputs_bytes_reader(
 //         &u32_min_wire,
 //         &ie::IE::mibObjectValueInteger,
 //         4,
 //         &u32_min,
 //     );
-//     test_parsed_completely_with_two_inputs(
+//     test_parsed_completely_with_two_inputs_bytes_reader(
 //         &u24_pos_wire,
 //         &ie::IE::mibObjectValueInteger,
 //         3,
 //         &u24_pos,
 //     );
-//     test_parsed_completely_with_two_inputs(
+//     test_parsed_completely_with_two_inputs_bytes_reader(
 //         &u24_neg_wire,
 //         &ie::IE::mibObjectValueInteger,
 //         3,
 //         &u24_min,
 //     );
-//     test_parsed_completely_with_two_inputs(
+//     test_parsed_completely_with_two_inputs_bytes_reader(
 //         &u16_max_wire,
 //         &ie::IE::mibObjectValueInteger,
 //         2,
 //         &u16_max,
 //     );
-//     test_parsed_completely_with_two_inputs(
+//     test_parsed_completely_with_two_inputs_bytes_reader(
 //         &u16_min_wire,
 //         &ie::IE::mibObjectValueInteger,
 //         2,
 //         &u16_neg,
 //     );
-//     test_parsed_completely_with_two_inputs(
+//     test_parsed_completely_with_two_inputs_bytes_reader(
 //         &u8_max_wire,
 //         &ie::IE::mibObjectValueInteger,
 //         1,
 //         &u8_max,
 //     );
-//     test_parsed_completely_with_two_inputs(
+//     test_parsed_completely_with_two_inputs_bytes_reader(
 //         &u8_min_wire,
 //         &ie::IE::mibObjectValueInteger,
 //         1,

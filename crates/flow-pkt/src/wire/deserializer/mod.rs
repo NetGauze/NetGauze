@@ -13,14 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use nom::IResult;
-use nom::error::ErrorKind;
-use nom::number::complete::{be_u16, be_u32};
 use serde::{Deserialize, Serialize};
 
 use crate::{FieldSpecifier, FieldSpecifierError};
-use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePdu, Span};
-use netgauze_serde_macros::LocatedError;
+use netgauze_parse_utils::error::ParseError;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFrom;
 
 use crate::ie::{IE, IEError};
 
@@ -28,93 +26,42 @@ pub mod ie;
 pub mod ipfix;
 pub mod netflow;
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FlowParsingError {
+    #[error("Flow parsing error parsing IPFIX packet: {0}")]
     IpfixParsingError(ipfix::IpfixPacketParsingError),
+
+    #[error("Flow parsing error parsing NetFlow V9 packet: {0}")]
     NetFlowV9ParsingError(netflow::NetFlowV9PacketParsingError),
 }
 
-impl std::fmt::Display for FlowParsingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FlowParsingError::IpfixParsingError(err) => {
-                write!(f, "Flow parsing error parsing IPFIX packet: {err}")
-            }
-            FlowParsingError::NetFlowV9ParsingError(err) => {
-                write!(f, "Flow parsing error parsing Netflow V9 packet: {err}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for FlowParsingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            FlowParsingError::IpfixParsingError(err) => Some(err),
-            FlowParsingError::NetFlowV9ParsingError(err) => Some(err),
-        }
-    }
-}
-
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FieldSpecifierParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    FieldSpecifierError(FieldSpecifierError),
-    IEError(IEError),
+    #[error("{0}")]
+    Parse(#[from] ParseError),
+
+    #[error("in field specifier: {0}")]
+    FieldSpecifierError(#[from] FieldSpecifierError),
+
+    #[error("in field specifier: {0}")]
+    IEError(#[from] IEError),
 }
 
-impl std::fmt::Display for FieldSpecifierParsingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NomError(e) => write!(f, "{}", nom::Err::Error(e)),
-            Self::FieldSpecifierError(e) => write!(f, "{e}"),
-            Self::IEError(e) => write!(f, "{e}"),
-        }
-    }
-}
+impl<'a> ParseFrom<'a> for FieldSpecifier {
+    type Error = FieldSpecifierParsingError;
 
-impl std::error::Error for FieldSpecifierParsingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::NomError(_err) => None,
-            Self::FieldSpecifierError(err) => Some(err),
-            Self::IEError(err) => Some(err),
-        }
-    }
-}
-
-impl<'a> ReadablePdu<'a, LocatedFieldSpecifierParsingError<'a>> for FieldSpecifier {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedFieldSpecifierParsingError<'a>> {
-        let input = buf;
-        let (buf, code) = be_u16(buf)?;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
+        let code = cur.read_u16_be()?;
         let is_enterprise = code & 0x8000u16 != 0;
-        let (buf, length) = be_u16(buf)?;
-        let (buf, (pen, code)) = if is_enterprise {
-            let (buf, pen) = be_u32(buf)?;
+        let length = cur.read_u16_be()?;
+        let (pen, code) = if is_enterprise {
+            let pen = cur.read_u32_be()?;
             // remove the enterprise bit from the IE number
-            (buf, (pen, code & 0x7FFF))
+            (pen, code & 0x7FFF)
         } else {
-            (buf, (0, code))
+            (0, code)
         };
-        let ie = match IE::try_from((pen, code)) {
-            Ok(ie) => ie,
-            Err(err) => {
-                return Err(nom::Err::Error(LocatedFieldSpecifierParsingError::new(
-                    input,
-                    FieldSpecifierParsingError::IEError(err),
-                )));
-            }
-        };
-        let spec = match FieldSpecifier::new(ie, length) {
-            Ok(spec) => spec,
-            Err(err) => {
-                return Err(nom::Err::Error(LocatedFieldSpecifierParsingError::new(
-                    input,
-                    FieldSpecifierParsingError::FieldSpecifierError(err),
-                )));
-            }
-        };
-        Ok((buf, spec))
+        let ie = IE::try_from((pen, code))?;
+        Ok(FieldSpecifier::new(ie, length)?)
     }
 }
