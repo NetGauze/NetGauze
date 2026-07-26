@@ -58,6 +58,7 @@ impl ParseError {
             ret_len,
         }
     }
+
     #[inline]
     pub fn offset(&self) -> usize {
         match self {

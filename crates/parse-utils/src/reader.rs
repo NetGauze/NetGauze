@@ -198,6 +198,101 @@ impl<'a> SliceReader<'a> {
         out[..len].copy_from_slice(src);
         Ok(out)
     }
+
+    /// Read a big-endian unsigned integer carried in `len` octets, where `len`
+    /// may be smaller than the type's natural width.
+    ///
+    /// This is the reduced-size encoding of IPFIX (RFC 7011 Section 6.2): a
+    /// value whose abstract type is `unsigned32` may travel in 1 to 4
+    /// octets, and the octets are the *low-order* end of the value. Callers
+    /// wanting a narrower type cast the result down, having already bounded
+    /// `len` themselves.
+    ///
+    /// `len` above 4 cannot be represented and is rejected rather than
+    /// truncated.
+    #[inline]
+    pub fn read_unsigned32_be(&mut self, len: usize) -> Result<u32, ParseError> {
+        Ok(match len {
+            0 => 0,
+            1 => u32::from(self.read_array::<1>()?[0]),
+            2 => u32::from(u16::from_be_bytes(self.read_array::<2>()?)),
+            3 => {
+                let b = self.read_array::<3>()?;
+                u32::from_be_bytes([0, b[0], b[1], b[2]])
+            }
+            4 => u32::from_be_bytes(self.read_array::<4>()?),
+            _ => return Err(ParseError::invalid_padding_length(self.offset, len, 4)),
+        })
+    }
+    /// Read a big-endian unsigned integer carried in `len` octets, where `len`
+    /// may be smaller than the type's natural width.
+    ///
+    /// This is the reduced-size encoding of IPFIX (RFC 7011 Section 6.2): a
+    /// value whose abstract type is `unsigned64` may travel in 1 to 8
+    /// octets, and the octets are the *low-order* end of the value. Callers
+    /// wanting a narrower type cast the result down, having already bounded
+    /// `len` themselves.
+    ///
+    /// `len` above 8 cannot be represented and is rejected rather than
+    /// truncated.
+    #[inline]
+    pub fn read_unsigned64_be(&mut self, len: usize) -> Result<u64, ParseError> {
+        Ok(match len {
+            0 => 0,
+            1 => u64::from(self.read_array::<1>()?[0]),
+            2 => u64::from(u16::from_be_bytes(self.read_array::<2>()?)),
+            3 => {
+                let b = self.read_array::<3>()?;
+                u64::from(u32::from_be_bytes([0, b[0], b[1], b[2]]))
+            }
+            4 => u64::from(u32::from_be_bytes(self.read_array::<4>()?)),
+            5 => {
+                let b = self.read_array::<5>()?;
+                u64::from_be_bytes([0, 0, 0, b[0], b[1], b[2], b[3], b[4]])
+            }
+            6 => {
+                let b = self.read_array::<6>()?;
+                u64::from_be_bytes([0, 0, b[0], b[1], b[2], b[3], b[4], b[5]])
+            }
+            7 => {
+                let b = self.read_array::<7>()?;
+                u64::from_be_bytes([0, b[0], b[1], b[2], b[3], b[4], b[5], b[6]])
+            }
+            8 => u64::from_be_bytes(self.read_array::<8>()?),
+            _ => return Err(ParseError::invalid_padding_length(self.offset, len, 8)),
+        })
+    }
+
+    /// Read a big-endian two's-complement signed integer carried in `len`
+    /// octets, sign-extending it to the full width.
+    ///
+    /// The 32-bit-capped counterpart of [`Self::read_signed64_be`] /
+    /// signed twin of [`Self::read_unsigned32_be`].
+    #[inline]
+    pub fn read_signed32_be(&mut self, len: usize) -> Result<i32, ParseError> {
+        // Read right-aligned and zero-filled (constant-size per arm, see
+        // read_unsigned32_be), then sign-extend by shifting the value's own
+        // top bit up to bit 63 and arithmetic-shifting back down.
+        let v = self.read_unsigned32_be(len)? as i32;
+        let shift = ((4 - len) * 8) & 31; // len == 0 -> 32 & 31 == 0 -> yields 0
+        Ok((v << shift) >> shift)
+    }
+
+    /// Read a big-endian two's-complement signed integer carried in `len`
+    /// octets, sign-extending it to the full width.
+    ///
+    /// The signed counterpart of [`Self::read_unsigned64_be`]. The sign is
+    /// taken from the top bit of the first octet read, so a value shortened
+    /// under IPFIX reduced-size encoding keeps its sign.
+    #[inline]
+    pub fn read_signed64_be(&mut self, len: usize) -> Result<i64, ParseError> {
+        // Read right-aligned and zero-filled (constant-size per arm, see
+        // read_unsigned32_be), then sign-extend by shifting the value's own
+        // top bit up to bit 63 and arithmetic-shifting back down.
+        let v = self.read_unsigned64_be(len)? as i64;
+        let shift = ((8 - len) * 8) & 63; // len == 0 -> 64 & 63 == 0 -> yields 0
+        Ok((v << shift) >> shift)
+    }
 }
 
 #[cfg(test)]
@@ -300,5 +395,167 @@ mod tests {
         let err = r.read_padded::<2>(5);
         assert_eq!(err, Err(ParseError::invalid_padding_length(2, 5, 2)));
         assert_eq!(r.offset(), 2); // read_bytes failed before advancing
+    }
+
+    #[test]
+    fn uint_be_right_aligns_shortened_values() {
+        // the same value 0x0000ABCD carried in 2, 3 and 4 octets
+        for wire in [
+            &[0xAB, 0xCD][..],
+            &[0x00, 0xAB, 0xCD],
+            &[0x00, 0x00, 0xAB, 0xCD],
+        ] {
+            let mut r = SliceReader::new(wire);
+            assert_eq!(r.read_unsigned64_be(wire.len()), Ok(0xABCD));
+            assert_eq!(r.remaining(), 0);
+        }
+    }
+
+    #[test]
+    fn uint_be_full_width_matches_fixed_read() {
+        let data = [0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF];
+        let mut a = SliceReader::new(&data);
+        let mut b = SliceReader::new(&data);
+        assert_eq!(a.read_unsigned64_be(8), b.read_u64_be());
+    }
+
+    #[test]
+    fn uint_be_zero_len_reads_nothing() {
+        let data = [0xAA];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(r.read_unsigned64_be(0), Ok(0));
+        assert_eq!(r.offset(), 0);
+    }
+
+    #[test]
+    fn uint_be_rejects_len_beyond_width() {
+        let data = [0u8; 16];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(
+            r.read_unsigned64_be(9),
+            Err(ParseError::invalid_padding_length(0, 9, 8))
+        );
+        assert_eq!(r.offset(), 0); // rejected before consuming
+    }
+
+    #[test]
+    fn uint_be_short_buffer_is_eof() {
+        let data = [0xAA, 0xBB];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(r.read_unsigned64_be(4), Err(ParseError::eof(0, 4, 2)));
+    }
+
+    #[test]
+    fn int_be_sign_extends_shortened_negative() {
+        // -2 (0xFE) shortened to one octet must widen to -2, not 254
+        let data = [0xFE];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(r.read_signed64_be(1), Ok(-2));
+    }
+
+    #[test]
+    fn int_be_keeps_positive_values_unsigned() {
+        let data = [0x7F];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(r.read_signed64_be(1), Ok(127));
+    }
+
+    #[test]
+    fn int_be_full_width_matches_fixed_read() {
+        let data = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE];
+        let mut a = SliceReader::new(&data);
+        let mut b = SliceReader::new(&data);
+        assert_eq!(a.read_signed64_be(8), b.read_i64_be());
+        assert_eq!(a.read_signed64_be(8), Err(ParseError::eof(8, 8, 0)));
+    }
+
+    #[test]
+    fn int_be_zero_len_is_not_negative() {
+        let data = [0xFF];
+        let mut r = SliceReader::new(&data);
+        // no octet read means no sign bit to extend
+        assert_eq!(r.read_signed64_be(0), Ok(0));
+        assert_eq!(r.offset(), 0);
+    }
+
+    #[test]
+    fn uint32_be_right_aligns_shortened_values() {
+        // the same value 0x0000ABCD carried in 2, 3 and 4 octets
+        for wire in [
+            &[0xAB, 0xCD][..],
+            &[0x00, 0xAB, 0xCD],
+            &[0x00, 0x00, 0xAB, 0xCD],
+        ] {
+            let mut r = SliceReader::new(wire);
+            assert_eq!(r.read_unsigned32_be(wire.len()), Ok(0xABCD));
+            assert_eq!(r.remaining(), 0);
+        }
+    }
+
+    #[test]
+    fn uint32_be_full_width_matches_fixed_read() {
+        let data = [0x01, 0x23, 0x45, 0x67];
+        let mut a = SliceReader::new(&data);
+        let mut b = SliceReader::new(&data);
+        assert_eq!(a.read_unsigned32_be(4), b.read_u32_be());
+    }
+
+    #[test]
+    fn uint32_be_zero_len_reads_nothing() {
+        let data = [0xAA];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(r.read_unsigned32_be(0), Ok(0));
+        assert_eq!(r.offset(), 0);
+    }
+
+    #[test]
+    fn uint32_be_rejects_len_beyond_width() {
+        let data = [0u8; 16];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(
+            r.read_unsigned32_be(5),
+            Err(ParseError::invalid_padding_length(0, 5, 4))
+        );
+        assert_eq!(r.offset(), 0); // rejected before consuming
+    }
+
+    #[test]
+    fn uint32_be_short_buffer_is_eof() {
+        let data = [0xAA];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(r.read_unsigned32_be(4), Err(ParseError::eof(0, 4, 1)));
+    }
+
+    #[test]
+    fn int32_be_sign_extends_shortened_negative() {
+        // -2 (0xFE) shortened to one octet must widen to -2, not 254
+        let data = [0xFE];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(r.read_signed32_be(1), Ok(-2));
+    }
+
+    #[test]
+    fn int32_be_keeps_positive_values_unsigned() {
+        let data = [0x7F];
+        let mut r = SliceReader::new(&data);
+        assert_eq!(r.read_signed32_be(1), Ok(127));
+    }
+
+    #[test]
+    fn int32_be_full_width_matches_fixed_read() {
+        let data = [0xFF, 0xFF, 0xFF, 0xFE];
+        let mut a = SliceReader::new(&data);
+        let mut b = SliceReader::new(&data);
+        assert_eq!(a.read_signed32_be(4), b.read_i32_be());
+        assert_eq!(a.read_signed32_be(4), Err(ParseError::eof(4, 4, 0)));
+    }
+
+    #[test]
+    fn int32_be_zero_len_is_not_negative() {
+        let data = [0xFF];
+        let mut r = SliceReader::new(&data);
+        // no octet read means no sign bit to extend
+        assert_eq!(r.read_signed32_be(0), Ok(0));
+        assert_eq!(r.offset(), 0);
     }
 }
