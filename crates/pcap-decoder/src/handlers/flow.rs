@@ -403,9 +403,11 @@ mod tests {
     #[test]
     fn test_flow_handler_serialize_error() {
         let handler = FlowProtocolHandler::new(vec![9991]);
-        let error = FlowInfoCodecDecoderError::IpfixParsingError(
-            IpfixPacketParsingError::InvalidLength(10),
-        );
+        let error =
+            FlowInfoCodecDecoderError::IpfixParsingError(IpfixPacketParsingError::InvalidLength {
+                offset: 2,
+                length: 10,
+            });
         let outcome = DecodeOutcome::Error(error);
 
         let result = handler.serialize(outcome);
@@ -414,7 +416,10 @@ mod tests {
         let json = result.unwrap();
         let expected = json!({
             "IpfixParsingError": {
-                "InvalidLength": 10
+                "InvalidLength": {
+                    "offset": 2,
+                    "length": 10
+                }
             }
         });
         assert_eq!(json, expected);

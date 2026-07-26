@@ -16,15 +16,22 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use netgauze_flow_pkt::ipfix::IpfixPacket;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 use std::collections::HashMap;
 
 fuzz_target!(|data: &[u8]| {
-    let mut buf = data;
-    let templates_map = HashMap::new();
-    while let Ok((retbuf, _msg)) =
-        IpfixPacket::from_wire(Span::new(buf), &mut templates_map.clone())
     {
-        buf = retbuf.fragment();
+        let mut reader = SliceReader::new(data);
+        let templates_map = HashMap::new();
+        while !reader.is_empty() {
+            {
+                if IpfixPacket::parse(&mut reader, &mut templates_map.clone()).is_err() {
+                    {
+                        break;
+                    }
+                }
+            }
+        }
     }
 });

@@ -1300,7 +1300,7 @@ pub(crate) fn generate_ie_ids(
 
 /// Held out temporary, we might not need this
 #[allow(dead_code)]
-fn generate_ie_value_converters(rust_type: &str, ie_name: &String) -> String {
+fn generate_ie_value_converters(rust_type: &str, ie_name: &str) -> String {
     let mut ret = String::new();
     match rust_type {
         "u8" => {
@@ -1405,269 +1405,229 @@ fn generate_ie_value_converters(rust_type: &str, ie_name: &String) -> String {
     ret
 }
 
-fn generate_u8_deserializer(ie_name: &String, enum_subreg: bool) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    let subreg = if enum_subreg {
-        quote! {
-            let enum_val = #ident::from(value);
-            (buf, Field::#ident(enum_val))
-        }
-    } else if ie_name == "tcpControlBits" {
-        quote! { (buf, Field::#ident(netgauze_iana::tcp::TCPHeaderFlags::from(value))) }
-    } else {
-        quote! { (buf, Field::#ident(value)) }
-    };
-
-    quote! {
-        {
-            let (buf, value) = match length {
-                1 => nom::number::complete::be_u8(buf)?,
-                _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            };
-            #subreg
-        }
-    }
-}
-
-fn generate_u16_deserializer(ie_name: &String, enum_subreg: bool) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    let subreg = if enum_subreg {
-        quote! {
-            let enum_val = #ident::from(value);
-            (buf, Field::#ident(enum_val))
-        }
-    } else if ie_name == "tcpControlBits" {
-        quote! { (buf, Field::#ident(netgauze_iana::tcp::TCPHeaderFlags::from(value))) }
-    } else {
-        quote! { (buf, Field::#ident(value)) }
-    };
-
-    quote! {
-        {
-            let (buf, value) = match length {
-                1 => {
-                    let (buf, value) = nom::number::complete::be_u8(buf)?;
-                    (buf, value as u16)
-                },
-                2 => nom::number::complete::be_u16(buf)?,
-                _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            };
-            #subreg
-        }
-    }
-}
-
-fn generate_u32_deserializer(ie_name: &String, enum_subreg: bool) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    let subreg = if enum_subreg {
-        quote! {
-            let enum_val = #ident::from(res);
-            (buf.slice(len..), Field::#ident(enum_val))
-        }
-    } else {
-        quote! { (buf.slice(len..), Field::#ident(res)) }
-    };
-    quote! {
-        {
-            let len = length as usize;
-            if length > 4 || buf.input_len() < len {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            }
-            let mut res = 0u32;
-            for byte in buf.iter_elements().take(len) {
-                 res = (res << 8) + byte as u32;
-            }
-            #subreg
-        }
-    }
-}
-
-fn generate_u64_deserializer(ie_name: &String, enum_subreg: bool) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    let subreg = if enum_subreg {
-        quote! {
-            let enum_val = #ident::from(res);
-            (buf.slice(len..), Field::#ident(enum_val))
-        }
-    } else {
-        quote! { (buf.slice(len..), Field::#ident(res)) }
-    };
-    quote! {
-        {
-            let len = length as usize;
-            if length > 8 || buf.input_len() < len {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            }
-            let mut res = 0u64;
-            for byte in buf.iter_elements().take(len) {
-                 res = (res << 8) + byte as u64;
-            }
-            #subreg
-        }
-    }
-}
-
-fn generate_u256_deserializer(ie_name: &String, enum_subreg: bool) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    let subreg = if enum_subreg {
-        quote! {
-            let enum_val = #ident::from(res);
-            (buf.slice(len..), Field::#ident(enum_val))
-        }
-    } else {
-        quote! { (buf.slice(len..), Field::#ident(Box::new(res))) }
-    };
-    quote! {
-        {
-            let len = length as usize;
-            if length > 32 || buf.input_len() < len {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            }
-            let mut res: [u8; 32] = [0; 32];
-            res[..len].copy_from_slice(buf.slice(..len).fragment());
-            #subreg
-        }
-    }
-}
-
-fn generate_i8_deserializer(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    quote! {
-        {
-            let (buf, value) = match length {
-                1 => nom::number::complete::be_i8(buf)?,
-                _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            };
-            (buf, Field::#ident(value))
-        }
-    }
-}
-
-fn generate_i16_deserializer(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    quote! {
-        {
-            let len = length as usize;
-            if length > 2 || buf.input_len() < len {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            }
-            let mut res = 0u16;
-            let mut first = true;
-            for byte in buf.iter_elements().take(len) {
-                if first {
-                    if byte & 0x80 != 0 {
-                        res = u16::MAX;
-                    }
-                    first = false;
-                }
-                res = (res << 8) + byte as u16;
-            }
-            (buf.slice(len..), Field::#ident(res as i16))
-        }
-    }
-}
-
-fn generate_i32_deserializer(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    quote! {
-        {
-            let len = length as usize;
-            if length > 4 || buf.input_len() < len {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            }
-            let mut res = 0u32;
-            let mut first = true;
-            for byte in buf.iter_elements().take(len) {
-                if first {
-                    if byte & 0x80 != 0 {
-                        res = u32::MAX;
-                    }
-                    first = false;
-                }
-                res = (res << 8) + byte as u32;
-            }
-            (buf.slice(len..), Field::#ident(res as i32))
-        }
-    }
-}
-
-fn generate_i64_deserializer(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    quote! {
-        {
-            let len = length as usize;
-            if length > 8 || buf.input_len() < len {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            }
-            let mut res = 0u64;
-            let mut first = true;
-            for byte in buf.iter_elements().take(len) {
-                if first {
-                    if byte & 0x80 != 0 {
-                        res = u64::MAX;
-                    }
-                    first = false;
-                }
-                res = (res << 8) + byte as u64;
-            }
-            (buf.slice(len..), Field::#ident(res as i64))
-        }
-    }
-}
-
-fn generate_f32_deserializer(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    quote! {
-        {
-             let (buf, value) = match length {
-                4 => nom::number::complete::be_f32(buf)?,
-                _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-             };
-            (buf, Field::#ident(value.into()))
-        }
-    }
-}
-
-fn generate_f64_deserializer(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    quote! {
-        {
-            let (buf, value) = match length {
-                8 => nom::number::complete::be_f64(buf)?,
-                _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-             };
-            (buf, Field::#ident(value.into()))
-        }
-    }
-}
-
-fn generate_bool_deserializer(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name.as_str(), Span::call_site());
-    quote! {
-        {
-            let (buf, value) = match length {
-                1 => nom::number::complete::be_u8(buf)?,
-                _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-             };
-            (buf, Field::#ident(value != 0))
-        }
-    }
-}
-
-fn generate_mac_address_deserializer(ie_name: &String) -> TokenStream {
+/// Wrap the parsed scalar in its `Field` variant.
+///
+/// Most IEs hold the value as-is; those with a sub-registry hold the generated
+/// enum, and `tcpControlBits` holds a flags type from `netgauze-iana`.
+fn wrap_field_value(ie_name: &str, enum_subreg: bool, value: TokenStream) -> TokenStream {
     let ident = Ident::new(ie_name, Span::call_site());
+    if enum_subreg {
+        quote! { Field::#ident(#ident::from(#value)) }
+    } else if ie_name == "tcpControlBits" {
+        quote! { Field::#ident(netgauze_iana::tcp::TCPHeaderFlags::from(#value)) }
+    } else {
+        quote! { Field::#ident(#value) }
+    }
+}
+
+/// `return Err(..)` for a field whose declared length the type cannot hold.
+///
+/// Captures `cur.offset()` at the call site: every one of this function's
+/// callers checks the length *before* reading anything for the field, so
+/// this is the field's own start offset, not wherever the cursor ends up
+/// after a partial/failed read.
+fn invalid_length(ie_name: &str) -> TokenStream {
+    quote! {
+        return Err(FieldParsingError::InvalidLength {
+            offset: cur.offset(),
+            ie_name: #ie_name.to_string(),
+            length,
+        })
+    }
+}
+
+fn generate_u8_deserializer(ie_name: &str, enum_subreg: bool) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, enum_subreg, quote! { value });
+    quote! {
+        {
+            if length != 1 {
+                #invalid;
+            }
+            let value = cur.read_u8()?;
+            #field
+        }
+    }
+}
+
+fn generate_u16_deserializer(ie_name: &str, enum_subreg: bool) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, enum_subreg, quote! { value });
+    quote! {
+        {
+            let value = match length {
+                1 => cur.read_u8()? as u16,
+                2 => cur.read_u16_be()?,
+                _ => #invalid,
+            };
+            #field
+        }
+    }
+}
+
+fn generate_u32_deserializer(ie_name: &str, enum_subreg: bool) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, enum_subreg, quote! { value });
+
+    quote! {
+        {
+            if length > 4 {
+                #invalid;
+            }
+            let value = cur.read_unsigned32_be(length as usize)?;
+            #field
+        }
+    }
+}
+
+fn generate_u64_deserializer(ie_name: &str, enum_subreg: bool) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, enum_subreg, quote! { value });
+
+    quote! {
+        {
+            if length > 8 {
+                #invalid;
+            }
+            let value = cur.read_unsigned64_be(length as usize)?;
+            #field
+        }
+    }
+}
+
+fn generate_u256_deserializer(ie_name: &str, enum_subreg: bool) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    // Unlike the integer types above, the value is kept as a byte array and
+    // left-aligned in it, so it is read with read_padded rather than
+    // read_unsigned64_be.
+    let value = if enum_subreg {
+        quote! { value }
+    } else {
+        quote! { Box::new(value) }
+    };
+    let field = wrap_field_value(ie_name, enum_subreg, value);
+    quote! {
+        {
+            if length > 32 {
+                #invalid;
+            }
+            let value = cur.read_padded::<32>(length as usize)?;
+            #field
+        }
+    }
+}
+
+fn generate_i8_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value });
+    quote! {
+        {
+            if length != 1 {
+                #invalid;
+            }
+            let value = cur.read_u8()? as i8;
+            #field
+        }
+    }
+}
+
+fn generate_i16_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value });
+    quote! {
+        {
+            let value = match length {
+                1 => cur.read_u8()? as u16,
+                2 => cur.read_i16_be()?,
+                _ => #invalid,
+            };
+            #field
+        }
+    }
+}
+
+fn generate_i32_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value });
+
+    quote! {
+        {
+            if length > 8 {
+                #invalid;
+            }
+            let value = cur.read_signed32_be(length as usize)?;
+            #field
+        }
+    }
+}
+
+fn generate_i64_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value });
+
+    quote! {
+        {
+            if length > 8 {
+                #invalid;
+            }
+            let value = cur.read_signed64_be(length as usize)?;
+            #field
+        }
+    }
+}
+
+fn generate_f32_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value.into() });
+    quote! {
+        {
+            if length != 4 {
+                #invalid;
+            }
+            let value = cur.read_f32_be()?;
+            #field
+        }
+    }
+}
+
+fn generate_f64_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value.into() });
+    quote! {
+        {
+            if length != 8 {
+                #invalid;
+            }
+            let value = cur.read_f64_be()?;
+            #field
+        }
+    }
+}
+
+fn generate_bool_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value != 0 });
+    quote! {
+        {
+            if length != 1 {
+                #invalid;
+            }
+            let value = cur.read_u8()?;
+            #field
+        }
+    }
+}
+
+fn generate_mac_address_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value });
     quote! {
         {
             if length != 6 {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
+                #invalid;
             }
-            let (buf, b0) = nom::number::complete::be_u8(buf)?;
-            let (buf, b1) = nom::number::complete::be_u8(buf)?;
-            let (buf, b2) = nom::number::complete::be_u8(buf)?;
-            let (buf, b3) = nom::number::complete::be_u8(buf)?;
-            let (buf, b4) = nom::number::complete::be_u8(buf)?;
-            let (buf, b5) = nom::number::complete::be_u8(buf)?;
-            (buf, Field::#ident([b0, b1, b2, b3, b4, b5]))
+            let value = cur.read_array::<6>()?;
+            #field
         }
     }
 }
@@ -1676,125 +1636,138 @@ fn generate_string_deserializer(ie_name: &str) -> TokenStream {
     let ident = Ident::new(ie_name, Span::call_site());
     quote! {
         {
-            if length == u16::MAX {
-                let (buf, short_length) = nom::number::complete::be_u8(buf)?;
-                let (buf, variable_length) = if short_length == u8::MAX {
-                    let mut variable_length: u32= 0;
-                    let (buf, part1) = nom::number::complete::be_u8(buf)?;
-                    let (buf, part2) = nom::number::complete::be_u8(buf)?;
-                    let (buf, part3) = nom::number::complete::be_u8(buf)?;
-                    variable_length = (variable_length << 8) + part1  as u32;
-                    variable_length = (variable_length << 8) + part2  as u32;
-                    variable_length = (variable_length << 8) + part3  as u32;
-                    (buf, variable_length)
+            let (offset, str_buf) = if length == u16::MAX {
+                let short_length = cur.read_u8()?;
+                let len = if short_length == u8::MAX {
+                   cur.read_unsigned32_be(3)? as usize
                 } else {
-                    (buf, short_length as u32)
+                    short_length as usize
                 };
-                let (buf, value) = nom::combinator::map_res(nom::bytes::complete::take(variable_length), |str_buf: netgauze_parse_utils::Span<'_>| {
-                    let result = ::std::str::from_utf8(&str_buf);
-                    result.map(|x| x.into())
-                })(buf)?;
-                (buf,  Field::#ident(value))
+                let offset = cur.offset();
+                (offset, cur.read_bytes(len)?)
             } else {
-                let (buf, value) =
-                nom::combinator::map_res(nom::bytes::complete::take(length), |str_buf: netgauze_parse_utils::Span<'_>| {
-                    let nul_range_end = str_buf
-                        .iter()
-                        .position(|&c| c == b'\0')
-                        .unwrap_or(str_buf.len());
-                    let result = ::std::str::from_utf8(&str_buf[..nul_range_end]);
-                    result.map(|x| x.into())
-                })(buf)?;
-                (buf,  Field::#ident(value))
-            }
+                // A fixed-length string is NUL-padded out to the declared
+                // length. Only the text before the first NUL is validated as
+                // UTF-8: the padding is not guaranteed to be well-formed in
+                // practice, and rejecting a record over its padding would be
+                // unhelpful.
+                let offset = cur.offset();
+                let str_buf = cur.read_bytes(length as usize)?;
+                let nul_range_end = str_buf
+                    .iter()
+                    .position(|&c| c == b'\0')
+                    .unwrap_or(str_buf.len());
+                (offset, &str_buf[..nul_range_end])
+            };
+            let value = ::std::str::from_utf8(str_buf).map_err(|err| {
+                FieldParsingError::Utf8Error {
+                    offset,
+                    ie_name: #ie_name.to_string(),
+                    error: err.to_string(),
+                }
+            })?;
+            Field::#ident(value.into())
         }
     }
 }
 
-fn generate_ipv4_deserializer(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name, Span::call_site());
+fn generate_ipv4_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { std::net::Ipv4Addr::from(value) });
     quote! {
         {
             if length != 4 {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
+                #invalid;
             }
-            let (buf, ip) = nom::number::complete::be_u32(buf)?;
-            let value = std::net::Ipv4Addr::from(ip);
-            (buf, Field::#ident(value))
+            let value = cur.read_u32_be()?;
+            #field
         }
     }
 }
 
-fn generate_ipv6_deserializer(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name, Span::call_site());
+fn generate_ipv6_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { std::net::Ipv6Addr::from(value) });
     quote! {
         {
             if length != 16 {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
+                #invalid;
             }
-            let (buf, ip) = nom::number::complete::be_u128(buf)?;
-            let value = std::net::Ipv6Addr::from(ip);
-            (buf, Field::#ident(value))
+            let value = cur.read_u128_be()?;
+            #field
         }
     }
 }
 
-fn generate_date_time_seconds(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name, Span::call_site());
+fn generate_date_time_seconds(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value });
     quote! {
         {
             if length != 4 {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            };
-            let (buf, secs) = nom::number::complete::be_u32(buf)?;
+                #invalid;
+            }
+            let offset = cur.offset();
+            let secs = cur.read_u32_be()?;
             let value = match chrono::Utc.timestamp_opt(secs as i64, 0) {
                 chrono::LocalResult::Single(val) => val,
-                _ => {
-                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidTimestamp{ie_name: #ie_name.to_string(), seconds: secs})));
-                }
+                _ => return Err(FieldParsingError::InvalidTimestamp {
+                    offset,
+                    ie_name: #ie_name.to_string(),
+                    seconds: secs,
+                }),
             };
-            (buf, Field::#ident(value))
+            #field
         }
     }
 }
 
-fn generate_date_time_milli(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name, Span::call_site());
+fn generate_date_time_milli(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value });
     quote! {
         {
             if length != 8 {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
-            };
-            let (buf, millis) = nom::number::complete::be_u64(buf)?;
+                #invalid;
+            }
+            let offset = cur.offset();
+            let millis = cur.read_u64_be()?;
             let value = match chrono::Utc.timestamp_millis_opt(millis as i64) {
                 chrono::LocalResult::Single(val) => val,
-                _ => {
-                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidTimestampMillis{ie_name: #ie_name.to_string(), millis})));
-                }
+                _ => return Err(FieldParsingError::InvalidTimestampMillis {
+                    offset,
+                    ie_name: #ie_name.to_string(),
+                    millis,
+                }),
             };
-            (buf, Field::#ident(value))
+            #field
         }
     }
 }
 
-fn generate_date_time_micro(ie_name: &String) -> TokenStream {
-    let ident = Ident::new(ie_name, Span::call_site());
+fn generate_date_time_micro(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
+    let field = wrap_field_value(ie_name, false, quote! { value });
     quote! {
         {
             if length != 8 {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
+                #invalid;
             }
-            let (buf, seconds) = nom::number::complete::be_u32(buf)?;
-            let (buf, fraction) = nom::number::complete::be_u32(buf)?;
+            let offset = cur.offset();
+            let seconds = cur.read_u32_be()?;
+            let fraction = cur.read_u32_be()?;
             // Convert 1/2^32 of a second to nanoseconds
             let f: u32 = (1_000_000_000f64 * (fraction as f64 / u32::MAX as f64)) as u32;
             let value = match chrono::Utc.timestamp_opt(seconds as i64, f) {
                 chrono::LocalResult::Single(val) => val,
-                _ => {
-                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidTimestampFraction{ie_name: #ie_name.to_string(), seconds, fraction})));
-                }
+                _ => return Err(FieldParsingError::InvalidTimestampFraction {
+                    offset,
+                    ie_name: #ie_name.to_string(),
+                    seconds,
+                    fraction,
+                }),
             };
-            (buf, Field::#ident(value))
+            #field
         }
     }
 }
@@ -1803,45 +1776,37 @@ fn generate_vec_u8_deserializer(ie_name: &str) -> TokenStream {
     let ident = Ident::new(ie_name, Span::call_site());
     quote! {
         {
-            let (buf, len) = if length == u16::MAX {
-                // first byte is the length if it's less than 255
-                let (buf, short_length) = nom::number::complete::be_u8(buf)?;
-                // the following three bytes are the length if first byte is 255
+            let len = if length == u16::MAX {
+                let short_length = cur.read_u8()?;
                 if short_length == u8::MAX {
-                    let mut variable_length: u32= 0;
-                    let (buf, part1) = nom::number::complete::be_u8(buf)?;
-                    let (buf, part2) = nom::number::complete::be_u8(buf)?;
-                    let (buf, part3) = nom::number::complete::be_u8(buf)?;
-                    variable_length = (variable_length << 8) + part1  as u32;
-                    variable_length = (variable_length << 8) + part2  as u32;
-                    variable_length = (variable_length << 8) + part3  as u32;
-                    (buf, variable_length as usize)
+                   cur.read_unsigned32_be(3)? as usize
                 } else {
-                    (buf, short_length as usize)
+                    short_length as usize
                 }
             } else {
-                (buf, length as usize)
+                length as usize
             };
-            let (buf, value) = nom::multi::count(nom::number::complete::be_u8, len)(buf)?;
-            (buf, Field::#ident(value.into_boxed_slice()))
+            let value = cur.read_bytes(len)?;
+            Field::#ident(value.into())
         }
     }
 }
 
-fn generate_mpls_deserializer(ie_name: &String) -> TokenStream {
+fn generate_mpls_deserializer(ie_name: &str) -> TokenStream {
+    let invalid = invalid_length(ie_name);
     let ident = Ident::new(ie_name, Span::call_site());
     quote! {
         {
             if length != 3 {
-                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
+                #invalid;
             }
-            let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;
-            (buf, Field::#ident([value[0], value[1], value[2]]))
+            let value = cur.read_array::<3>()?;
+            Field::#ident(value)
         }
     }
 }
 
-fn generate_ie_deserializer(data_type: &str, ie_name: &String, enum_subreg: bool) -> TokenStream {
+fn generate_ie_deserializer(data_type: &str, ie_name: &str, enum_subreg: bool) -> TokenStream {
     match data_type {
         "octetArray" => {
             if is_mpls_type(ie_name) {
@@ -1885,19 +1850,6 @@ pub(crate) fn generate_pkg_ie_deserializers(
     ies: &[InformationElement],
 ) -> TokenStream {
     let mut token_stream = TokenStream::new();
-    // Not every vendor contains big integer types
-    if ies.iter().any(|x| {
-        [
-            "unsigned32",
-            "unsigned64",
-            "signed16",
-            "signed32",
-            "signed64",
-        ]
-        .contains(&x.data_type.as_str())
-    }) {
-        token_stream.extend(quote! {use nom::{InputIter, InputLength, Slice};});
-    }
     // Not every vendor is using time based values
     if ies.iter().any(|x| x.data_type.contains("Time")) {
         token_stream.extend(quote! {use chrono::TimeZone;});
@@ -2905,77 +2857,51 @@ fn generate_ie_values_deserializers(ies: &[InformationElement]) -> TokenStream {
     });
     quote! {
         #[allow(non_camel_case_types)]
-        #[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[derive(thiserror::Error, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
         pub enum FieldParsingError {
-            #[serde(with = "netgauze_parse_utils::ErrorKindSerdeDeref")]
-            NomError(#[from_nom] nom::error::ErrorKind),
-            InvalidLength{ie_name: String, length: u16},
-            InvalidTimestamp{ie_name: String, seconds: u32},
-            InvalidTimestampMillis{ie_name: String, millis: u64},
-            InvalidTimestampFraction{ie_name: String, seconds: u32, fraction: u32},
-            Utf8Error(String),
+            #[error("{0}")]
+            Parse(#[from] netgauze_parse_utils::error::ParseError),
+            #[error("invalid length {length} for IE {ie_name} at byte offset {offset}")]
+            InvalidLength{offset: usize, ie_name: String, length: u16},
+            #[error("invalid timestamp {seconds} for IE {ie_name} at byte offset {offset}")]
+            InvalidTimestamp{offset: usize, ie_name: String, seconds: u32},
+            #[error("invalid timestamp {millis} for IE {ie_name} at byte offset {offset}")]
+            InvalidTimestampMillis{offset: usize, ie_name: String, millis: u64},
+            #[error(
+                "invalid timestamp fraction ({seconds}, {fraction}) for IE {ie_name} at byte offset {offset}"
+            )]
+            InvalidTimestampFraction{offset: usize, ie_name: String, seconds: u32, fraction: u32},
+            #[error("invalid UTF-8 for IE {ie_name} at byte offset {offset}: {error}")]
+            Utf8Error{offset: usize, ie_name: String, error: String},
         }
 
-        impl<'a> nom::error::FromExternalError<netgauze_parse_utils::Span<'a>, std::str::Utf8Error> for LocatedFieldParsingError<'a>
-        {
-            fn from_external_error(input: netgauze_parse_utils::Span<'a>, _kind: nom::error::ErrorKind, error: std::str::Utf8Error) -> Self {
-                LocatedFieldParsingError::new(
-                    input,
-                    FieldParsingError::Utf8Error(error.to_string()),
-                )
-            }
-        }
+        impl<'a> netgauze_parse_utils::traits::ParseFromWithTwoInputs<'a, &IE, u16> for Field {
+            type Error = FieldParsingError;
 
-        impl std::fmt::Display for FieldParsingError {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self {
-                   Self::NomError(err) => write!(f, "Nom error {}", nom::Err::Error(err)),
-                   Self::InvalidLength{ie_name, length} => write!(f, "error parsing {ie_name} invalid field length {length}"),
-                   Self::InvalidTimestamp{ie_name, seconds} => write!(f, "error parsing {ie_name} invalid timestamp {seconds}"),
-                   Self::InvalidTimestampMillis{ie_name, millis} => write!(f, "error parsing {ie_name} invalid timestamp {millis}"),
-                   Self::InvalidTimestampFraction{ie_name, seconds, fraction} => write!(f, "error parsing {ie_name} invalid timestamp fraction ({seconds}, {fraction})"),
-                   Self::Utf8Error(val) => write!(f, "utf8 error {val}"),
-                }
-            }
-        }
-
-        impl std::error::Error for FieldParsingError {}
-
-
-        impl<'a> netgauze_parse_utils::ReadablePduWithTwoInputs<'a, &IE, u16, LocatedFieldParsingError<'a>> for Field {
             #[inline]
-            fn from_wire(
-                buf: netgauze_parse_utils::Span<'a>,
+            fn parse(
+                cur: &mut netgauze_parse_utils::reader::SliceReader<'a>,
                 ie: &IE,
                 length: u16,
-            ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, LocatedFieldParsingError<'a>> {
-                let (buf, value) = match ie {
+            ) -> Result<Self, Self::Error> {
+                let value = match ie {
                     IE::Unknown {id } => {
-                        let (buf, len) = if length == u16::MAX {
-                            // first byte is the length if it's less than 255
-                            let (buf, short_length) = nom::number::complete::be_u8(buf)?;
-                            // the following three bytes are the length if first byte is 255
+                        let len = if length == u16::MAX {
+                            let short_length = cur.read_u8()?;
                             if short_length == u8::MAX {
-                                let mut variable_length: u32= 0;
-                                let (buf, part1) = nom::number::complete::be_u8(buf)?;
-                                let (buf, part2) = nom::number::complete::be_u8(buf)?;
-                                let (buf, part3) = nom::number::complete::be_u8(buf)?;
-                                variable_length = (variable_length << 8) + part1  as u32;
-                                variable_length = (variable_length << 8) + part2  as u32;
-                                variable_length = (variable_length << 8) + part3  as u32;
-                                (buf, variable_length as usize)
+                               cur.read_unsigned32_be(3)? as usize
                             } else {
-                                (buf, short_length as usize)
+                                short_length as usize
                             }
                         } else {
-                            (buf, length as usize)
+                            length as usize
                         };
-                        let (buf, value) = nom::multi::count(nom::number::complete::be_u8, len)(buf)?;
-                        (buf, Self::Unknown{ id: *id, value: value.into_boxed_slice()})
+                        let value = cur.read_bytes(len)?;
+                        Self::Unknown{ id: *id, value: value.into()}
                     }
                     #(#parsers,)*
                 };
-               Ok((buf, value))
+                Ok(value)
             }
         }
     }
@@ -2988,24 +2914,20 @@ pub(crate) fn generate_ie_deser_main(
     let vendor_errors = vendor_prefixes.iter().map(|(name, pkg, _)| {
         let value_name_ident = Ident::new(&format!("{name}Error"), Span::call_site());
         let pkg_ident = Ident::new(pkg, Span::call_site());
+        let msg = format!("in {name} IE: {{0}}");
         quote! {
-            #value_name_ident(#[from_located(module = "")] #pkg_ident::FieldParsingError)
+            #[error(#msg)]
+            #value_name_ident(#[from] #pkg_ident::FieldParsingError)
         }
     });
 
-    let vendor_errors_display = vendor_prefixes.iter().map(|(name, _, _)| {
-        let value_name_ident = Ident::new(&format!("{name}Error"), Span::call_site());
-        quote! {
-            Self::#value_name_ident(err) => write!(f, "{err}")
-        }
-    });
-
-    let vendor_parsers = vendor_prefixes.iter().map(|(name, _, _)| {
+    let vendor_parsers = vendor_prefixes.iter().map(|(name, pkg, _)| {
         let ident = Ident::new(name, Span::call_site());
+        let pkg_ident = Ident::new(pkg, Span::call_site());
         quote! {
             IE::#ident(value_ie) => {
-                let (buf, value) = netgauze_parse_utils::parse_into_located_two_inputs(buf, value_ie, length)?;
-                (buf, crate::ie::Field::#ident(value))
+                let value = <crate::ie::#pkg_ident::Field as netgauze_parse_utils::traits::ParseFromWithTwoInputs<'a, _, _>>::parse(cur, value_ie, length)?;
+                crate::ie::Field::#ident(value)
             }
         }
     });
@@ -3021,63 +2943,46 @@ pub(crate) fn generate_ie_deser_main(
     });
 
     quote! {
-        use nom::{InputLength, InputIter, Slice};
         use chrono::TimeZone;
 
         #[allow(non_camel_case_types)]
-        #[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
+        #[derive(thiserror::Error, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
         pub enum FieldParsingError {
-            #[serde(with = "netgauze_parse_utils::ErrorKindSerdeDeref")]
-            NomError(#[from_nom] nom::error::ErrorKind),
-            UnknownInformationElement(IE),
+            #[error("{0}")]
+            Parse(#[from] netgauze_parse_utils::error::ParseError),
             #(#vendor_errors,)*
-            InvalidLength{ie_name: String, length: u16},
-            InvalidTimestamp{ie_name: String, seconds: u32},
-            InvalidTimestampMillis{ie_name: String, millis: u64},
-            InvalidTimestampFraction{ie_name: String, seconds: u32, fraction: u32},
-            Utf8Error(String),
+            #[error("invalid length {length} for IE {ie_name} at byte offset {offset}")]
+            InvalidLength{offset: usize, ie_name: String, length: u16},
+            #[error("invalid timestamp {seconds} for IE {ie_name} at byte offset {offset}")]
+            InvalidTimestamp{offset: usize, ie_name: String, seconds: u32},
+            #[error("invalid timestamp {millis} for IE {ie_name} at byte offset {offset}")]
+            InvalidTimestampMillis{offset: usize, ie_name: String, millis: u64},
+            #[error(
+                "invalid timestamp fraction ({seconds}, {fraction}) for IE {ie_name} at byte offset {offset}"
+            )]
+            InvalidTimestampFraction{offset: usize, ie_name: String, seconds: u32, fraction: u32},
+            #[error("invalid UTF-8 for IE {ie_name} at byte offset {offset}: {error}")]
+            Utf8Error{offset: usize, ie_name: String, error: String},
         }
 
-        impl<'a> nom::error::FromExternalError<netgauze_parse_utils::Span<'a>, std::str::Utf8Error> for LocatedFieldParsingError<'a> {
-            fn from_external_error(input: netgauze_parse_utils::Span<'a>, _kind: nom::error::ErrorKind, error: std::str::Utf8Error) -> Self {
-                LocatedFieldParsingError::new(input, FieldParsingError::Utf8Error(error.to_string()))
-            }
-        }
+        impl<'a> netgauze_parse_utils::traits::ParseFromWithTwoInputs<'a, &IE, u16> for Field {
+            type Error = FieldParsingError;
 
-        impl std::fmt::Display for FieldParsingError {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self {
-                   Self::NomError(err) => write!(f, "Nom error {}", nom::Err::Error(err)),
-                   Self::UnknownInformationElement(ie) => write!(f, "unknown information element {ie:?}"),
-                    #(#vendor_errors_display,)*
-                   Self::InvalidLength{ie_name, length} => write!(f, "error parsing {ie_name} invalid field length {length}"),
-                   Self::InvalidTimestamp{ie_name, seconds} => write!(f, "error parsing {ie_name} invalid timestamp {seconds}"),
-                   Self::InvalidTimestampMillis{ie_name, millis} => write!(f, "error parsing {ie_name} invalid timestamp {millis}"),
-                   Self::InvalidTimestampFraction{ie_name, seconds, fraction} => write!(f, "error parsing {ie_name} invalid timestamp fraction ({seconds}, {fraction})"),
-                   Self::Utf8Error(val) => write!(f, "utf8 error {val}"),
-                }
-            }
-        }
-
-        impl std::error::Error for FieldParsingError {}
-
-        impl<'a> netgauze_parse_utils::ReadablePduWithTwoInputs<'a, &IE, u16, LocatedFieldParsingError<'a>>
-        for Field {
             #[inline]
-            fn from_wire(
-                buf: netgauze_parse_utils::Span<'a>,
+            fn parse(
+                cur: &mut netgauze_parse_utils::reader::SliceReader<'a>,
                 ie: &IE,
                 length: u16,
-            ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, LocatedFieldParsingError<'a>> {
-                let (buf, value) = match ie {
+            ) -> Result<Self, Self::Error> {
+                let value = match ie {
                     #(#vendor_parsers,)*
                     #(#iana_parsers,)*
                     ie => {
-                        let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;
-                        (buf, Field::Unknown{pen: ie.pen(), id: ie.id(), value: value.into_boxed_slice()})
+                        let value = cur.read_bytes(length as usize)?;
+                        Field::Unknown{pen: ie.pen(), id: ie.id(), value: value.into()}
                     }
                 };
-                Ok((buf, value))
+                Ok(value)
             }
         }
     }

@@ -19,7 +19,6 @@
 
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
-use nom::Needed;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
@@ -31,43 +30,36 @@ use crate::wire::serializer::FlowWritingError;
 use crate::wire::serializer::ipfix::IpfixPacketWritingError;
 use crate::wire::serializer::netflow::NetFlowV9WritingError;
 use crate::{FlowInfo, ipfix, netflow};
-use netgauze_parse_utils::{
-    LocatedParsingError, ReadablePduWithOneInput, Span, WritablePduWithOneInput,
-};
+use netgauze_parse_utils::WritablePduWithOneInput;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(thiserror::Error, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum FlowInfoCodecDecoderError {
+    #[error("I/O error: {0}")]
     IoError(String),
+
+    /// No longer produced: [`Decoder::decode`] only starts parsing once the
+    /// whole message is buffered, so running out of bytes mid-packet now means
+    /// the packet's own length fields are inconsistent, which is reported as a
+    /// parsing error instead. Retained so that previously serialized errors
+    /// still deserialize.
+    #[error("Incomplete pkt, need {0:?}")]
     Incomplete(Option<usize>),
+
+    #[error("Unsupported protocol version: {0}")]
     UnsupportedVersion(u16),
+
+    #[error("{0}")]
     IpfixParsingError(IpfixPacketParsingError),
+
+    #[error("{0}")]
     NetFlowV9ParingError(NetFlowV9PacketParsingError),
 }
 
 impl From<std::io::Error> for FlowInfoCodecDecoderError {
     fn from(error: std::io::Error) -> Self {
         Self::IoError(error.to_string())
-    }
-}
-
-impl std::error::Error for FlowInfoCodecDecoderError {}
-
-impl std::fmt::Display for FlowInfoCodecDecoderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::IoError(err) => write!(f, "IO error: {err}"),
-            Self::Incomplete(len) => write!(
-                f,
-                "Incomplete pkt, need {}",
-                len.map(|x| format!("{x} bytes"))
-                    .unwrap_or("unknown".to_string())
-            ),
-            Self::UnsupportedVersion(version) => {
-                write!(f, "Unsupported protocol version: {version}")
-            }
-            Self::IpfixParsingError(err) => write!(f, "IPFIX parsing error: {err}"),
-            Self::NetFlowV9ParingError(err) => write!(f, "NetFlow V9 parsing error: {err}"),
-        }
     }
 }
 
@@ -154,28 +146,18 @@ fn parse_ipfix(
     length: usize,
     templates_map: &mut ipfix::TemplatesMap,
 ) -> Result<Option<FlowInfo>, FlowInfoCodecDecoderError> {
-    let msg = match ipfix::IpfixPacket::from_wire(Span::new(buf), templates_map) {
-        Ok((span, msg)) => {
-            buf.advance(span.location_offset());
+    let mut cur = SliceReader::new(buf);
+    let msg = match ipfix::IpfixPacket::parse(&mut cur, templates_map) {
+        Ok(msg) => {
+            let consumed = cur.offset();
+            buf.advance(consumed);
             msg
         }
-        Err(error) => {
-            let err = match error {
-                nom::Err::Incomplete(needed) => {
-                    let needed = match needed {
-                        Needed::Unknown => None,
-                        Needed::Size(size) => Some(size.get()),
-                    };
-                    FlowInfoCodecDecoderError::Incomplete(needed)
-                }
-                nom::Err::Error(error) | nom::Err::Failure(error) => {
-                    FlowInfoCodecDecoderError::IpfixParsingError(error.error().clone())
-                }
-            };
+        Err(err) => {
             // Make sure we advance the buffer far enough, so we don't get stuck on
             // an error value.
             buf.advance(if length < 5 { 5 } else { length });
-            return Err(err);
+            return Err(FlowInfoCodecDecoderError::IpfixParsingError(err));
         }
     };
     Ok(Some(FlowInfo::IPFIX(msg)))
@@ -186,30 +168,20 @@ fn parse_netflow_v9(
     buf: &mut BytesMut,
     templates_map: &mut netflow::TemplatesMap,
 ) -> Result<Option<FlowInfo>, FlowInfoCodecDecoderError> {
-    let msg = match netflow::NetFlowV9Packet::from_wire(Span::new(buf), templates_map) {
-        Ok((span, msg)) => {
-            buf.advance(span.location_offset());
+    let mut cur = SliceReader::new(buf);
+    let msg = match netflow::NetFlowV9Packet::parse(&mut cur, templates_map) {
+        Ok(msg) => {
+            let consumed = cur.offset();
+            buf.advance(consumed);
             msg
         }
-        Err(error) => {
-            let err = match error {
-                nom::Err::Incomplete(needed) => {
-                    let needed = match needed {
-                        Needed::Unknown => None,
-                        Needed::Size(size) => Some(size.get()),
-                    };
-                    FlowInfoCodecDecoderError::Incomplete(needed)
-                }
-                nom::Err::Error(error) | nom::Err::Failure(error) => {
-                    FlowInfoCodecDecoderError::NetFlowV9ParingError(error.error().clone())
-                }
-            };
+        Err(err) => {
             // Netflow v9 doesn't have a length component to tell us how many bytes
             // should skip for the next packet. Sadly, our best bet is to clear the
             // buffer and start over at the risk of discarding other good packets in
             // the buffer.
             buf.clear();
-            return Err(err);
+            return Err(FlowInfoCodecDecoderError::NetFlowV9ParingError(err));
         }
     };
     Ok(Some(FlowInfo::NetFlowV9(msg)))
