@@ -13,38 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput, impl_from_io_error};
 use std::io::Write;
 
 use crate::ipfix::*;
 use crate::wire::serializer::FieldSpecifierWritingError;
 use crate::wire::serializer::ie::FieldWritingError;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum IpfixPacketWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing IPFIX packet: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in set: {0}")]
     SetError(#[from] SetWritingError),
 }
-
-impl std::fmt::Display for IpfixPacketWritingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::StdIOError(err) => write!(f, "{err}"),
-            Self::SetError(err) => write!(f, "{err}"),
-        }
-    }
-}
-
-impl std::error::Error for IpfixPacketWritingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::StdIOError(_) => None,
-            Self::SetError(err) => Some(err),
-        }
-    }
-}
+impl_from_io_error!(IpfixPacketWritingError);
 
 impl WritablePduWithOneInput<Option<&TemplatesMap>, IpfixPacketWritingError> for IpfixPacket {
     /// 2-octets version, 2-octets length, 4-octets * 3 (export time, seq no,
@@ -65,11 +49,11 @@ impl WritablePduWithOneInput<Option<&TemplatesMap>, IpfixPacketWritingError> for
         writer: &mut T,
         templates_map: Option<&TemplatesMap>,
     ) -> Result<(), IpfixPacketWritingError> {
-        writer.write_u16::<NetworkEndian>(self.version())?;
-        writer.write_u16::<NetworkEndian>(self.len(templates_map) as u16)?;
-        writer.write_u32::<NetworkEndian>(self.export_time().timestamp() as u32)?;
-        writer.write_u32::<NetworkEndian>(self.sequence_number())?;
-        writer.write_u32::<NetworkEndian>(self.observation_domain_id())?;
+        writer.write_all(&self.version().to_be_bytes())?;
+        writer.write_all(&(self.len(templates_map) as u16).to_be_bytes())?;
+        writer.write_all(&(self.export_time().timestamp() as u32).to_be_bytes())?;
+        writer.write_all(&self.sequence_number().to_be_bytes())?;
+        writer.write_all(&self.observation_domain_id().to_be_bytes())?;
         for set in self.sets() {
             set.write(writer, templates_map)?;
         }
@@ -77,29 +61,15 @@ impl WritablePduWithOneInput<Option<&TemplatesMap>, IpfixPacketWritingError> for
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum TemplateRecordWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing template record: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in field specifier: {0}")]
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
 }
-
-impl std::fmt::Display for TemplateRecordWritingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::StdIOError(err) => write!(f, "{err}"),
-            Self::FieldSpecifierError(err) => write!(f, "{err}"),
-        }
-    }
-}
-
-impl std::error::Error for TemplateRecordWritingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::StdIOError(_) => None,
-            Self::FieldSpecifierError(err) => Some(err),
-        }
-    }
-}
+impl_from_io_error!(TemplateRecordWritingError);
 
 impl WritablePdu<TemplateRecordWritingError> for TemplateRecord {
     /// 2-octets template_id, 2-octets field count
@@ -115,8 +85,8 @@ impl WritablePdu<TemplateRecordWritingError> for TemplateRecord {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), TemplateRecordWritingError> {
-        writer.write_u16::<NetworkEndian>(self.id())?;
-        writer.write_u16::<NetworkEndian>(self.field_specifiers().len() as u16)?;
+        writer.write_all(&self.id().to_be_bytes())?;
+        writer.write_all(&(self.field_specifiers().len() as u16).to_be_bytes())?;
         for field in self.field_specifiers() {
             field.write(writer)?;
         }
@@ -124,29 +94,15 @@ impl WritablePdu<TemplateRecordWritingError> for TemplateRecord {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum OptionsTemplateRecordWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing options template record: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in field specifier: {0}")]
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
 }
-
-impl std::fmt::Display for OptionsTemplateRecordWritingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::StdIOError(err) => write!(f, "{err}"),
-            Self::FieldSpecifierError(err) => write!(f, "{err}"),
-        }
-    }
-}
-
-impl std::error::Error for OptionsTemplateRecordWritingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::StdIOError(_) => None,
-            Self::FieldSpecifierError(err) => Some(err),
-        }
-    }
-}
+impl_from_io_error!(OptionsTemplateRecordWritingError);
 
 impl WritablePdu<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
     /// 2-octets template_id, 2-octets fields count, 2-octet scope fields count
@@ -167,11 +123,12 @@ impl WritablePdu<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), OptionsTemplateRecordWritingError> {
-        writer.write_u16::<NetworkEndian>(self.id())?;
-        writer.write_u16::<NetworkEndian>(
-            (self.scope_field_specifiers().len() + self.field_specifiers().len()) as u16,
+        writer.write_all(&self.id().to_be_bytes())?;
+        writer.write_all(
+            &((self.scope_field_specifiers().len() + self.field_specifiers().len()) as u16)
+                .to_be_bytes(),
         )?;
-        writer.write_u16::<NetworkEndian>(self.scope_field_specifiers().len() as u16)?;
+        writer.write_all(&(self.scope_field_specifiers().len() as u16).to_be_bytes())?;
         for field in self.scope_field_specifiers() {
             field.write(writer)?;
         }
@@ -182,29 +139,15 @@ impl WritablePdu<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum DataRecordWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing data record: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in field: {0}")]
     FieldError(#[from] FieldWritingError),
 }
-
-impl std::fmt::Display for DataRecordWritingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::StdIOError(err) => write!(f, "{err}"),
-            Self::FieldError(err) => write!(f, "{err}"),
-        }
-    }
-}
-
-impl std::error::Error for DataRecordWritingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::StdIOError(_) => None,
-            Self::FieldError(err) => Some(err),
-        }
-    }
-}
+impl_from_io_error!(DataRecordWritingError);
 
 impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> for DataRecord {
     const BASE_LENGTH: usize = 0;
@@ -309,35 +252,21 @@ fn calculate_set_size(templates_map: Option<&TemplatesMap>, set: &Set) -> usize 
     length + base_length
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum SetWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing set: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in data record: {0}")]
     FlowError(#[from] DataRecordWritingError),
+
+    #[error("in template record: {0}")]
     TemplateRecordError(#[from] TemplateRecordWritingError),
+
+    #[error("in options template record: {0}")]
     OptionsTemplateRecordError(#[from] OptionsTemplateRecordWritingError),
 }
-
-impl std::fmt::Display for SetWritingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::StdIOError(err) => write!(f, "{err}"),
-            Self::FlowError(err) => write!(f, "{err}"),
-            Self::TemplateRecordError(err) => write!(f, "{err}"),
-            Self::OptionsTemplateRecordError(err) => write!(f, "{err}"),
-        }
-    }
-}
-
-impl std::error::Error for SetWritingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::StdIOError(_) => None,
-            Self::FlowError(err) => Some(err),
-            Self::TemplateRecordError(err) => Some(err),
-            Self::OptionsTemplateRecordError(err) => Some(err),
-        }
-    }
-}
+impl_from_io_error!(SetWritingError);
 
 impl WritablePduWithOneInput<Option<&TemplatesMap>, SetWritingError> for Set {
     /// 2-octets set id + 2-octet set length
@@ -355,22 +284,22 @@ impl WritablePduWithOneInput<Option<&TemplatesMap>, SetWritingError> for Set {
         let length = calculate_set_size(templates_map, self) as u16;
         match self {
             Self::Template(records) => {
-                writer.write_u16::<NetworkEndian>(IPFIX_TEMPLATE_SET_ID)?;
-                writer.write_u16::<NetworkEndian>(length)?;
+                writer.write_all(&IPFIX_TEMPLATE_SET_ID.to_be_bytes())?;
+                writer.write_all(&length.to_be_bytes())?;
                 for record in records {
                     record.write(writer)?;
                 }
             }
             Self::OptionsTemplate(records) => {
-                writer.write_u16::<NetworkEndian>(IPFIX_OPTIONS_TEMPLATE_SET_ID)?;
-                writer.write_u16::<NetworkEndian>(length)?;
+                writer.write_all(&IPFIX_OPTIONS_TEMPLATE_SET_ID.to_be_bytes())?;
+                writer.write_all(&length.to_be_bytes())?;
                 for record in records {
                     record.write(writer)?;
                 }
             }
             Self::Data { id, records } => {
-                writer.write_u16::<NetworkEndian>(id.id())?;
-                writer.write_u16::<NetworkEndian>(length)?;
+                writer.write_all(&id.id().to_be_bytes())?;
+                writer.write_all(&length.to_be_bytes())?;
                 let decoding_template = templates_map.and_then(|x| x.get(&self.id()));
                 for record in records {
                     record.write(writer, decoding_template)?;
