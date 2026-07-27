@@ -17,7 +17,6 @@
 
 [docs-url]: https://docs.rs/netgauze-ipfix-code-generator
 
-
 ## Example:
 
 To include the generated IANA and custom registry Information elements, in `build.rs` add the following code
@@ -45,6 +44,9 @@ fn main() {
         637,
         "nokia".to_string(),
         "Nokia".to_string(),
+        // Optional external sub-registries, see `ExternalSubRegistrySource`;
+        // used to pull e.g. protocol-numbers in as a sub-registry of an IE.
+        None,
     );
     let iana_source = SourceConfig::new(
         RegistrySource::Http(IPFIX_URL.to_string()),
@@ -52,6 +54,7 @@ fn main() {
         0,
         "iana".to_string(),
         "IANA".to_string(),
+        None,
     );
     let configs = Config::new(iana_source, vec![nokia_source]);
     generate(&out_dir, &configs).unwrap();
