@@ -18,16 +18,7 @@ categories = ["parsing"]
 [lib]
 proc-macro = true
 
-[[test]]
-name = "tests"
-path = "tests/tests.rs"
 
 [dependencies]
-syn = { workspace = true, default-features = true, features = ["extra-traits", "full"] }
+syn = { workspace = true, default-features = true }
 quote = { workspace = true, default-features = true }
-
-[dev-dependencies]
-netgauze-parse-utils = { workspace = true }
-netgauze-locate = { workspace = true }
-nom = { workspace = true }
-trybuild = { workspace = true, features = ["diff"] }
