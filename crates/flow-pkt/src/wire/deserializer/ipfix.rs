@@ -213,7 +213,8 @@ impl<'a> ParseFromWithOneInput<'a, &mut TemplatesMap> for Set {
                         })
                         .sum::<usize>();
 
-                let mut records = Vec::new();
+                let mut records =
+                    Vec::with_capacity(buf.remaining().checked_div(min_record_length).unwrap_or(0));
 
                 while buf.remaining() >= min_record_length && min_record_length > 0 {
                     let read_template: &DecodingTemplate = template;
