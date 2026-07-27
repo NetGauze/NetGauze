@@ -5,7 +5,9 @@ use criterion::{Criterion, criterion_group, criterion_main};
 
 use netgauze_flow_pkt::ipfix;
 use netgauze_flow_pkt::ipfix::IpfixPacket;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInput};
+use netgauze_parse_utils::WritablePduWithOneInput;
+use netgauze_parse_utils::reader::SliceReader;
+use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
 const IPFIX_PKT_TEMPLATE_RAW: &[u8] = &[
     0x00, 0x0a, // Version
@@ -158,8 +160,8 @@ const IPFIX_PKT_DATA_PKT_ONLY: &[u8] = &[
     0x06, 0x02, 0x04, 0x00
 ];
 
-pub fn test_parse(span: Span<'_>, templates_map: &mut ipfix::TemplatesMap) {
-    let x = IpfixPacket::from_wire(span, templates_map);
+pub fn test_parse(buf: &[u8], templates_map: &mut ipfix::TemplatesMap) {
+    let x = IpfixPacket::parse(&mut SliceReader::new(buf), templates_map);
     x.unwrap();
 }
 
@@ -168,17 +170,18 @@ pub fn test_serialize(pkt: &IpfixPacket, cursor: &mut Cursor<&mut [u8]>) {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let template_span = Span::new(&IPFIX_PKT_TEMPLATE_RAW);
-    let options_template_span = Span::new(&IPFIX_PKT_OPTIONS_TEMPLATE_RAW);
-    let mixed_span = Span::new(&IPFIX_PKT_MIXED);
-    let data_span = Span::new(&IPFIX_PKT_DATA_PKT_ONLY);
+    let template_span = &IPFIX_PKT_TEMPLATE_RAW[..];
+    let options_template_span = &IPFIX_PKT_OPTIONS_TEMPLATE_RAW[..];
+    let mixed_span = &IPFIX_PKT_MIXED[..];
+    let data_span = &IPFIX_PKT_DATA_PKT_ONLY[..];
 
     let mut templates_map = HashMap::new();
     c.bench_function("Deserialize IPFIX pkt with template only pkt", |b| {
         b.iter(|| test_parse(template_span, &mut templates_map))
     });
 
-    let (_, pkt) = IpfixPacket::from_wire(template_span, &mut HashMap::new()).unwrap();
+    let pkt =
+        IpfixPacket::parse(&mut SliceReader::new(template_span), &mut HashMap::new()).unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
     c.bench_function("Serialize IPFIX pkt with template only pkt", |b| {
         b.iter(|| {
@@ -192,7 +195,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| test_parse(options_template_span, &mut templates_map))
     });
 
-    let (_, pkt) = IpfixPacket::from_wire(options_template_span, &mut HashMap::new()).unwrap();
+    let pkt = IpfixPacket::parse(
+        &mut SliceReader::new(options_template_span),
+        &mut HashMap::new(),
+    )
+    .unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
     c.bench_function("Serialize IPFIX with options template only pkt", |b| {
         b.iter(|| {
@@ -206,7 +213,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| test_parse(mixed_span, &mut templates_map))
     });
 
-    let (_, pkt) = IpfixPacket::from_wire(mixed_span, &mut HashMap::new()).unwrap();
+    let pkt = IpfixPacket::parse(&mut SliceReader::new(mixed_span), &mut HashMap::new()).unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
     c.bench_function("Serialize IPFIX  IPFIX mixed with all set types", |b| {
         b.iter(|| {
@@ -217,12 +224,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     // Initialize the templates
     let mut templates_map = HashMap::new();
-    IpfixPacket::from_wire(mixed_span, &mut templates_map).unwrap();
+    IpfixPacket::parse(&mut SliceReader::new(mixed_span), &mut templates_map).unwrap();
     c.bench_function("Deserialize IPFIX mixed with data only", |b| {
         b.iter(|| test_parse(data_span, &mut templates_map))
     });
 
-    let (_, pkt) = IpfixPacket::from_wire(data_span, &mut templates_map).unwrap();
+    let pkt = IpfixPacket::parse(&mut SliceReader::new(data_span), &mut templates_map).unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
     c.bench_function("Serialize IPFIX mixed with data only", |b| {
         b.iter(|| {
