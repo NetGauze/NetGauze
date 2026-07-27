@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="ipfix">
 <title>IP Flow Information Export (IPFIX) Entities</title>
 <created>2007-05-10</created>
-<updated>2026-07-08</updated>
+<updated>2026-07-22</updated>
 
 <note><xref type="rfc" data="rfc7012"/> has obsoleted <xref type="rfc" data="rfc5102"/>. However, references to <xref type="rfc" data="rfc5102"/>
 remain as part of the historical record.</note>
@@ -11422,13 +11422,13 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <status>current</status>
 <description>
   <paragraph>
-    BGP Extended Community as defined in <xref type="rfc" data="rfc4360"/>;
+    BGP Extended Community as defined in <xref type="draft" data="RFC-ietf-idr-rfc4360-bis-09"/>;
     the size of this IE MUST be 8 octets
   </paragraph>
 </description>
 <references>
   <paragraph>
-    <xref type="rfc" data="rfc4360"/>
+    <xref type="draft" data="RFC-ietf-idr-rfc4360-bis-09"/>
   </paragraph>
 </references>
 <xref type="rfc" data="rfc8549"/>
@@ -11452,7 +11452,7 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <references>
   <paragraph>
     <xref type="rfc" data="rfc6313"/>
-    <xref type="rfc" data="rfc4360"/> 
+    <xref type="draft" data="RFC-ietf-idr-rfc4360-bis-09"/> 
   </paragraph>
 </references>
 <xref type="rfc" data="rfc8549"/>
@@ -11476,7 +11476,7 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <references>
   <paragraph>
     <xref type="rfc" data="rfc6313"/>
-    <xref type="rfc" data="rfc4360"/> 
+    <xref type="draft" data="RFC-ietf-idr-rfc4360-bis-09"/> 
   </paragraph>
 </references>
 <xref type="rfc" data="rfc8549"/>

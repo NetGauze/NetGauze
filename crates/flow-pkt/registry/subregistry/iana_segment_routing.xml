@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="segment-routing">
   <title>Segment Routing</title>
   <created>2021-01-08</created>
-  <updated>2026-07-02</updated>
+  <updated>2026-07-22</updated>
   
   <registry id="srv6-endpoint-behaviors">
     <title>SRv6 Endpoint Behaviors</title>
@@ -1280,9 +1280,23 @@
       <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
       <controller><xref type="person" data="Cheng_Li"/></controller>
     </record>
+    <record date="2026-07-22">
+      <value>188</value>
+      <hex>0x00BC</hex>
+      <description>End.B6.Insert with NEXT-C-SID flavor</description>
+      <xref type="draft" data="draft-chen-spring-srv6-compressed-bsid-insertion-02"/>
+      <controller><xref type="person" data="Ran_Chen"/></controller>
+    </record>
+    <record date="2026-07-22">
+      <value>189</value>
+      <hex>0x00BD</hex>
+      <description>End.B6.Insert.Red with NEXT-C-SID flavor</description>
+      <xref type="draft" data="draft-chen-spring-srv6-compressed-bsid-insertion-02"/>
+      <controller><xref type="person" data="Ran_Chen"/></controller>
+    </record>
     <record>
-      <value>188-32766</value>
-      <hex>0x00BC-0x7FFE</hex>
+      <value>190-32766</value>
+      <hex>0x00BE-0x7FFE</hex>
       <description>Unassigned</description>
       <controller/>
     </record>
@@ -1549,7 +1563,7 @@
     <person id="Ran_Chen">
       <name>Ran Chen</name>
       <uri>mailto:chen.ran&amp;zte.com.cn</uri>
-      <updated>2022-11-23</updated>
+      <updated>2026-07-22</updated>
     </person>
     <person id="Yuya_Kawakami">
       <name>Yuya Kawakami</name>
