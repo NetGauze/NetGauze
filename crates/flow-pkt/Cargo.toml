@@ -27,7 +27,6 @@ include = [
 
 [dependencies]
 netgauze-parse-utils = { workspace = true, optional = true }
-netgauze-serde-macros = { workspace = true, optional = true }
 netgauze-iana = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 strum = { workspace = true }
@@ -36,7 +35,6 @@ chrono = { workspace = true, default-features = false, features = [
     "std",
     "serde",
 ] }
-byteorder = { workspace = true, optional = true }
 criterion = { workspace = true, optional = true } # Dev dep for bench
 tracing = { workspace = true, optional = true }
 tokio-util = { workspace = true, default-features = false, features = ["codec"], optional = true }
@@ -50,9 +48,7 @@ thiserror = { workspace = true }
 [features]
 default = ["serde"]
 serde = [
-    "byteorder",
     "netgauze-parse-utils",
-    "netgauze-serde-macros",
 ]
 codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]

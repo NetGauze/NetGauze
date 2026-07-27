@@ -2007,9 +2007,9 @@ pub(crate) fn generate_pkg_ie_serializers(
                             }
                             Some(u16::MAX) => {
                                 if value.len() < u8::MAX as usize {
-                                    writer.write_u8(value.len() as u8)?;
+                                    writer.write_all(&[value.len() as u8])?;
                                 } else {
-                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&[u8::MAX])?;
                                     let len = value.len() as u32;
                                     writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
@@ -2019,7 +2019,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                                 writer.write_all(value)?;
                                 // fill the rest with zeros
                                 for _ in value.len()..(len as usize) {
-                                    writer.write_u8(0)?
+                                    writer.write_all(&[0])?
                                 }
                             }
                         }
@@ -2031,13 +2031,13 @@ pub(crate) fn generate_pkg_ie_serializers(
                     quote! {
                         Self::#ident(value) => {
                             let num_val = u8::from(*value);
-                            writer.write_u8(num_val)?
+                            writer.write_all(&[num_val])?
                         }
                     }
                 } else {
                     quote! {
                         Self::#ident(value) => {
-                            writer.write_u8(*value)?
+                            writer.write_all(&[*value])?
                         }
                     }
                 }
@@ -2052,7 +2052,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_u16::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&value.to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -2075,7 +2075,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_u32::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&value.to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -2098,7 +2098,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_u64::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&value.to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -2116,13 +2116,13 @@ pub(crate) fn generate_pkg_ie_serializers(
                     quote! {
                         Self::#ident(value) => {
                             let num_val = i8::from(*value);
-                            writer.write_i8(num_val)?
+                            writer.write_all(&[num_val as u8])?
                         }
                     }
                 } else {
                     quote! {
                         Self::#ident(value) => {
-                            writer.write_i8(*value)?
+                            writer.write_all(&[*value as u8])?
                         }
                     }
                 }
@@ -2137,7 +2137,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_i16::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&value.to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -2160,7 +2160,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_i32::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&value.to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -2183,7 +2183,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_i32::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&value.to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -2201,7 +2201,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                     Self::#ident(value) => {
                         let value = f32::from(*value);
                         match length {
-                            None => writer.write_f32::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&value.to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -2219,7 +2219,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                     Self::#ident(value) => {
                         let value = f64::from(*value);
                         match length {
-                            None => writer.write_f64::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&value.to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -2235,7 +2235,7 @@ pub(crate) fn generate_pkg_ie_serializers(
             "boolean" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_u8(*value as u8)?
+                        writer.write_all(&[*value as u8])?
                     }
                 }
             }
@@ -2253,9 +2253,9 @@ pub(crate) fn generate_pkg_ie_serializers(
                             Some(u16::MAX) | None => {
                                 let bytes = value.as_bytes();
                                 if bytes.len() < u8::MAX as usize {
-                                    writer.write_u8(bytes.len() as u8)?;
+                                    writer.write_all(&[bytes.len() as u8])?;
                                 } else {
-                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&[u8::MAX])?;
                                     let len = bytes.len() as u32;
                                     writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
@@ -2265,7 +2265,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                                 writer.write_all(value.as_bytes())?;
                                 // fill the rest with zeros
                                 for _ in value.len()..(len as usize) {
-                                    writer.write_u8(0)?
+                                    writer.write_all(&[0])?
                                 }
                             }
                         }
@@ -2275,25 +2275,25 @@ pub(crate) fn generate_pkg_ie_serializers(
             "dateTimeSeconds" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?
+                        writer.write_all(&(value.timestamp() as u32).to_be_bytes())?
                     }
                 }
             }
             "dateTimeMilliseconds" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_u64::<byteorder::NetworkEndian>(value.timestamp_millis() as u64)?;
+                        writer.write_all(&(value.timestamp_millis() as u64).to_be_bytes())?;
                     }
                 }
             }
             "dateTimeMicroseconds" | "dateTimeNanoseconds" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?;
+                        writer.write_all(&(value.timestamp() as u32).to_be_bytes())?;
                         let nanos = value.timestamp_subsec_nanos();
                         // Convert 1/2**32 of a second to a fraction of a nano second
                         let fraction = (nanos as u64 * u32::MAX as u64) / 1_000_000_000;
-                        writer.write_u32::<byteorder::NetworkEndian>(fraction as u32)?;
+                        writer.write_all(&(fraction as u32).to_be_bytes())?;
                     }
                 }
             }
@@ -2348,26 +2348,17 @@ pub(crate) fn generate_pkg_ie_serializers(
     });
 
     quote! {
-        use byteorder::WriteBytesExt;
         use crate::ie::#vendor_ident::*;
 
         #[allow(non_camel_case_types)]
-        #[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]
+        #[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
         pub enum FieldWritingError {
-            StdIOError(#[from_std_io_error] String),
+            #[error("IO error while writing field: {0}")]
+            StdIOError(Box<str>),
+            #[error("invalid length {length} for IE {ie_name}")]
             InvalidLength{ie_name: String, length: u16},
         }
-
-        impl std::fmt::Display for FieldWritingError {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self {
-                    Self::StdIOError(err) => write!(f, "{err}"),
-                    Self::InvalidLength{ie_name, length} => write!(f, "writing error of {ie_name} invalid length {length}"),
-                }
-            }
-        }
-
-        impl std::error::Error for FieldWritingError {}
+        netgauze_parse_utils::impl_from_io_error!(FieldWritingError);
 
         impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, FieldWritingError> for Field {
             const BASE_LENGTH: usize = 0;
@@ -2399,9 +2390,9 @@ pub(crate) fn generate_pkg_ie_serializers(
                         match length {
                             Some(u16::MAX) | None => {
                                 if value.len() < u8::MAX as usize {
-                                    writer.write_u8(value.len() as u8)?;
+                                    writer.write_all(&[value.len() as u8])?;
                                 } else {
-                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&[u8::MAX])?;
                                     let len = value.len() as u32;
                                     writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
@@ -2411,7 +2402,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                                 writer.write_all(value)?;
                                 // fill the rest with zeros
                                 for _ in value.len()..(len as usize) {
-                                    writer.write_u8(0)?
+                                    writer.write_all(&[0])?
                                 }
                             }
                         }
@@ -2993,14 +2984,13 @@ pub(crate) fn generate_ie_ser_main(
     vendor_prefixes: &[(String, String, u32)],
 ) -> TokenStream {
     let vendor_errors = vendor_prefixes.iter().map(|(name, pkg, _)| {
-        let name = Ident::new(&format!("{name}Error"), Span::call_site());
-        let pkg = Ident::new(pkg, Span::call_site());
-        quote! { #name(#[from] #pkg::FieldWritingError) }
-    });
-
-    let vendor_display_errors = vendor_prefixes.iter().map(|(name, _, _)| {
-        let name = Ident::new(&format!("{name}Error"), Span::call_site());
-        quote! {  Self::#name(err) => write!(f, "writing error of #pkg: {err}") }
+        let variant = Ident::new(&format!("{name}Error"), Span::call_site());
+        let pkg_ident = Ident::new(pkg, Span::call_site());
+        let msg = format!("in {name} IE: {{0}}");
+        quote! {
+            #[error(#msg)]
+            #variant(#[from] #pkg_ident::FieldWritingError)
+        }
     });
 
     let vendor_len = vendor_prefixes.iter().map(|(name, _, _)| {
@@ -3030,9 +3020,9 @@ pub(crate) fn generate_ie_ser_main(
                             }
                             Some(u16::MAX) => {
                                 if value.len() < u8::MAX as usize {
-                                    writer.write_u8(value.len() as u8)?;
+                                    writer.write_all(&[value.len() as u8])?;
                                 } else {
-                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&[u8::MAX])?;
                                     let len = value.len() as u32;
                                     writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
@@ -3042,7 +3032,7 @@ pub(crate) fn generate_ie_ser_main(
                                 writer.write_all(value)?;
                                 // fill the rest with zeros
                                 for _ in value.len()..(len as usize) {
-                                    writer.write_u8(0)?
+                                    writer.write_all(&[0])?
                                 }
                             }
                         }
@@ -3054,13 +3044,13 @@ pub(crate) fn generate_ie_ser_main(
                     quote! {
                         Self::#ident(value) => {
                             let num_val = u8::from(*value);
-                            writer.write_u8(num_val)?
+                            writer.write_all(&[num_val])?
                         }
                     }
                 } else {
                     quote! {
                         Self::#ident(value) => {
-                            writer.write_u8(*value)?
+                            writer.write_all(&[*value])?
                         }
                     }
                 }
@@ -3075,7 +3065,7 @@ pub(crate) fn generate_ie_ser_main(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_u16::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&(value).to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -3098,7 +3088,7 @@ pub(crate) fn generate_ie_ser_main(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_u32::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&(value).to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -3121,7 +3111,7 @@ pub(crate) fn generate_ie_ser_main(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_u64::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&(value).to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -3139,13 +3129,13 @@ pub(crate) fn generate_ie_ser_main(
                     quote! {
                         Self::#ident(value) => {
                             let num_val = i8::from(*value);
-                            writer.write_i8(num_val)?
+                            writer.write_all(&[num_val as u8])?
                         }
                     }
                 } else {
                     quote! {
                         Self::#ident(value) => {
-                            writer.write_i8(*value)?
+                            writer.write_all(&[*value as u8])?
                         }
                     }
                 }
@@ -3160,7 +3150,7 @@ pub(crate) fn generate_ie_ser_main(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_i16::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&(value).to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -3183,7 +3173,7 @@ pub(crate) fn generate_ie_ser_main(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_i32::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&(value).to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -3206,7 +3196,7 @@ pub(crate) fn generate_ie_ser_main(
                     Self::#ident(value) => {
                         #value
                         match length {
-                            None => writer.write_i32::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&(value).to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -3224,7 +3214,7 @@ pub(crate) fn generate_ie_ser_main(
                     Self::#ident(value) => {
                         let value = f32::from(*value);
                         match length {
-                            None => writer.write_f32::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&(value).to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -3242,7 +3232,7 @@ pub(crate) fn generate_ie_ser_main(
                     Self::#ident(value) => {
                         let value = f64::from(*value);
                         match length {
-                            None => writer.write_f64::<byteorder::NetworkEndian>(value)?,
+                            None => writer.write_all(&(value).to_be_bytes())?,
                             Some(len) => {
                                 let be_bytes = value.to_be_bytes();
                                 if usize::from(len) > be_bytes.len() {
@@ -3258,7 +3248,7 @@ pub(crate) fn generate_ie_ser_main(
             "boolean" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_u8(*value as u8)?
+                        writer.write_all(&[*value as u8])?
                     }
                 }
             }
@@ -3276,9 +3266,9 @@ pub(crate) fn generate_ie_ser_main(
                             Some(u16::MAX) | None => {
                                 let bytes = value.as_bytes();
                                 if bytes.len() < u8::MAX as usize {
-                                    writer.write_u8(bytes.len() as u8)?;
+                                    writer.write_all(&[bytes.len() as u8])?;
                                 } else {
-                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&[u8::MAX])?;
                                     let len = bytes.len() as u32;
                                     writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
@@ -3288,7 +3278,7 @@ pub(crate) fn generate_ie_ser_main(
                                 writer.write_all(value.as_bytes())?;
                                 // fill the rest with zeros
                                 for _ in value.len()..(len as usize) {
-                                    writer.write_u8(0)?
+                                    writer.write_all(&[0])?
                                 }
                             }
                         }
@@ -3298,25 +3288,25 @@ pub(crate) fn generate_ie_ser_main(
             "dateTimeSeconds" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?
+                        writer.write_all(&(value.timestamp() as u32).to_be_bytes())?
                     }
                 }
             }
             "dateTimeMilliseconds" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_u64::<byteorder::NetworkEndian>(value.timestamp_millis() as u64)?;
+                        writer.write_all(&(value.timestamp_millis() as u64).to_be_bytes())?;
                     }
                 }
             }
             "dateTimeMicroseconds" | "dateTimeNanoseconds" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?;
+                        writer.write_all(&(value.timestamp() as u32).to_be_bytes())?;
                         let nanos = value.timestamp_subsec_nanos();
                         // Convert 1/2**32 of a second to a fraction of a nano second
                         let fraction = (nanos as u64 * u32::MAX as u64) / 1_000_000_000;
-                        writer.write_u32::<byteorder::NetworkEndian>(fraction as u32)?;
+                        writer.write_all(&(fraction as u32).to_be_bytes())?;
                     }
                 }
             }
@@ -3499,27 +3489,16 @@ pub(crate) fn generate_ie_ser_main(
     });
 
     quote! {
-        use byteorder::WriteBytesExt;
-
         #[allow(non_camel_case_types)]
-        #[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]
+        #[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
         pub enum FieldWritingError {
-            StdIOError(#[from_std_io_error] String),
+            #[error("IO error while writing field: {0}")]
+            StdIOError(Box<str>),
             #(#vendor_errors,)*
+            #[error("invalid length {length} for IE {ie_name}")]
             InvalidLength{ie_name: String, length: u16},
         }
-
-        impl std::fmt::Display for FieldWritingError {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self {
-                    Self::StdIOError(err) => write!(f, "{err}"),
-                    #(#vendor_display_errors,)*
-                    Self::InvalidLength{ie_name, length} => write!(f, "writing error of {ie_name} invalid length {length}"),
-                }
-            }
-        }
-
-        impl std::error::Error for FieldWritingError {}
+        netgauze_parse_utils::impl_from_io_error!(FieldWritingError);
 
         impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, FieldWritingError> for Field {
             const BASE_LENGTH: usize = 0;
@@ -3552,9 +3531,9 @@ pub(crate) fn generate_ie_ser_main(
                         match length {
                             Some(u16::MAX) | None => {
                                 if value.len() < u8::MAX as usize {
-                                    writer.write_u8(value.len() as u8)?;
+                                    writer.write_all(&[value.len() as u8])?;
                                 } else {
-                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&[u8::MAX])?;
                                     let len = value.len() as u32;
                                     writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
@@ -3564,7 +3543,7 @@ pub(crate) fn generate_ie_ser_main(
                                 writer.write_all(value)?;
                                 // fill the rest with zeros
                                 for _ in value.len()..(len as usize) {
-                                    writer.write_u8(0)?
+                                    writer.write_all(&[0])?
                                 }
                             }
                         }

@@ -19,52 +19,28 @@ pub mod netflow;
 
 use crate::FieldSpecifier;
 use crate::ie::InformationElementTemplate;
-use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::WritablePdu;
-use netgauze_serde_macros::WritingError;
+use netgauze_parse_utils::{WritablePdu, impl_from_io_error};
 use std::io::Write;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum FlowWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing flow packet: {0}")]
+    StdIOError(Box<str>),
+
+    #[error("in IPFIX packet: {0}")]
     IpfixWritingError(#[from] ipfix::IpfixPacketWritingError),
+
+    #[error("in NetFlow V9 packet: {0}")]
     NetFlowV9WritingError(#[from] netflow::NetFlowV9WritingError),
 }
+impl_from_io_error!(FlowWritingError);
 
-impl std::fmt::Display for FlowWritingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::StdIOError(e) => write!(f, "StdIO error: {e}"),
-            Self::IpfixWritingError(e) => write!(f, "IPFIX writing error: {e}"),
-            Self::NetFlowV9WritingError(e) => write!(f, "NetFlow V9 writing error: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for FlowWritingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::StdIOError(_) => None,
-            Self::IpfixWritingError(e) => Some(e),
-            Self::NetFlowV9WritingError(e) => Some(e),
-        }
-    }
-}
-
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(thiserror::Error, Eq, PartialEq, Clone, Debug)]
 pub enum FieldSpecifierWritingError {
-    StdIOError(#[from_std_io_error] String),
+    #[error("IO error while writing field specifier: {0}")]
+    StdIOError(Box<str>),
 }
-
-impl std::fmt::Display for FieldSpecifierWritingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::StdIOError(e) => write!(f, "StdIO error: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for FieldSpecifierWritingError {}
+impl_from_io_error!(FieldSpecifierWritingError);
 
 impl WritablePdu<FieldSpecifierWritingError> for FieldSpecifier {
     /// 2-octets field id, 2-octets length
@@ -79,16 +55,16 @@ impl WritablePdu<FieldSpecifierWritingError> for FieldSpecifier {
         let pen = self.element_id.pen();
 
         if pen == 0 {
-            writer.write_u16::<NetworkEndian>(element_id)?;
+            writer.write_all(&element_id.to_be_bytes())?;
         } else {
             // Set Enterprise bit
-            writer.write_u16::<NetworkEndian>(element_id | 0x8000)?;
+            writer.write_all(&(element_id | 0x8000).to_be_bytes())?;
         }
 
-        writer.write_u16::<NetworkEndian>(self.length)?;
+        writer.write_all(&self.length.to_be_bytes())?;
 
         if pen != 0 {
-            writer.write_u32::<NetworkEndian>(pen)?;
+            writer.write_all(&pen.to_be_bytes())?;
         }
         Ok(())
     }

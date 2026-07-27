@@ -17,7 +17,6 @@
 //! It works with [`FlowInfo`] which is enum that combine both IPFIX and Netflow
 //! V9 into one object to make it easier to handle.
 
-use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -200,10 +199,10 @@ impl Decoder for FlowInfoCodec {
             // We don't have enough data yet to start processing
             return Ok(None);
         }
-        let version: u16 = NetworkEndian::read_u16(&buf[0..2]);
+        let version = u16::from_be_bytes([buf[0], buf[1]]);
         // Read the length (ipfix) or count (NetFlow v9), starting from after the
         // version
-        let length = NetworkEndian::read_u16(&buf[2..4]) as usize;
+        let length = u16::from_be_bytes([buf[2], buf[3]]) as usize;
         if buf.len() < length {
             // We still didn't read all the bytes for the message yet
             return Ok(None);
