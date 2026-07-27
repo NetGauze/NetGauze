@@ -49,13 +49,23 @@ impl WritablePduWithOneInput<Option<&TemplatesMap>, IpfixPacketWritingError> for
         writer: &mut T,
         templates_map: Option<&TemplatesMap>,
     ) -> Result<(), IpfixPacketWritingError> {
+        // Every set's length is needed twice: once to make up the message
+        // length in the header, and once as the set's own length field.
+        // Computing it walks every field in the set, so compute it once here
+        // and hand it down rather than letting `Set::write` recompute it.
+        let set_lengths = self
+            .sets()
+            .iter()
+            .map(|x| x.len(templates_map))
+            .collect::<Vec<_>>();
+        let length = Self::BASE_LENGTH + set_lengths.iter().sum::<usize>();
         writer.write_all(&self.version().to_be_bytes())?;
-        writer.write_all(&(self.len(templates_map) as u16).to_be_bytes())?;
+        writer.write_all(&(length as u16).to_be_bytes())?;
         writer.write_all(&(self.export_time().timestamp() as u32).to_be_bytes())?;
         writer.write_all(&self.sequence_number().to_be_bytes())?;
         writer.write_all(&self.observation_domain_id().to_be_bytes())?;
-        for set in self.sets() {
-            set.write(writer, templates_map)?;
+        for (set, len) in self.sets().iter().zip(set_lengths) {
+            set.write_with_len(writer, templates_map, len)?;
         }
         Ok(())
     }
@@ -281,7 +291,25 @@ impl WritablePduWithOneInput<Option<&TemplatesMap>, SetWritingError> for Set {
         writer: &mut T,
         templates_map: Option<&TemplatesMap>,
     ) -> Result<(), SetWritingError> {
-        let length = calculate_set_size(templates_map, self) as u16;
+        self.write_with_len(
+            writer,
+            templates_map,
+            calculate_set_size(templates_map, self),
+        )
+    }
+}
+
+impl Set {
+    /// Same as [`WritablePduWithOneInput::write`], but takes an already
+    /// computed length so callers that need it anyway do not pay for a second
+    /// walk over every field.
+    fn write_with_len<T: Write>(
+        &self,
+        writer: &mut T,
+        templates_map: Option<&TemplatesMap>,
+        length: usize,
+    ) -> Result<(), SetWritingError> {
+        let length = length as u16;
         match self {
             Self::Template(records) => {
                 writer.write_all(&IPFIX_TEMPLATE_SET_ID.to_be_bytes())?;
