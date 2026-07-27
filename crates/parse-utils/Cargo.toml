@@ -16,7 +16,6 @@ keywords = ["protocol"]
 categories = ["parsing"]
 
 [dependencies]
-nom = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true  }
 ipnet = { workspace = true }
