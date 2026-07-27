@@ -89,13 +89,13 @@ cargo run -p netgauze-pcap-decoder -- --protocol bmp --ports 11019 input.pcap -o
 
 These crates provide shared infrastructure used across the protocol libraries:
 
-| Crate                                           | Purpose                                                          |
-|-------------------------------------------------|------------------------------------------------------------------|
-| [`netgauze-iana`](crates/iana/)                 | IANA registry constants for address families, capabilities, etc. |
-| [`netgauze-parse-utils`](crates/parse-utils/)   | Traits and helpers for nom-based protocol parsing                |
-| [`netgauze-serde-macros`](crates/serde-macros/) | Procedural macros for error location tracking in parsers         |
-| [`netgauze-locate`](crates/locate/)             | Binary span types for tracking byte positions during parsing     |
-| [`netgauze-analytics`](crates/analytics/)       | Analytics and aggregation primitives                             |
+| Crate                                           | Purpose                                                                    |
+|-------------------------------------------------|----------------------------------------------------------------------------|
+| [`netgauze-iana`](crates/iana/)                 | IANA registry constants for address families, capabilities, etc.           |
+| [`netgauze-parse-utils`](crates/parse-utils/)   | Traits and helpers for protocol parsing and serialization                  |
+| [`netgauze-serde-macros`](crates/serde-macros/) | Procedural macros for error location tracking in parsers                   |
+| [`netgauze-locate`](crates/locate/)             | *Deprecated:* Binary span types for tracking byte positions during parsing |
+| [`netgauze-analytics`](crates/analytics/)       | Analytics and aggregation primitives                                       |
 
 ## Quick Start
 
@@ -114,10 +114,10 @@ use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
 use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
-let raw: &[u8] = &[ /* BGP message bytes */ ];
+let raw: & [u8] = & [ /* BGP message bytes */ ];
 let mut reader = SliceReader::new(raw);
-let mut ctx = BgpParsingContext::default();
-let message = BgpMessage::parse(&mut reader, &mut ctx).unwrap();
+let mut ctx = BgpParsingContext::default ();
+let message = BgpMessage::parse( & mut reader, & mut ctx).unwrap();
 ```
 
 ## Design Principles
@@ -135,14 +135,11 @@ NetGauze follows a consistent architecture across all protocol crates, documente
 
 ## Running Tests
 
-NetGauze uses macro tests from the [trybuild](https://crates.io/crates/trybuild) crate and PCAP-based regression tests.
+NetGauze includes integration tests to check for PCAP-based regression.
 
 ```bash
 # Standard test run
 cargo test --features=codec
-
-# Regenerate expected macro test output
-TRYBUILD=overwrite cargo test
 
 # Regenerate expected PCAP test output
 OVERWRITE=true cargo test
