@@ -29,7 +29,7 @@ tracing = { workspace = true }
 opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
 either = { workspace = true }
 async-channel = { workspace = true }
-yang4 = { workspace = true }
+yang5 = { workspace = true }
 rustc-hash = { workspace = true }
 quick-xml = { workspace = true }
 futures-util = { workspace = true }
