@@ -1,4 +1,4 @@
-# Helper macros to make ser/deser binary protocols easier
+# **Deprecated**: Helper macros to make ser/deser binary protocols easier
 
 [![Crates.io][crates-badge]][crates-url]
 [![Documentation][docs-badge]][docs-url]
