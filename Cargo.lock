@@ -2777,7 +2777,6 @@ dependencies = [
  "netgauze-flow-service",
  "netgauze-iana",
  "netgauze-netconf-proto",
- "netgauze-serde-macros",
  "netgauze-udp-notif-pkt",
  "netgauze-udp-notif-service",
  "netgauze-yang-push",

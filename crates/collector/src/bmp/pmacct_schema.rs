@@ -376,7 +376,8 @@ pub struct PmacctTerminationMessage {
     Debug,
     PartialEq,
     Clone,
-    netgauze_serde_macros::StringBackedEnum,
+    serde_with::SerializeDisplay,
+    serde_with::DeserializeFromStr,
 )]
 #[strum(serialize_all = "kebab-case")]
 pub enum LogType {
@@ -394,7 +395,8 @@ pub enum LogType {
     Debug,
     PartialEq,
     Clone,
-    netgauze_serde_macros::StringBackedEnum,
+    serde_with::SerializeDisplay,
+    serde_with::DeserializeFromStr,
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum EventType {
@@ -413,7 +415,8 @@ pub enum EventType {
     Debug,
     PartialEq,
     Clone,
-    netgauze_serde_macros::StringBackedEnum,
+    serde_with::SerializeDisplay,
+    serde_with::DeserializeFromStr,
 )]
 pub enum BgpOrigin {
     #[strum(to_string = "i")]
@@ -431,7 +434,8 @@ pub enum BgpOrigin {
     Debug,
     PartialEq,
     Clone,
-    netgauze_serde_macros::StringBackedEnum,
+    serde_with::SerializeDisplay,
+    serde_with::DeserializeFromStr,
 )]
 #[strum(serialize_all = "lowercase")]
 pub enum RdOrigin {
@@ -449,7 +453,8 @@ pub enum RdOrigin {
     Debug,
     PartialEq,
     Clone,
-    netgauze_serde_macros::StringBackedEnum,
+    serde_with::SerializeDisplay,
+    serde_with::DeserializeFromStr,
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum BmpMsgType {
@@ -469,7 +474,8 @@ pub enum BmpMsgType {
     Debug,
     PartialEq,
     Clone,
-    netgauze_serde_macros::StringBackedEnum,
+    serde_with::SerializeDisplay,
+    serde_with::DeserializeFromStr,
 )]
 pub enum BmpRibType {
     #[strum(to_string = "Unknown")]
@@ -1902,6 +1908,34 @@ impl PmacctBmpMessage {
         }
     }
 }
+
+/// Implements [`apache_avro::schema::derive::AvroSchemaComponent`] as a bare
+/// Avro `string` for enums that serialize through their `Display` form.
+///
+/// `apache_avro`'s own `AvroSchema` derive would emit a *named* Avro `enum`
+/// with a closed symbol list. pmacct expects an open string here, so that
+/// adding a variant does not break schema compatibility for existing readers.
+macro_rules! impl_avro_string_schema {
+    ($($ty:ty),+ $(,)?) => {
+        $(
+            impl apache_avro::schema::derive::AvroSchemaComponent for $ty {
+                fn get_schema_in_ctxt(
+                    _named_schemas: &mut std::collections::HashMap<
+                        apache_avro::schema::Name,
+                        apache_avro::Schema,
+                    >,
+                    _enclosing_namespace: &apache_avro::schema::Namespace,
+                ) -> apache_avro::Schema {
+                    apache_avro::Schema::String
+                }
+            }
+        )+
+    };
+}
+
+impl_avro_string_schema!(
+    LogType, EventType, BgpOrigin, RdOrigin, BmpMsgType, BmpRibType,
+);
 
 #[cfg(test)]
 mod tests;
