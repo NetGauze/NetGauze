@@ -2915,7 +2915,7 @@ dependencies = [
  "reqwest",
  "roxmltree",
  "serde",
- "syn 2.0.119",
+ "syn 3.0.3",
  "thiserror",
  "tracing",
 ]
@@ -2994,7 +2994,7 @@ name = "netgauze-serde-macros"
 version = "0.12.2+deprecated"
 dependencies = [
  "quote",
- "syn 2.0.119",
+ "syn 3.0.3",
 ]
 
 [[package]]
