@@ -18,4 +18,4 @@ keywords = ["protocol"]
 categories = ["parsing"]
 
 [dependencies]
-nom = { workspace = true }
+nom = { version = "7.1" }
