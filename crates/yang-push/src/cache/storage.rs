@@ -780,7 +780,7 @@ impl YangLibraryReference {
 /// println!("Subscription Target: {}", subscription_info.target());
 /// println!("Models: {:?}", subscription_info.models());
 /// ```
-#[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SubscriptionInfo {
     pub collector: SocketAddr,
     pub interface: Option<String>,
@@ -806,6 +806,36 @@ pub struct SubscriptionInfo {
     pub models: Box<[YangPushModuleVersion]>,
 
     pub content_id: ContentId,
+}
+
+impl std::hash::Hash for SubscriptionInfo {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.peer.ip().hash(state);
+        self.id.hash(state);
+        self.target.hash(state);
+        self.stop_time.hash(state);
+        self.transport.hash(state);
+        self.encoding.hash(state);
+        self.purpose.hash(state);
+        self.update_trigger.hash(state);
+        self.models.hash(state);
+        self.content_id.hash(state);
+    }
+}
+
+impl PartialEq for SubscriptionInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.peer.ip() == other.peer.ip()
+            && self.id == other.id
+            && self.target == other.target
+            && self.stop_time == other.stop_time
+            && self.transport == other.transport
+            && self.encoding == other.encoding
+            && self.purpose == other.purpose
+            && self.update_trigger == other.update_trigger
+            && self.models == other.models
+            && self.content_id == other.content_id
+    }
 }
 
 impl SubscriptionInfo {
@@ -2010,5 +2040,76 @@ mod tests {
         assert_eq!(subscriptions.len(), 2);
         assert!(subscriptions.contains(&subscription_info1));
         assert!(subscriptions.contains(&subscription_info2));
+    }
+
+    /// A device that reconnects from a different source port must still hit the
+    /// cache: [`SubscriptionInfo`] identity intentionally ignores the peer's
+    /// ephemeral port. See <https://github.com/NetGauze/NetGauze/issues/483>.
+    #[test]
+    fn test_subscription_info_identity_ignores_peer_port() {
+        let info = create_test_subscription_info("content-id-1");
+
+        // Same subscription, device reconnected from a different source port.
+        let mut reconnected = info.clone();
+        reconnected.peer = SocketAddr::new(info.peer.ip(), info.peer.port() + 1);
+
+        assert_eq!(
+            info, reconnected,
+            "subscriptions differing only by peer port must compare equal"
+        );
+
+        // `Hash` must agree with `Eq`, otherwise the map lookup still misses.
+        let hash = |x: &SubscriptionInfo| {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            x.hash(&mut h);
+            h.finish()
+        };
+        assert_eq!(
+            hash(&info),
+            hash(&reconnected),
+            "equal subscriptions must hash equally"
+        );
+
+        // The lookup the issue is about: cached under the old port, found under
+        // the new one.
+        let mut cache = FxHashMap::default();
+        cache.insert(info.clone(), "yang-library");
+        assert_eq!(
+            cache.get(&reconnected),
+            Some(&"yang-library"),
+            "cache lookup must hit after the peer reconnects from a new port"
+        );
+    }
+
+    /// The port is the *only* part of the peer that is ignored -- a different
+    /// device must never share a cache entry.
+    #[test]
+    fn test_subscription_info_identity_still_distinguishes_peer_ip() {
+        let info = create_test_subscription_info("content-id-1");
+
+        let mut other_device = info.clone();
+        other_device.peer = SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 200)),
+            info.peer.port(),
+        );
+        assert_ne!(
+            info, other_device,
+            "subscriptions from different peer IPs must not compare equal"
+        );
+
+        let mut other_id = info.clone();
+        other_id.id = info.id + 1;
+        assert_ne!(
+            info, other_id,
+            "different subscription IDs must not compare equal"
+        );
+
+        let mut other_content = info.clone();
+        other_content.content_id = ContentId::from("content-id-2".to_string());
+        assert_ne!(
+            info, other_content,
+            "different content IDs must not compare equal"
+        );
     }
 }
