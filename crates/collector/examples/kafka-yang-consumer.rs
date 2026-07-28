@@ -48,8 +48,8 @@ use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr};
 use tokio::signal;
 use tracing::{debug, error, info, trace, warn};
-use yang4::context::Context;
-use yang4::data::{DataFormat, DataParserFlags, DataValidationFlags};
+use yang5::context::Context;
+use yang5::data::{DataFormat, DataParserFlags, DataValidationFlags};
 
 shadow!(build);
 
@@ -206,7 +206,7 @@ impl YangContextCache {
             &yang_lib_ref.yang_library_path(),
             DataFormat::XML,
             &search_dir.as_path(),
-            yang4::context::ContextFlags::empty(),
+            yang5::context::ContextFlags::empty(),
         )?;
 
         info!(
@@ -985,27 +985,14 @@ async fn main() -> Result<()> {
                                         );
                                         validation_stats.no_tm_schema += 1;
                                     } else {
-                                        // Extract ietf-telemetry-message extension instance
-                                        let tm_ext = tm_module.as_ref().and_then(|m| m.extensions().next());
-
                                         // Validate message payload
-                                        let validation_result = match &tm_ext {
-                                            Some(ext) => yang4::data::DataTree::parse_ext_string(
-                                                ext,
-                                                payload,
-                                                DataFormat::JSON,
-                                                DataParserFlags::STRICT,
-                                                DataValidationFlags::PRESENT,
-                                            ),
-                                            // Support legacy ietf-telemetry-message without YANG structure
-                                            None => yang4::data::DataTree::parse_string(
+                                        let validation_result =yang5::data::DataTree::parse_string(
                                                 yang_ctx,
                                                 payload,
                                                 DataFormat::JSON,
                                                 DataParserFlags::STRICT,
                                                 DataValidationFlags::PRESENT,
-                                            ),
-                                        };
+                                        );
 
                                         match validation_result {
                                             Ok(_) => {

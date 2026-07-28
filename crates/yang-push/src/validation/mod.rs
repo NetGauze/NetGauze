@@ -67,7 +67,7 @@
 //!
 //! - **Subscription Level**: Per-subscription state including:
 //!   - `SubscriptionInfo`: Metadata from `SubscriptionStarted`
-//!   - `yang4::Context`: Loaded YANG schemas for validation
+//!   - `yang5::Context`: Loaded YANG schemas for validation
 //!   - Buffered packets waiting for schema retrieval
 //!   - Enforces `max_cached_packets_per_subscription` limit
 //!
@@ -87,7 +87,7 @@
 //!
 //! The actor validates packets when YANG schemas are available:
 //!
-//! - **Schema available**: Validates using `yang4` library
+//! - **Schema available**: Validates using `yang5` library
 //!   - Valid packets → forwarded with full `SubscriptionInfo`
 //!   - Invalid packets → dropped with error logged
 //!
@@ -131,13 +131,13 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, info, trace, warn};
-use yang4::data::{DataFormat, DataOperation, DataParserFlags, DataValidationFlags};
+use yang5::data::{DataFormat, DataOperation, DataParserFlags, DataValidationFlags};
 
 #[derive(Debug)]
 struct CachedSubscription {
     cached_content_id: Option<ContentId>,
     subscription_info: SubscriptionInfo,
-    yang_ctx: Option<yang4::context::Context>,
+    yang_ctx: Option<yang5::context::Context>,
     cached_packets: Vec<Arc<UdpNotifRequest>>,
 }
 
@@ -687,25 +687,17 @@ impl ValidationActor {
         subscription_info: &SubscriptionInfo,
         cached_content_id: ContentId,
         notification_type: &String,
-        yang_ctx: &yang4::context::Context,
+        yang_ctx: &yang5::context::Context,
         is_legacy: bool,
-    ) -> Result<(), yang4::Error> {
+    ) -> Result<(), yang5::Error> {
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
         Self::extend_peer_targs_with_subscription_info(subscription_info, &mut peer_tags);
         let message_id = packet.message_id();
         let publisher_id = packet.publisher_id();
 
-        let mut envelope_ext = None;
-        if let Some(ietf_yo_notif) = yang_ctx.get_module_implemented("ietf-yp-notification")
-            && let Some(ext) = ietf_yo_notif.extensions().next()
-        {
-            envelope_ext = Some(ext);
-        }
-        if let Some(envelope_ext) = envelope_ext
-            && !is_legacy
-        {
-            let validation_result = yang4::data::DataTree::parse_ext_string(
-                &envelope_ext,
+        if !is_legacy {
+            let validation_result = yang5::data::DataTree::parse_string(
+                yang_ctx,
                 packet.payload(),
                 DataFormat::JSON,
                 DataParserFlags::STRICT,
@@ -743,7 +735,7 @@ impl ValidationActor {
             );
             Ok(())
         } else {
-            let validation_result = yang4::data::DataTree::parse_op_string(
+            let validation_result = yang5::data::DataTree::parse_op_string(
                 yang_ctx,
                 packet.payload(),
                 DataFormat::JSON,
@@ -936,11 +928,11 @@ impl ValidationActor {
         subscription_cache.subscription_info = subscription_info.clone();
         if let Some(yang_lib_ref) = yang_lib_ref {
             let search_dir = yang_lib_ref.search_dir();
-            let yang_ctx_result = yang4::context::Context::new_from_yang_library_file(
+            let yang_ctx_result = yang5::context::Context::new_from_yang_library_file(
                 &yang_lib_ref.yang_library_path(),
                 DataFormat::XML,
                 &search_dir.as_path(),
-                yang4::context::ContextFlags::empty(),
+                yang5::context::ContextFlags::empty(),
             );
             let yang_ctx = match yang_ctx_result {
                 Ok(yang_ctx) => {

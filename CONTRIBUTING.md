@@ -147,7 +147,7 @@ toolchain and a few development libraries, because some dependencies build
 native code.
 
 Most of this comes from **libyang**: `netgauze-yang-push` and
-`netgauze-collector` depend on `yang4`, which is declared with
+`netgauze-collector` depend on `yang5`, which is declared with
 `features = ["bundled"]`, so `libyang4-sys` **compiles libyang from source with
 CMake** as part of `cargo build`. That is what pulls in CMake, a C/C++ compiler
 and PCRE2.
@@ -197,7 +197,7 @@ What each dependency is for:
 
 | Dependency                               | Needed by                                                                                                |
 |------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| C/C++ compiler, `cmake`                  | building bundled libyang (`libyang4-sys`)                                                                |
+| C/C++ compiler, `cmake`                  | building bundled libyang (`libyang5-sys`)                                                                |
 | `libpcre2-dev` / `pcre2-devel`           | libyang links against PCRE2                                                                              |
 | `pkg-config`                             | locating PCRE2 and OpenSSL during builds                                                                 |
 | `libssl-dev` / `openssl-devel`           | `openssl-sys`, via `rdkafka` in the collector                                                            |
@@ -205,7 +205,7 @@ What each dependency is for:
 | `libcurl4-openssl-dev` / `libcurl-devel` | `curl-sys`                                                                                               |
 | `git`                                    | fetching sources at build time                                                                           |
 
-You do **not** need `libclang`: `libyang4-sys` ships pre-generated bindings and
+You do **not** need `libclang`: `libyang5-sys` ships pre-generated bindings and
 only uses `bindgen` behind an opt-in feature.
 
 If you are only working on the protocol crates, you can skip libyang entirely by
