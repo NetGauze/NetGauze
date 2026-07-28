@@ -35,7 +35,6 @@ netgauze-flow-pkt = { version = "0.12.1", path = "crates/flow-pkt" }
 netgauze-flow-service = { version = "0.12.1", path = "crates/flow-service" }
 netgauze-locate = { version = "0.12.1", path = "crates/locate" }
 netgauze-parse-utils = { version = "0.12.1", path = "crates/parse-utils" }
-netgauze-serde-macros = { version = "0.12.1", path = "crates/serde-macros" }
 netgauze-udp-notif-pkt = { version = "0.12.1", path = "crates/udp-notif-pkt" }
 netgauze-udp-notif-service = { version = "0.12.1", path = "crates/udp-notif-service" }
 netgauze-analytics = { version = "0.12.1", path = "crates/analytics" }

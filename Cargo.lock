@@ -2980,7 +2980,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-serde-macros"
-version = "0.12.1"
+version = "0.12.2+deprecated"
 dependencies = [
  "quote",
  "syn",
