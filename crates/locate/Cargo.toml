@@ -2,7 +2,7 @@ lints.workspace = true
 
 [package]
 name = "netgauze-locate"
-version = "0.12.1"
+version = "0.12.2+deprecated"
 edition = "2024"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
@@ -10,7 +10,7 @@ readme = "README.md"
 repository = "https://github.com/NetGauze/NetGauze"
 homepage = "https://github.com/NetGauze/NetGauze"
 description = """
-Cloned from the crate `nom_locate` but with the omission of computing
+Deprecated: Cloned from the crate `nom_locate` but with the omission of computing
 the line & column number since we don't care about them in binary protocols,
 and they do make using the `LocateSpan` slower.
 """
