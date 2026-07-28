@@ -65,7 +65,6 @@ strum = "0.28"
 strum_macros = "0.28"
 serde = { version = "1.0" }
 serde_json = "1"
-nom = { version = "7.1" }
 reqwest = { version = "0.13", default-features = false }
 roxmltree = "0.21"
 arbitrary = { version = "1" }
@@ -74,7 +73,7 @@ rstest = "0.26"
 pcap-parser = { version = "0.17" }
 clap = { version = "4.6", default-features = true }
 socket2 = { version = "0.6" }
-either = { version = "1.16" }
+either = { version = "1.17" }
 opentelemetry = { version = "0.32" }
 opentelemetry_sdk = { version = "0.32" }
 opentelemetry-otlp = { version = "0.32" }
@@ -82,13 +81,13 @@ anyhow = { version = "1" }
 serde_with = { version = "3.21" }
 indexmap = { version = "2.14" }
 apache-avro = { version = "0.21" }
-schema_registry_converter = { version = "4.9", default-features = false }
+schema_registry_converter = { version = "4.10", default-features = false }
 rdkafka = { version = "0.39", default-features = false }
 tracing-test = { version = "0.2" }
 syn = { version = "2.0", default-features = false }
 quote = { version = "1.0" }
 trybuild = { version = "1.0" }
-regex = { version = "1.12" }
+regex = { version = "1.13" }
 pdu = { version = "1.5" }
 pin-utils = { version = "0.1" }
 serde_yaml = { version = "0.9" }
