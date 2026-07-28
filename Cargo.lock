@@ -2911,7 +2911,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-locate"
-version = "0.12.1"
+version = "0.12.2+deprecated"
 dependencies = [
  "nom 7.1.3",
 ]
