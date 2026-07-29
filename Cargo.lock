@@ -2585,12 +2585,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "minimal-lexical"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
-
-[[package]]
 name = "miniz_oxide"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2921,13 +2915,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "netgauze-locate"
-version = "0.12.2+deprecated"
-dependencies = [
- "nom 7.1.3",
-]
-
-[[package]]
 name = "netgauze-netconf-proto"
 version = "0.13.0"
 dependencies = [
@@ -2987,14 +2974,6 @@ version = "0.13.0"
 dependencies = [
  "pcap-parser",
  "pdu",
-]
-
-[[package]]
-name = "netgauze-serde-macros"
-version = "0.12.2+deprecated"
-dependencies = [
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -3083,16 +3062,6 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
-]
-
-[[package]]
-name = "nom"
-version = "7.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
-dependencies = [
- "memchr",
- "minimal-lexical",
 ]
 
 [[package]]
@@ -3562,7 +3531,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1099a3a64b376c536394622c9e5ea8ecfac3e3e44f88857b1e7da114135d3df4"
 dependencies = [
  "circular",
- "nom 8.0.0",
+ "nom",
  "rusticata-macros",
 ]
 
@@ -4531,7 +4500,7 @@ version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f40620447734539bcc6c64e9c66fed2410e17b46986733f1090c922d85f7105b"
 dependencies = [
- "nom 8.0.0",
+ "nom",
 ]
 
 [[package]]

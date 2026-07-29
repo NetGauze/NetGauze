@@ -93,8 +93,6 @@ These crates provide shared infrastructure used across the protocol libraries:
 |-------------------------------------------------|----------------------------------------------------------------------------|
 | [`netgauze-iana`](crates/iana/)                 | IANA registry constants for address families, capabilities, etc.           |
 | [`netgauze-parse-utils`](crates/parse-utils/)   | Traits and helpers for protocol parsing and serialization                  |
-| [`netgauze-serde-macros`](crates/serde-macros/) | *Deprecated:* Procedural macros for error location tracking in parsers     |
-| [`netgauze-locate`](crates/locate/)             | *Deprecated:* Binary span types for tracking byte positions during parsing |
 | [`netgauze-analytics`](crates/analytics/)       | Analytics and aggregation primitives                                       |
 
 ## Quick Start
