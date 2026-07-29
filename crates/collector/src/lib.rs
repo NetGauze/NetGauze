@@ -366,6 +366,13 @@ pub async fn init_flow_collection(
         // Add all enrichment handles in outer vec so shutdown works properly
         enrichment_handles.extend(publisher_enrichment_handles);
     }
+    if join_set.is_empty() {
+        return Err(anyhow::anyhow!(
+            "no flow publisher actors were created for this collection; check that at \
+             least one publisher endpoint is configured (FlowKafkaAvro/FlowKafkaJson \
+             require an `aggregation` block to publish)"
+        ));
+    }
     let ret = tokio::select! {
         supervisor_ret = supervisor_join_handle => {
             info!("Flow supervisor exited, shutting down all publishers");
@@ -779,6 +786,12 @@ pub async fn init_udp_notif_collection(
         // Add all enrichment handles in outer vec so shutdown works properly
         enrichment_handles.extend(publisher_enrichment_handles);
     }
+    if join_set.is_empty() {
+        return Err(anyhow::anyhow!(
+            "no udp-notif publisher actors were created for this collection; check that \
+             at least one publisher endpoint is configured"
+        ));
+    }
     let ret = tokio::select! {
         supervisor_ret = supervisor_join_handle => {
             info!("udp-notif supervisor exited, shutting down all publishers");
@@ -793,7 +806,7 @@ pub async fn init_udp_notif_collection(
                 Err(err) => Err(anyhow::anyhow!(err)),
             }
         },
-        join_ret = validation_join_set.next() => {
+        join_ret = validation_join_set.next(), if !validation_join_set.is_empty() => {
             warn!("udp-notif http publisher exited, shutting down udp-notif collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
             let _ = schema_handle.shutdown().await;
@@ -1056,6 +1069,46 @@ mod tests {
     use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
     use std::collections::HashMap;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    /// Regression test for the empty-`FuturesUnordered` startup race: a
+    /// flow collection config with zero publishers previously bound its
+    /// listener, then had `join_set.next()` win the `select!` immediately
+    /// (an empty `FuturesUnordered` resolves `Ready(None)` right away,
+    /// rather than pending), logging a message that reads like a crash
+    /// even though nothing ever ran. `init_flow_collection` should now
+    /// fail fast, with a clear error, instead.
+    #[tokio::test]
+    async fn test_init_flow_collection_errors_on_no_publishers() {
+        let flow_config = FlowConfig {
+            subscriber_timeout: Duration::from_secs(1),
+            template_cache_purge_timeout: None,
+            cmd_buffer_size: 10,
+            listeners: vec![config::Binding {
+                address: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0),
+                interface: None,
+                workers: 1,
+            }],
+            publishers: HashMap::new(),
+        };
+        let meter = opentelemetry::global::meter("test");
+
+        let result = tokio::time::timeout(
+            Duration::from_secs(5),
+            init_flow_collection(flow_config, meter),
+        )
+        .await
+        .expect("init_flow_collection should return promptly, not hang");
+
+        assert!(
+            result.is_err(),
+            "expected an error for a config with zero publisher endpoints, got: {result:?}"
+        );
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("no flow publisher actors were created"),
+            "unexpected error message: {msg}"
+        );
+    }
 
     #[test]
     fn test_serialize_udp_notif_unknown_media_type() {
