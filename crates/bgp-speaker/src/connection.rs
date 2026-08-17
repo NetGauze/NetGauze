@@ -1249,9 +1249,6 @@ fn handle_update_message<A>(
     let mut bgp_mp_reach_count = 0;
     let mut bgp_mp_unreach_count = 0;
     for attr in update.path_attributes() {
-        if has_origin && has_asn_path {
-            break;
-        }
         if let PathAttributeValue::Origin(_) = attr.value() {
             has_origin = true;
         } else if let PathAttributeValue::AsPath(_) = attr.value() {
@@ -1266,14 +1263,15 @@ fn handle_update_message<A>(
             bgp_mp_unreach_count += 1;
         }
     }
-    if end_of_rib.is_none() && !has_origin {
+    let advertises_nlri = !update.nlri().is_empty() || bgp_mp_reach_count > 0;
+    if end_of_rib.is_none() && advertises_nlri && !has_origin {
         return Some(ConnectionEvent::UpdateMsgErr(
             UpdateMessageError::MissingWellKnownAttribute {
                 value: vec![PathAttributeType::Origin as u8].into(),
             },
         ));
     }
-    if end_of_rib.is_none() && !has_asn_path {
+    if end_of_rib.is_none() && advertises_nlri && !has_asn_path {
         return Some(ConnectionEvent::UpdateMsgErr(
             UpdateMessageError::MissingWellKnownAttribute {
                 value: vec![PathAttributeType::AsPath as u8].into(),
