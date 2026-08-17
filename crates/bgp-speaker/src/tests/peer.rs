@@ -4574,6 +4574,123 @@ async fn test_established_update_msg() -> Result<(), FsmStateError<SocketAddr>> 
     Ok(())
 }
 
+async fn established_then_read(
+    msg: &[u8],
+) -> Result<(BgpEvent<SocketAddr>, FsmState), FsmStateError<SocketAddr>> {
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
+    let mut io_builder = BgpIoMockBuilder::new();
+    io_builder
+        .write(BgpMessage::Open(BgpOpenMessage::new(
+            MY_AS as u16,
+            HOLD_TIME,
+            MY_BGP_ID,
+            vec![],
+        )))
+        .read(BgpMessage::Open(peer_open))
+        .write(BgpMessage::KeepAlive)
+        .read(BgpMessage::KeepAlive)
+        .read_u8(msg);
+
+    let active_connect = MockActiveConnect {
+        peer_addr: PEER_ADDR,
+        io_builder,
+        connect_delay: Duration::from_secs(0),
+    };
+    let mut peer = Peer::new(
+        PEER_KEY,
+        PROPERTIES,
+        PeerConfig::default(),
+        POLICY,
+        active_connect,
+    );
+    peer.add_admin_event(PeerAdminEvents::ManualStart);
+    peer.run().await?;
+    peer.run().await?;
+    peer.run().await?;
+    let event = peer.run().await?;
+    assert_eq!(event, BgpEvent::KeepAliveMsg);
+    assert_eq!(peer.fsm_state(), FsmState::Established);
+
+    let event = peer.run().await?;
+    Ok((event, peer.fsm_state()))
+}
+
+#[tokio::test]
+#[tracing_test::traced_test]
+async fn test_established_update_msg_ipv4_advertisement() -> Result<(), FsmStateError<SocketAddr>> {
+    let advertisement = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, // marker
+        0x00, 0x2d, 0x02, // length 45, type UPDATE
+        0x00, 0x00, // withdrawn routes length
+        0x00, 0x12, // total path attribute length 18
+        0x40, 0x01, 0x01, 0x00, // ORIGIN: IGP
+        0x40, 0x02, 0x04, 0x02, 0x01, 0x00, 0x64, // AS_PATH: AS_SEQUENCE [100]
+        0x40, 0x03, 0x04, 0xc0, 0xa8, 0x00, 0x02, // NEXT_HOP: 192.168.0.2
+        0x18, 0xac, 0x10, 0x01, // NLRI: 172.16.1.0/24
+    ];
+    let (event, state) = established_then_read(&advertisement).await?;
+    assert!(
+        matches!(event, BgpEvent::UpdateMsg(_, _)),
+        "expected the advertisement to be accepted, got {event:?}"
+    );
+    assert_eq!(state, FsmState::Established);
+    Ok(())
+}
+
+#[tokio::test]
+#[tracing_test::traced_test]
+async fn test_established_update_msg_ipv4_withdraw() -> Result<(), FsmStateError<SocketAddr>> {
+    let withdraw = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, // marker
+        0x00, 0x1b, 0x02, // length 27, type UPDATE
+        0x00, 0x04, // withdrawn routes length
+        0x18, 0xac, 0x10, 0x01, // withdrawn: 172.16.1.0/24
+        0x00, 0x00, // total path attribute length
+    ];
+    let (event, state) = established_then_read(&withdraw).await?;
+    assert!(
+        matches!(event, BgpEvent::UpdateMsg(_, _)),
+        "expected the withdrawal to be accepted, got {event:?}"
+    );
+    assert_eq!(state, FsmState::Established);
+    Ok(())
+}
+
+#[tokio::test]
+#[tracing_test::traced_test]
+async fn test_established_update_msg_bgp_ls_withdraw() -> Result<(), FsmStateError<SocketAddr>> {
+    let withdraw = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, // marker
+        0x00, 0x6b, 0x02, // length 107, type UPDATE
+        0x00, 0x00, // withdrawn routes length
+        0x00, 0x54, // total path attribute length 84
+        0x90, 0x0f, 0x00, 0x50, // optional, extended length, MP_UNREACH_NLRI, 80
+        0x40, 0x04, 0x47, // AFI 16388 (BGP-LS), SAFI 71 (BGP-LS)
+        0x00, 0x02, 0x00, 0x49, // NLRI type 2 (link), length 73
+        0x03, // protocol-id: OSPFv2
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // identifier
+        0x01, 0x00, 0x00, 0x18, // local node descriptors, length 24
+        0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0xfb, 0xf0, // AS 64496
+        0x02, 0x02, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, // BGP-LS identifier
+        0x02, 0x03, 0x00, 0x04, 0xc0, 0x00, 0x02, 0x01, // IGP router-id 192.0.2.1
+        0x01, 0x01, 0x00, 0x18, // remote node descriptors, length 24
+        0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0xfb, 0xf0, // AS 64496
+        0x02, 0x02, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, // BGP-LS identifier
+        0x02, 0x03, 0x00, 0x04, 0xc0, 0x00, 0x02, 0x02, // IGP router-id 192.0.2.2
+        0x01, 0x03, 0x00, 0x04, 0xc6, 0x33, 0x64, 0x01, // IPv4 interface address 198.51.100.1
+    ];
+    let (event, state) = established_then_read(&withdraw).await?;
+    assert!(
+        matches!(event, BgpEvent::UpdateMsg(_, _)),
+        "expected the withdrawal to be accepted, got {event:?}"
+    );
+    assert_eq!(state, FsmState::Established);
+    Ok(())
+}
+
 #[tokio::test]
 #[tracing_test::traced_test]
 async fn test_connect_echo_policy() -> Result<(), FsmStateError<SocketAddr>> {
