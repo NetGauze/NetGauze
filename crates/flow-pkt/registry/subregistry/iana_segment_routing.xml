@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="segment-routing">
   <title>Segment Routing</title>
   <created>2021-01-08</created>
-  <updated>2026-07-22</updated>
+  <updated>2026-08-18</updated>
   
   <registry id="srv6-endpoint-behaviors">
     <title>SRv6 Endpoint Behaviors</title>
@@ -567,21 +567,21 @@
       <value>76</value>
       <hex>0x004C</hex>
       <description>End.DTMC4</description>
-      <xref type="draft" data="RFC-ietf-bess-mvpn-evpn-sr-p2mp-18"/>
+      <xref type="rfc" data="rfc10018"/>
       <controller>IETF</controller>
     </record>
     <record date="2022-07-05" updated="2026-01-26">
       <value>77</value>
       <hex>0x004D</hex>
       <description>End.DTMC6</description>
-      <xref type="draft" data="RFC-ietf-bess-mvpn-evpn-sr-p2mp-18"/>
+      <xref type="rfc" data="rfc10018"/>
       <controller>IETF</controller>
     </record>
     <record date="2022-07-05" updated="2026-01-26">
       <value>78</value>
       <hex>0x004E</hex>
       <description>End.DTMC46</description>
-      <xref type="draft" data="RFC-ietf-bess-mvpn-evpn-sr-p2mp-18"/>
+      <xref type="rfc" data="rfc10018"/>
       <controller>IETF</controller>
     </record>
     <record date="2022-11-23">
@@ -1280,17 +1280,17 @@
       <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
       <controller><xref type="person" data="Cheng_Li"/></controller>
     </record>
-    <record date="2026-07-22">
+    <record date="2026-07-22" updated="2026-08-18">
       <value>188</value>
       <hex>0x00BC</hex>
-      <description>End.B6.Insert with NEXT-C-SID flavor</description>
+      <description>End.B6.Insert with NEXT‑CSID</description>
       <xref type="draft" data="draft-chen-spring-srv6-compressed-bsid-insertion-02"/>
       <controller><xref type="person" data="Ran_Chen"/></controller>
     </record>
-    <record date="2026-07-22">
+    <record date="2026-07-22" updated="2026-08-18">
       <value>189</value>
       <hex>0x00BD</hex>
-      <description>End.B6.Insert.Red with NEXT-C-SID flavor</description>
+      <description>End.B6.Insert.Red with NEXT‑CSID</description>
       <xref type="draft" data="draft-chen-spring-srv6-compressed-bsid-insertion-02"/>
       <controller><xref type="person" data="Ran_Chen"/></controller>
     </record>
