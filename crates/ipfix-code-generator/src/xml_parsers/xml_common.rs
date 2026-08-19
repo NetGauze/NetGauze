@@ -157,7 +157,7 @@ pub fn xml_string_to_enum_type(input: &str) -> (usize, String) {
     let str_words_amount = str_words.len();
     let mut str_without_spaces = str_before_column
         .chars()
-        .filter(|c| !c.is_whitespace() && !c.is_ascii_punctuation())
+        .filter(|c| !c.is_whitespace() && !c.is_ascii_punctuation() && *c != '‑')
         .collect::<String>();
 
     // Replace first numeric char if we have one
