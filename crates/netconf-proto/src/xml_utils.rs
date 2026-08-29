@@ -18,6 +18,7 @@
 use crate::NETCONF_NS;
 use chrono::{DateTime, Datelike, Timelike, Utc};
 use indexmap::IndexMap;
+use quick_xml::escape::resolve_predefined_entity;
 use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, NamespaceError, PrefixDeclaration, QName, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -476,15 +477,16 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
                     self.next_event()?
                 }
                 Event::GeneralRef(general_ref) => {
-                    let replaced = match general_ref.as_ref() {
-                        "quot" => "\"",
-                        "apos" => "'",
-                        "amp" => "&",
-                        "lt" => "<",
-                        "gt" => ">",
-                        _ => general_ref.as_ref(),
-                    };
-                    accumulator.push_str(replaced);
+                    if let Some(ch) = general_ref.resolve_char_ref()? {
+                        // &#10; &#x41; ...
+                        accumulator.push(ch);
+                    } else if let Some(s) = resolve_predefined_entity(general_ref.as_ref()) {
+                        // quot/apos/amp/lt/gt
+                        accumulator.push_str(s);
+                    } else {
+                        // unknown: unchanged
+                        accumulator.push_str(general_ref.as_ref());
+                    }
                     self.next_event()?
                 }
                 Event::End(_) => {
@@ -1760,5 +1762,13 @@ mod tests {
             namespaces,
             IndexMap::from([("if".to_string(), "urn:example:interfaces".to_string())]),
         );
+    }
+
+    #[test]
+    fn test_numeric_char_ref() {
+        let xml = "<root>line1&#10;line2</root>";
+        let mut parser = create_parser(xml);
+        parser.open(None, "root").expect("open root");
+        assert_eq!(parser.tag_string().unwrap().as_ref(), "line1\nline2");
     }
 }
