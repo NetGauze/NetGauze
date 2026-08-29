@@ -83,7 +83,7 @@ apache-avro = { version = "0.21" }
 schema_registry_converter = { version = "4.10", default-features = false }
 rdkafka = { version = "0.39", default-features = false }
 tracing-test = { version = "0.2" }
-syn = { version = "2.0", default-features = false }
+syn = { version = "3.0", default-features = false }
 quote = { version = "1.0" }
 trybuild = { version = "1.0" }
 regex = { version = "1.13" }
@@ -93,7 +93,7 @@ serde_yaml = { version = "0.9" }
 ciborium = { version = "0.2" }
 ordered-float = { version = "5.3", default-features = false }
 proc-macro2 = { version = "1.0" }
-prettyplease = { version = "0.2" }
+prettyplease = { version = "0.3" }
 sysinfo = { version = "0.39", default-features = false }
 shadow-rs = { version = "2.0", default-features = false }
 smallvec = { version = "1.15" }
