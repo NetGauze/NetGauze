@@ -3343,4 +3343,124 @@ mod tests {
         test_xml_value(&input_str, expected)?;
         Ok(())
     }
+
+    /// RFC 6241 sec. 4.3: an `<rpc-reply>` may carry MORE THAN ONE
+    /// `<rpc-error>`: a server processing an `edit-config` under
+    /// `continue-on-error` reports one per failed operation. The
+    /// rpc-error tests above parse an error in isolation; this is the
+    /// only case that exercises the reply-level error list.
+    #[test]
+    fn test_rpc_reply_multiple_errors() -> Result<(), ParsingError> {
+        let input_str = r#"<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="7">
+        <rpc-error>
+          <error-type>transport</error-type>
+          <error-tag>too-big</error-tag>
+          <error-severity>error</error-severity>
+          <error-path>/some/node</error-path>
+        </rpc-error>
+        <rpc-error>
+          <error-type>rpc</error-type>
+          <error-tag>malformed-message</error-tag>
+          <error-severity>error</error-severity>
+        </rpc-error>
+      </rpc-reply>"#;
+
+        let expected = RpcReply {
+            message_id: Some("7".into()),
+            reply: RpcReplyContent::ErrorsAndData {
+                errors: vec![
+                    RpcError {
+                        error_type: ErrorType::Transport,
+                        error_tag: ErrorTag::TooBig,
+                        error_severity: ErrorSeverity::Error,
+                        error_app_tag: None,
+                        error_path: Some("/some/node".into()),
+                        error_message: None,
+                        error_info: None,
+                    },
+                    RpcError {
+                        error_type: ErrorType::Rpc,
+                        error_tag: ErrorTag::MalformedMessage,
+                        error_severity: ErrorSeverity::Error,
+                        error_app_tag: None,
+                        error_path: None,
+                        error_message: None,
+                        error_info: None,
+                    },
+                ],
+                responses: RpcResponse::Raw("".into()),
+            },
+        };
+        test_xml_value(input_str, expected)?;
+        Ok(())
+    }
+
+    /// RFC 6241 sec. 4.2/4.3: `message-id` is echoed from the request, so
+    /// a reply to a request that carried none has none either, which is
+    /// exactly what a server returns for a `missing-attribute` error
+    /// about `message-id` itself. Parsing must yield `None`, not fail.
+    #[test]
+    fn test_rpc_reply_without_message_id() -> Result<(), ParsingError> {
+        let input_str = r#"<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><rpc-error>
+        <error-type>rpc</error-type>
+        <error-tag>missing-attribute</error-tag>
+        <error-severity>error</error-severity>
+        <error-info><bad-attribute>message-id</bad-attribute><bad-element>rpc</bad-element></error-info>
+      </rpc-error></rpc-reply>"#;
+
+        let expected = RpcReply {
+            message_id: None,
+            reply: RpcReplyContent::ErrorsAndData {
+                errors: vec![RpcError {
+                    error_type: ErrorType::Rpc,
+                    error_tag: ErrorTag::MissingAttribute,
+                    error_severity: ErrorSeverity::Error,
+                    error_app_tag: None,
+                    error_path: None,
+                    error_message: None,
+                    error_info: Some(ErrorInfo::Error(
+                        vec![ErrorInfoValue {
+                            bad_attribute: Some("message-id".into()),
+                            bad_element: Some("rpc".into()),
+                            ok_element: None,
+                            error_element: None,
+                            noop_element: None,
+                            bad_namespace: None,
+                        }]
+                        .into_boxed_slice(),
+                    )),
+                }],
+                responses: RpcResponse::Raw("".into()),
+            },
+        };
+        test_xml_value(input_str, expected)?;
+        Ok(())
+    }
+
+    /// RFC 6241 sec. 7.2: the `<config>` of an `edit-config` is an
+    /// arbitrary data fragment, not a single rooted document: a teardown
+    /// body typically removes several unrelated subtrees at once, each
+    /// from a different module and each carrying its own operation
+    /// attribute. `test_edit_content` covers only a single top-level
+    /// element, so this is the case that exercises the multi-fragment
+    /// copy.
+    #[test]
+    fn test_edit_content_multiple_top_level_fragments() -> Result<(), ParsingError> {
+        let config_str = concat!(
+            r#"<config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">"#,
+            r#"<first xmlns="urn:ed1" xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0" xc:operation="remove"/>"#,
+            r#"<top xmlns="urn:ed2" xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0" xc:operation="delete">"#,
+            r#"<interface><name>eth0</name></interface></top></config>"#
+        );
+
+        let expected = EditConfig::Config(
+            concat!(
+                r#"<first xmlns="urn:ed1" xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0" xc:operation="remove"/>"#,
+                r#"<top xmlns="urn:ed2" xmlns:xc="urn:ietf:params:xml:ns:netconf:base:1.0" xc:operation="delete">"#,
+                r#"<interface><name>eth0</name></interface></top>"#,
+            ).into(),
+        );
+        test_xml_value(config_str, expected)?;
+        Ok(())
+    }
 }
