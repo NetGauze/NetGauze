@@ -550,10 +550,15 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         }
     }
 
-    /// Copy buffer content until a specific end tag is reached.
+    /// Copy the raw XML content of the element most recently [`Self::open`]ed,
+    /// up to (but not including) its closing tag.
     ///
-    /// This method reads and copies all XML events to a string buffer until it
-    /// encounters an end tag matching the provided `tag` parameter.
+    /// Termination is by NESTING DEPTH, not by tag name: the copy ends at the
+    /// first end tag seen at depth zero, which XML well-formedness guarantees
+    /// is the opened element's own. A payload that nests an element sharing
+    /// the container's name (`<config>` inside a `<config>` subtree) is
+    /// therefore copied whole. A self-closing container (`<data/>`) yields an
+    /// empty string.
     ///
     /// # Namespace Handling
     ///
@@ -572,6 +577,9 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     /// - The namespace resolution only occurs once (on the first start tag) to
     ///   minimize overhead
     pub fn copy_buffer_till(&mut self, tag: &'_ str) -> Result<Box<str>, ParsingError> {
+        if !self.parent_has_child() {
+            return Ok("".into());
+        }
         let cursor = io::Cursor::new(vec![]);
         let mut writer = quick_xml::writer::Writer::new(cursor);
         let mut wrote_ns = false;
@@ -631,8 +639,9 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         Ok(ret.into())
     }
 
-    /// Copy every event between the current position and the end tag whose
-    /// local name matches `tag`, recording which namespace prefixes are
+    /// Copy every event between the current position and the closing tag of
+    /// the element most recently [`Self::open`]ed (found by nesting depth; see
+    /// [`Self::copy_buffer_till`]), recording which namespace prefixes are
     /// actually referenced inside.
     ///
     /// Unlike naive text extraction, this resolves each element and attribute
@@ -647,9 +656,15 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         &mut self,
         tag: &'_ str,
     ) -> Result<CopiedSubtree, ParsingError> {
+        if !self.parent_has_child() {
+            return Ok(CopiedSubtree {
+                xml: "".into(),
+                namespaces: IndexMap::new(),
+            });
+        }
         let mut writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
         let mut namespaces: IndexMap<String, String> = IndexMap::new();
-        // See `copy_buffer_till` for why this depth counter is required.
+        // Depth-based termination; see `copy_buffer_till`.
         let mut depth: usize = 0;
         loop {
             match self.peek() {
@@ -1847,5 +1862,142 @@ mod tests {
             r#"<a xmlns="urn:x"><filter>deep</filter></a>"#
         );
         parser.close().expect("close consumes the outer </filter>");
+    }
+
+    #[test]
+    fn test_copy_buffer_till_empty_container_leaves_siblings_readable() {
+        for envelope in [
+            r#"<rpc-reply><data/><ok/></rpc-reply>"#,
+            r#"<rpc-reply><data></data><ok/></rpc-reply>"#,
+        ] {
+            let mut parser = create_parser(envelope);
+            parser.open(None, "rpc-reply").expect("open rpc-reply");
+            parser.open(None, "data").expect("open data");
+
+            let copied = parser.copy_buffer_till("data").expect("copy empty data");
+            assert!(
+                copied.is_empty(),
+                "{envelope}: expected no content, got `{copied}`"
+            );
+
+            parser.close().expect("close data");
+            // The sibling after the empty container must still be there.
+            assert!(
+                parser.is_tag(None, "ok"),
+                "{envelope}: sibling after the empty container was consumed"
+            );
+            parser.open(None, "ok").expect("open ok");
+            parser.close().expect("close ok");
+            parser.close().expect("close rpc-reply");
+        }
+    }
+
+    #[test]
+    fn test_copy_buffer_till_container_vs_same_named_payload() {
+        let xml = r#"<config><config/><peer>1</peer></config>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "config").expect("open outer config");
+
+        let copied = parser.copy_buffer_till("config").expect("copy payload");
+        assert!(
+            copied.contains("<peer>1</peer>"),
+            "payload after the same-named self-closing element was lost: `{copied}`"
+        );
+        assert!(
+            !copied.is_empty(),
+            "self-closing payload element was mistaken for an empty container"
+        );
+        parser
+            .close()
+            .expect("outer </config> still pending after the copy");
+    }
+
+    #[test]
+    fn test_copy_buffer_till_spans_repeated_container_name() {
+        let xml = r#"<filter><a><filter><filter>deep</filter></filter></a></filter>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "filter").expect("open outer filter");
+
+        let copied = parser
+            .copy_buffer_till("filter")
+            .expect("copy nested payload");
+        assert_eq!(
+            copied.as_ref(),
+            r#"<a><filter><filter>deep</filter></filter></a>"#
+        );
+        parser
+            .close()
+            .expect("outer </filter> still pending after the copy");
+    }
+
+    #[test]
+    fn test_copy_buffer_till_with_namespaces_empty_container_records_nothing() {
+        let xml = r#"<top xmlns:unused="urn:never:referenced"><subtree/><next>x</next></top>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "top").expect("open top");
+        parser.open(None, "subtree").expect("open subtree");
+
+        let copied = parser
+            .copy_buffer_till_with_namespaces("subtree")
+            .expect("copy empty subtree");
+        assert!(
+            copied.xml.is_empty(),
+            "expected no XML, got `{}`",
+            copied.xml
+        );
+        assert!(
+            copied.namespaces.is_empty(),
+            "an in-scope but unreferenced binding was recorded: {:?}",
+            copied.namespaces
+        );
+
+        parser.close().expect("close subtree");
+        assert!(parser.is_tag(None, "next"), "sibling was consumed");
+    }
+
+    #[test]
+    fn test_copy_buffer_till_with_namespaces_spans_repeated_name() {
+        let xml = r#"<subtree xmlns:if="urn:example:if" xmlns:unused="urn:never">"#.to_string()
+            + r#"<if:port><subtree>inner</subtree></if:port></subtree>"#;
+        let mut parser = create_parser(&xml);
+        parser.open(None, "subtree").expect("open outer subtree");
+
+        let copied = parser
+            .copy_buffer_till_with_namespaces("subtree")
+            .expect("copy nested payload");
+        assert_eq!(
+            copied.xml.as_ref(),
+            r#"<if:port><subtree>inner</subtree></if:port>"#
+        );
+        assert_eq!(
+            copied.namespaces.get("if").map(String::as_str),
+            Some("urn:example:if"),
+            "the prefix used inside must be recorded: {:?}",
+            copied.namespaces
+        );
+        assert!(
+            !copied.namespaces.contains_key("unused"),
+            "an unreferenced binding was recorded: {:?}",
+            copied.namespaces
+        );
+        parser
+            .close()
+            .expect("outer </subtree> still pending after the copy");
+    }
+
+    /// The empty-container guard MUST key on the PARENT, not on the current
+    /// event: after open() the current event may be a self-closing element
+    /// with the SAME local name as the container, but it is CONTENT.
+    /// Guarding on `current` would silently drop it.
+    #[test]
+    fn test_copy_buffer_till_keeps_self_closing_child_of_same_name() {
+        let xml = r#"<config><config/></config>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "config").expect("open outer config");
+        let copied = parser
+            .copy_buffer_till("config")
+            .expect("copy till outer </config>");
+        assert_eq!(copied.as_ref(), "<config/>");
+        parser.close().expect("close consumes the outer </config>");
     }
 }
