@@ -17,6 +17,7 @@ members = [
     "crates/yang-push",
     "crates/pcap-decoder",
     "crates/netconf-proto",
+    "crates/service-core",
     "fuzz",
 ]
 resolver = "2"
@@ -107,8 +108,12 @@ petgraph = { version = "0.8", default-features = false }
 sha2 = { version = "0.11" }
 schema-registry-client = { version = "0.4" }
 bitflags = { version = "2.13" }
-axum = { version = "0.8"}
+axum = { version = "0.8" }
 schemars = { version = "1.2", features = ["derive"] }
+arc-swap = { version = "1.9" }
+raw-cpuid = { version = "11.6" }
+core_affinity = "0.8.3"
+hwlocality = { version = "1.0.0-alpha.12" }
 
 [profile.release]
 codegen-units = 1
