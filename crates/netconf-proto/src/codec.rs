@@ -155,10 +155,42 @@ impl Decoder for SshCodec {
         }
 
         loop {
-            // Check if we have enough data for chunk start
-            if src.len() < CHUNK_START.len() + MAX_CHUNK_SIZE_LEN + 1 {
+            // The message terminator MUST be tested first, and at the top
+            // of the loop: it may arrive in a read of its own, after the
+            // last chunk was already consumed and buffered. This allows the loop
+            // work across TCP/SSH segementation boundaries.
+            if src.starts_with(MESSAGE_TERMINATOR.as_bytes()) {
+                src.advance(MESSAGE_TERMINATOR.len());
+                let data = self.buf.split();
+                if tracing::enabled!(tracing::Level::TRACE) {
+                    trace!(
+                        "Parsing netconf message: `{:?}`",
+                        std::str::from_utf8(&data)
+                    );
+                }
+                let reader = NsReader::from_reader(data.reader());
+                let mut xml_parser = XmlParser::new(reader)?;
+                let parsed = NetConfMessage::xml_deserialize(&mut xml_parser)?;
+                return Ok(Some(parsed));
+            }
+            // Below this point a chunk header is expected. Distinguishing
+            // it from the terminator needs MESSAGE_TERMINATOR.len() bytes
+            // which is NOT a maximal size field: demanding the theoretical
+            // maximum stalls complete-but-short frames forever.
+            if src.len() < MESSAGE_TERMINATOR.len() {
+                // Bail out now on bytes that can become neither, instead
+                // of waiting for data that would only error later.
+                if !MESSAGE_TERMINATOR.as_bytes().starts_with(src)
+                    && !src.starts_with(CHUNK_START.as_bytes())
+                {
+                    return Err(SshCodecError::IO(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Expected chunk start sequence or message terminator",
+                    )));
+                }
                 return Ok(None);
             }
+
             // Verify the chunk start sequence
             if !src.starts_with(CHUNK_START.as_bytes()) {
                 return Err(SshCodecError::IO(std::io::Error::new(
@@ -169,14 +201,19 @@ impl Decoder for SshCodec {
 
             // Find the end of chunk size field
             let size_start = CHUNK_START.len();
-            // Look for the new line character after the chunk size
-            // RFC 6242 specifies that max size is 4294967295, so we can safely assume
-            // the size field will not exceed 11 characters (including the newline).
-            let size_end = src[size_start..size_start + MAX_CHUNK_SIZE_LEN + 1]
-                .iter()
-                .position(|&b| b == b'\n');
+            // Look for the new line character after the chunk size.
+            // RFC 6242 caps the size at 4294967295, so the field is at
+            // most MAX_CHUNK_SIZE_LEN digits plus its newline; search no
+            // further than that, and no further than what has arrived.
+            let search_end = src.len().min(size_start + MAX_CHUNK_SIZE_LEN + 1);
+            let size_end = src[size_start..search_end].iter().position(|&b| b == b'\n');
             let size_end = match size_end {
                 Some(pos) => size_start + pos,
+                // No newline yet: only an error once the whole maximal
+                // field has been seen without one; otherwise incomplete.
+                None if search_end < size_start + MAX_CHUNK_SIZE_LEN + 1 => {
+                    return Ok(None);
+                }
                 None => {
                     return Err(SshCodecError::IO(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
@@ -211,22 +248,6 @@ impl Decoder for SshCodec {
 
             // Advance past this chunk
             src.advance(chunk_start_pos + chunk_size);
-
-            // Check for message terminator
-            if src.starts_with(MESSAGE_TERMINATOR.as_bytes()) {
-                let data = self.buf.split();
-                if tracing::enabled!(tracing::Level::TRACE) {
-                    trace!(
-                        "Parsing netconf message: `{:?}`",
-                        std::str::from_utf8(&data)
-                    );
-                }
-                let reader = NsReader::from_reader(data.reader());
-                let mut xml_parser = XmlParser::new(reader)?;
-                let parsed = NetConfMessage::xml_deserialize(&mut xml_parser)?;
-                src.advance(MESSAGE_TERMINATOR.len());
-                return Ok(Some(parsed));
-            }
         }
     }
 }
@@ -390,5 +411,106 @@ mod test {
 
         let eof_result = codec.decode(&mut buf);
         assert_eq!(eof_result, Ok(None));
+    }
+
+    /// Build a single-chunk 1.1 frame WITHOUT the trailing terminator.
+    fn one_chunk_no_terminator(body: &str) -> Vec<u8> {
+        format!("\n#{}\n{}", body.len(), body).into_bytes()
+    }
+
+    /// The `\n##\n` terminator may arrive in a SEPARATE read from the
+    /// last chunk which is an ordinary TCP/SSH segmentation; not a hostile
+    /// peer. The completed message must still be delivered.
+    #[test]
+    fn test_terminator_in_separate_read_is_delivered() {
+        let body = r#"<rpc message-id="102" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><close-session/></rpc>"#;
+        let mut codec = SshCodec::new();
+        codec.in_hello = false;
+
+        // Read 1: the whole chunk, but the terminator hasn't arrived yet.
+        let mut buf = BytesMut::from(&one_chunk_no_terminator(body)[..]);
+        let r1 = codec.decode(&mut buf).expect("no error");
+        assert_eq!(r1, None, "chunk without terminator: correctly needs more");
+
+        // Read 2: the 4-byte terminator arrives on its own.
+        buf.extend_from_slice(b"\n##\n");
+        let r2 = codec.decode(&mut buf).expect("no error");
+        assert!(
+            r2.is_some(),
+            "the completed message MUST be delivered once the terminator arrives; \
+             got None -> the RPC is stuck in self.buf forever and rpc_reply() hangs"
+        );
+    }
+
+    /// A complete chunked frame shorter than a maximal chunk header must
+    /// still be acted upon: the decoder may not demand bytes for a
+    /// theoretical 10-digit size field that this frame does not use.
+    /// Before the fix this returned `Ok(None)` and stalled forever; now
+    /// the frame is parsed (and here rejected as invalid XML, which is
+    /// the point; the decoder makes progress instead of hanging).
+    #[test]
+    fn test_short_complete_frame_is_acted_on() {
+        let mut codec = SshCodec::new();
+        codec.in_hello = false;
+        // "\n#1\nx\n##\n" -- 9 bytes, complete, under the old 13-byte gate.
+        let mut buf = BytesMut::from(&b"\n#1\nx\n##\n"[..]);
+        let result = codec.decode(&mut buf);
+        assert!(
+            result.is_err(),
+            "complete short frame must be decoded (and rejected as bad XML), \
+             not silently stalled with Ok(None); got {result:?}"
+        );
+    }
+
+    /// The decoder must tolerate ARBITRARY segmentation: a peer's message
+    /// can be split anywhere, including mid-chunk-header and immediately
+    /// before the terminator. Feeding one byte at a time is the strongest
+    /// form of that guarantee.
+    #[test]
+    fn test_message_delivered_when_fed_one_byte_at_a_time() {
+        let body = r#"<rpc message-id="102" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><close-session/></rpc>"#;
+        let frame = format!("\n#{}\n{}\n##\n", body.len(), body).into_bytes();
+        let expected = NetConfMessage::Rpc(Rpc::new(
+            "102".into(),
+            RpcOperation::WellKnown(WellKnownOperation::CloseSession),
+        ));
+
+        let mut codec = SshCodec::new();
+        codec.in_hello = false;
+        let mut buf = BytesMut::new();
+        for (i, byte) in frame.iter().enumerate() {
+            buf.extend_from_slice(&[*byte]);
+            let result = codec.decode(&mut buf).expect("no decode error");
+            if i + 1 == frame.len() {
+                assert_eq!(
+                    result,
+                    Some(expected.clone()),
+                    "final byte must complete it"
+                );
+            } else {
+                assert_eq!(result, None, "incomplete at byte {}/{}", i + 1, frame.len());
+            }
+        }
+        assert!(buf.is_empty(), "the whole frame must be consumed");
+    }
+    /// Two messages arriving in one read must both decode: after the
+    /// first terminator is consumed, the next message's chunk header is
+    /// handled by the same top-of-loop dispatch.
+    #[test]
+    fn test_two_pipelined_messages_in_one_read() {
+        let body = r#"<rpc message-id="102" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><close-session/></rpc>"#;
+        let one = format!("\n#{}\n{}\n##\n", body.len(), body);
+        let expected = NetConfMessage::Rpc(Rpc::new(
+            "102".into(),
+            RpcOperation::WellKnown(WellKnownOperation::CloseSession),
+        ));
+        let mut codec = SshCodec::new();
+        codec.in_hello = false;
+        let mut buf = BytesMut::from(format!("{one}{one}").as_str());
+
+        assert_eq!(codec.decode(&mut buf), Ok(Some(expected.clone())));
+        assert_eq!(codec.decode(&mut buf), Ok(Some(expected)));
+        assert_eq!(codec.decode(&mut buf), Ok(None));
+        assert!(buf.is_empty());
     }
 }
