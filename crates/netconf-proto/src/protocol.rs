@@ -1952,6 +1952,38 @@ pub struct ErrorInfoValue {
     bad_namespace: Option<Box<str>>,
 }
 
+impl ErrorInfoValue {
+    /// RFC 6241 App. A `<bad-attribute>`: the name of the attribute at fault.
+    pub fn bad_attribute(&self) -> Option<&str> {
+        self.bad_attribute.as_deref()
+    }
+
+    /// RFC 6241 App. A `<bad-element>`: the element that contained the fault.
+    pub fn bad_element(&self) -> Option<&str> {
+        self.bad_element.as_deref()
+    }
+
+    /// RFC 6241 App. A `<ok-element>` (partial-operation reporting).
+    pub fn ok_element(&self) -> Option<&str> {
+        self.ok_element.as_deref()
+    }
+
+    /// RFC 6241 App. A `<err-element>` (partial-operation reporting).
+    pub fn error_element(&self) -> Option<&str> {
+        self.error_element.as_deref()
+    }
+
+    /// RFC 6241 App. A `<noop-element>` (partial-operation reporting).
+    pub fn noop_element(&self) -> Option<&str> {
+        self.noop_element.as_deref()
+    }
+
+    /// RFC 6241 App. A `<bad-namespace>` (accompanies `unknown-namespace`).
+    pub fn bad_namespace(&self) -> Option<&str> {
+        self.bad_namespace.as_deref()
+    }
+}
+
 impl<'a> XmlDeserialize<'a, ErrorInfoValue> for ErrorInfoValue {
     fn xml_deserialize(
         parser: &mut XmlParser<'a, impl io::BufRead>,
