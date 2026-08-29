@@ -574,14 +574,29 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         let cursor = io::Cursor::new(vec![]);
         let mut writer = quick_xml::writer::Writer::new(cursor);
         let mut wrote_ns = false;
+        // Depth of nested elements sharing the terminator's local name.
+        // Without it the FIRST inner `</tag>` (e.g. a `<config>` nested
+        // inside a `<config>` payload) ends the copy early, truncating
+        // the subtree and desyncing the parser for the rest of the
+        // message. Local-name counting is self-balancing: every
+        // same-named Start increments and its End decrements, regardless
+        // of namespace; quick-xml guarantees well-formedness, so opens
+        // and closes are matched. A self-closing `<tag/>` (Empty) opens
+        // and closes at once and needs no adjustment.
+        let mut depth: usize = 0;
         loop {
-            if let Event::End(b) = self.peek()
-                && b.local_name().into_inner() == tag
-            {
-                break;
-            }
-            if let Event::Eof = self.peek() {
-                return Err(ParsingError::Eof);
+            match self.peek() {
+                Event::End(b) if b.local_name().into_inner() == tag => {
+                    if depth == 0 {
+                        break;
+                    }
+                    depth -= 1;
+                }
+                Event::Start(b) if b.local_name().into_inner() == tag => {
+                    depth += 1;
+                }
+                Event::Eof => return Err(ParsingError::Eof),
+                _ => {}
             }
             if !wrote_ns {
                 if let Event::Start(a) = &mut self.current {
@@ -633,15 +648,21 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     ) -> Result<CopiedSubtree, ParsingError> {
         let mut writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
         let mut namespaces: IndexMap<String, String> = IndexMap::new();
-
+        // See `copy_buffer_till` for why this depth counter is required.
+        let mut depth: usize = 0;
         loop {
-            if let Event::End(b) = self.peek()
-                && b.local_name().into_inner() == tag
-            {
-                break;
-            }
-            if let Event::Eof = self.peek() {
-                return Err(ParsingError::Eof);
+            match self.peek() {
+                Event::End(b) if b.local_name().into_inner() == tag => {
+                    if depth == 0 {
+                        break;
+                    }
+                    depth -= 1;
+                }
+                Event::Start(b) if b.local_name().into_inner() == tag => {
+                    depth += 1;
+                }
+                Event::Eof => return Err(ParsingError::Eof),
+                _ => {}
             }
 
             // Record prefix usage on Start/Empty. We resolve NOW so that bindings
@@ -1770,5 +1791,39 @@ mod tests {
         let mut parser = create_parser(xml);
         parser.open(None, "root").expect("open root");
         assert_eq!(parser.tag_string().unwrap().as_ref(), "line1\nline2");
+    }
+
+    #[test]
+    fn test_copy_buffer_till_handles_nested_same_name() {
+        // A subtree whose payload legitimately nests an element with the
+        // SAME local name as the terminator (e.g., <config> inside <config>).
+        let xml = r#"<config><top xmlns="urn:x"><config>inner</config></top></config>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "config").expect("open outer config");
+        let copied = parser
+            .copy_buffer_till("config")
+            .expect("copy till outer </config>");
+        assert_eq!(
+            copied.as_ref(),
+            r#"<top xmlns="urn:x"><config>inner</config></top>"#
+        );
+        // The parser must now be positioned on the OUTER </config>, not
+        // desynced: close() consumes it cleanly.
+        parser.close().expect("close consumes the outer </config>");
+    }
+
+    #[test]
+    fn test_copy_buffer_till_with_namespaces_handles_nested_same_name() {
+        let xml = r#"<filter><a xmlns="urn:x"><filter>deep</filter></a></filter>"#;
+        let mut parser = create_parser(xml);
+        parser.open(None, "filter").expect("open outer filter");
+        let subtree = parser
+            .copy_buffer_till_with_namespaces("filter")
+            .expect("copy till outer </filter>");
+        assert_eq!(
+            subtree.xml.as_ref(),
+            r#"<a xmlns="urn:x"><filter>deep</filter></a>"#
+        );
+        parser.close().expect("close consumes the outer </filter>");
     }
 }
