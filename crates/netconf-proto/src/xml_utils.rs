@@ -502,6 +502,7 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
                     }
                     return Ok(accumulator.into());
                 }
+                Event::Eof => return Err(ParsingError::Eof),
                 _ => self.next_event()?,
             };
         }
@@ -1186,6 +1187,27 @@ mod tests {
         );
 
         parser.close().expect("failed to close root");
+    }
+
+    #[test]
+    fn test_tag_string_errors_on_unclosed_element_at_eof() {
+        // A framed-but-malformed inner document: a text leaf never closed
+        // before the stream ends. quick-xml returns Eof FOREVER once the
+        // reader is done (it does not error on unclosed elements), so
+        // without an explicit Eof arm this loop never terminates.
+        // Threaded with a timeout so a regression fails the test instead
+        // of hanging the test runner.
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let xml = r#"<identifier>foo"#; // no </identifier>, no more tags
+            let mut parser = create_parser(xml);
+            parser.open(None, "identifier").expect("open identifier");
+            let _ = tx.send(parser.tag_string());
+        });
+        match rx.recv_timeout(std::time::Duration::from_secs(5)) {
+            Ok(result) => assert_eq!(result, Err(ParsingError::Eof)),
+            Err(_) => panic!("tag_string() did not return which is a infinite loop on Eof"),
+        }
     }
 
     #[test]
