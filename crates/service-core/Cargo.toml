@@ -1,0 +1,37 @@
+[package]
+name = "netgauze-service-core"
+version = "0.13.0"
+edition = "2024"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+Shared-nothing, thread-per-core service scaffolding for NetGauze
+collectors: worker trait, supervisor, CPU affinity, and core assignment.
+"""
+keywords = ["supervisor", "thread-per-core", "affinity"]
+categories = ["network-programming", "concurrency"]
+
+[dependencies]
+tokio = { workspace = true, default-features = false, features = ["sync", "rt", "time", "macros"] }
+opentelemetry = { workspace = true }
+core_affinity = { workspace = true }
+hwlocality = { workspace = true, features = ["hwloc-latest", "vendored"] }
+thiserror = { workspace = true }
+futures = { workspace = true }
+arc-swap = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+raw-cpuid = { workspace = true }
+
+
+[dev-dependencies]
+tokio = { workspace = true, default-features = false, features = ["rt"] }
+tracing-test = { workspace = true }
+
+[lints]
+workspace = true
