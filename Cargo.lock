@@ -3069,14 +3069,14 @@ dependencies = [
 name = "netgauze-ipfix-code-generator"
 version = "0.13.0"
 dependencies = [
- "prettyplease 0.2.37",
+ "prettyplease 0.3.0",
  "proc-macro2",
  "quote",
  "regex",
  "reqwest",
  "roxmltree",
  "serde",
- "syn 2.0.119",
+ "syn 3.0.4",
  "thiserror",
  "tracing",
 ]
