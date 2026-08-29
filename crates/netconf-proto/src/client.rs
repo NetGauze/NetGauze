@@ -54,7 +54,7 @@ impl russh::client::Handler for SshHandler {
     type Error = russh::Error;
     async fn check_server_key(
         &mut self,
-        _server_public_key: &russh::keys::PublicKey,
+        _server_public_key: &russh::keys::PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
         // Don't check the server public key
         Ok(true)
