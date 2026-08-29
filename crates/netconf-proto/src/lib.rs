@@ -35,17 +35,16 @@ pub mod yanglib;
 pub mod yangparser;
 
 pub(crate) const NETCONF_NS_STR: &str = "urn:ietf:params:xml:ns:netconf:base:1.0";
-pub(crate) const NETCONF_NS: Namespace<'static> = Namespace(NETCONF_NS_STR.as_bytes());
+pub(crate) const NETCONF_NS: Namespace<'static> = Namespace(NETCONF_NS_STR);
 pub(crate) const NETCONF_MONITORING_NS_STR: &str =
     "urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring";
-pub(crate) const NETCONF_MONITORING_NS: Namespace<'static> =
-    Namespace(NETCONF_MONITORING_NS_STR.as_bytes());
+pub(crate) const NETCONF_MONITORING_NS: Namespace<'static> = Namespace(NETCONF_MONITORING_NS_STR);
 pub(crate) const YANG_LIBRARY_NS_STR: &str = "urn:ietf:params:xml:ns:yang:ietf-yang-library";
-pub(crate) const YANG_LIBRARY_NS: Namespace<'static> = Namespace(YANG_LIBRARY_NS_STR.as_bytes());
+pub(crate) const YANG_LIBRARY_NS: Namespace<'static> = Namespace(YANG_LIBRARY_NS_STR);
 pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS_STR: &str =
     "urn:ietf:params:xml:ns:yang:ietf-yang-library-augmentedby";
 pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS: Namespace<'static> =
-    Namespace(YANG_LIBRARY_AUGMENTED_BY_NS_STR.as_bytes());
+    Namespace(YANG_LIBRARY_AUGMENTED_BY_NS_STR);
 pub(crate) const YANG_DATASTORES_NS_STR: &str = "urn:ietf:params:xml:ns:yang:ietf-datastores";
 
 #[cfg(test)]

@@ -49,11 +49,11 @@ impl From<XmlWriterError> for quick_xml::Error {
     fn from(value: XmlWriterError) -> Self {
         match value {
             XmlWriterError::UndefinedNamespace(ns) => {
-                quick_xml::Error::Namespace(NamespaceError::UnknownPrefix(ns.as_bytes().to_vec()))
+                quick_xml::Error::Namespace(NamespaceError::UnknownPrefix(ns))
             }
-            XmlWriterError::DuplicateNamespacePrefix(prefix) => quick_xml::Error::Namespace(
-                NamespaceError::InvalidPrefixForXmlns(prefix.as_bytes().to_vec()),
-            ),
+            XmlWriterError::DuplicateNamespacePrefix(prefix) => {
+                quick_xml::Error::Namespace(NamespaceError::InvalidPrefixForXmlns(prefix))
+            }
         }
     }
 }
@@ -62,7 +62,7 @@ impl From<XmlWriterError> for quick_xml::Error {
 pub struct XmlWriter<T: io::Write> {
     inner: quick_xml::writer::Writer<T>,
     // Stack of multiple namespace bindings since XML allows to overwrite the bindings
-    namespace_bindings: Vec<IndexMap<Cow<'static, [u8]>, String>>,
+    namespace_bindings: Vec<IndexMap<Cow<'static, str>, String>>,
     // Namespaces has been appended to the xml element
     ns_applied: bool,
 }
@@ -89,7 +89,7 @@ impl<T: io::Write> XmlWriter<T> {
         let ns_applied = false;
         let mut cow_ns = IndexMap::with_capacity(namespace_binding.len());
         for (ns, prefix) in namespace_binding {
-            cow_ns.insert(Cow::Owned(ns.as_ref().to_vec()), prefix);
+            cow_ns.insert(ns.into_inner().to_owned().into(), prefix);
         }
         let namespace_bindings = vec![cow_ns];
         Ok(Self {
@@ -129,7 +129,7 @@ impl<T: io::Write> XmlWriter<T> {
             prefix
         } else {
             return Err(XmlWriterError::UndefinedNamespace(
-                String::from_utf8(ns.into_inner().to_vec()).unwrap_or("UNKNOWN".to_string()),
+                ns.into_inner().to_string(),
             ));
         };
         let mut start = if prefix.is_empty() {
@@ -149,13 +149,13 @@ impl<T: io::Write> XmlWriter<T> {
         self.ns_applied = false;
         let mut cow_ns = IndexMap::with_capacity(namespace_binding.len());
         for (ns, prefix) in namespace_binding {
-            cow_ns.insert(Cow::Owned(ns.as_ref().to_vec()), prefix);
+            cow_ns.insert(ns.into_inner().to_owned().into(), prefix);
         }
         self.namespace_bindings.push(cow_ns);
         Ok(())
     }
 
-    pub fn pop_namespace_binding(&mut self) -> Option<IndexMap<Cow<'static, [u8]>, String>> {
+    pub fn pop_namespace_binding(&mut self) -> Option<IndexMap<Cow<'static, str>, String>> {
         self.namespace_bindings.pop()
     }
 
@@ -176,10 +176,10 @@ impl<T: io::Write> XmlWriter<T> {
             if let Some(bindings) = self.namespace_bindings.last() {
                 for (namespace, prefix) in bindings {
                     if prefix.is_empty() {
-                        start.push_attribute(("xmlns".as_bytes(), namespace.as_ref()));
+                        start.push_attribute(("xmlns", namespace.as_ref()));
                     } else {
                         start.push_attribute((
-                            format!("xmlns:{prefix}").as_bytes(),
+                            format!("xmlns:{prefix}").as_str(),
                             namespace.as_ref(),
                         ));
                     }
@@ -378,7 +378,7 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
             }
             Event::End(e) => Err(ParsingError::SkipError(format!(
                 "Cannot skip a closing tag, call close() to close </{}>",
-                std::str::from_utf8(e.name().local_name().into_inner())?
+                e.name().local_name().into_inner()
             ))),
             Event::Eof => Err(ParsingError::Eof),
             _ => self.next_event(),
@@ -401,7 +401,7 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         };
 
         let (resolved, local) = self.ns_reader.resolver().resolve_element(qname);
-        if local.into_inner() != key.as_bytes() {
+        if local.into_inner() != key {
             return false;
         }
         let expected = match ns {
@@ -468,24 +468,21 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         loop {
             match self.peek() {
                 Event::CData(unescaped) => {
-                    let decoded = unescaped.decode()?;
-                    accumulator.push_str(decoded.as_ref());
+                    accumulator.push_str(unescaped.as_ref());
                     self.next_event()?
                 }
                 Event::Text(escaped) => {
-                    let decoded = escaped.decode()?;
-                    accumulator.push_str(decoded.as_ref());
+                    accumulator.push_str(escaped.as_ref());
                     self.next_event()?
                 }
                 Event::GeneralRef(general_ref) => {
-                    let decoded = general_ref.decode()?;
-                    let replaced = match decoded.as_ref() {
+                    let replaced = match general_ref.as_ref() {
                         "quot" => "\"",
                         "apos" => "'",
                         "amp" => "&",
                         "lt" => "<",
                         "gt" => ">",
-                        _ => decoded.as_ref(),
+                        _ => general_ref.as_ref(),
                     };
                     accumulator.push_str(replaced);
                     self.next_event()?
@@ -515,17 +512,14 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     /// Fails with [`ParsingError::InvalidValue`] if the prefix cannot be
     /// resolved.
     pub fn resolve_identity_ref(&self, raw: &str) -> Result<(String, String), ParsingError> {
-        let (resolved_ns, local) = self
-            .ns_reader
-            .resolver()
-            .resolve(QName(raw.trim().as_bytes()), true);
+        let (resolved_ns, local) = self.ns_reader.resolver().resolve(QName(raw.trim()), true);
         let ns_uri = match resolved_ns {
-            ResolveResult::Bound(ns) => std::str::from_utf8(ns.into_inner())?.to_owned(),
+            ResolveResult::Bound(ns) => ns.into_inner().to_string(),
             _ => {
                 return Err(ParsingError::InvalidValue(raw.to_string()));
             }
         };
-        let local_name = std::str::from_utf8(local.into_inner())?.to_owned();
+        let local_name = local.into_inner().to_string();
         Ok((ns_uri, local_name))
     }
 
@@ -574,7 +568,7 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     /// - Performs UTF-8 conversion which may fail on invalid sequences
     /// - The namespace resolution only occurs once (on the first start tag) to
     ///   minimize overhead
-    pub fn copy_buffer_till(&mut self, tag: &'_ [u8]) -> Result<Box<str>, ParsingError> {
+    pub fn copy_buffer_till(&mut self, tag: &'_ str) -> Result<Box<str>, ParsingError> {
         let cursor = io::Cursor::new(vec![]);
         let mut writer = quick_xml::writer::Writer::new(cursor);
         let mut wrote_ns = false;
@@ -594,17 +588,15 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
                         .flatten()
                         .map(|x| {
                             (
-                                std::str::from_utf8(x.key.local_name().into_inner())
-                                    .unwrap()
-                                    .to_string(),
-                                std::str::from_utf8(&x.value).unwrap().to_string(),
+                                x.key.local_name().into_inner().to_string(),
+                                x.value.to_string(),
                             )
                         })
                         .collect::<HashMap<_, _>>();
                     if !attrs.contains_key("xmlns") {
                         let (ns, _) = self.ns_reader.resolver().resolve(a.name(), true);
                         if let ResolveResult::Bound(ns) = ns {
-                            a.push_attribute((&b"xmlns"[..], ns.0));
+                            a.push_attribute(("xmlns", ns.0));
                         }
                     }
                     wrote_ns = true;
@@ -635,7 +627,7 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     /// [`CopiedSubtree::namespaces`].
     pub fn copy_buffer_till_with_namespaces(
         &mut self,
-        tag: &'_ [u8],
+        tag: &'_ str,
     ) -> Result<CopiedSubtree, ParsingError> {
         let mut writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
         let mut namespaces: IndexMap<String, String> = IndexMap::new();
@@ -702,7 +694,7 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
     >(
         &mut self,
         ns: Option<Namespace<'_>>,
-        tag: &'_ [u8],
+        tag: &'_ str,
     ) -> Result<Vec<N>, ParsingError> {
         let mut acc = Vec::new();
         let resolved_ns = if let Some(ns) = ns {
@@ -745,9 +737,9 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
         for (decl, Namespace(ns)) in self.ns_reader().resolver().bindings() {
             let prefix = match decl {
                 PrefixDeclaration::Default => String::from(""),
-                PrefixDeclaration::Named(p) => String::from_utf8_lossy(p).into_owned(),
+                PrefixDeclaration::Named(p) => p.to_string(),
             };
-            all_namespaces.insert(prefix, String::from_utf8_lossy(ns).into_owned());
+            all_namespaces.insert(prefix, ns.to_string());
         }
         let path = self.tag_string()?;
         let used_namespaces = Self::find_xpath_prefixes(&path);
@@ -767,32 +759,32 @@ impl<'a, R: io::BufRead> XmlParser<'a, R> {
 
         // Element QName: prefix (or empty for default namespace).
         let prefix = match e.name().prefix() {
-            Some(p) => String::from_utf8_lossy(p.as_ref()).into_owned(),
+            Some(p) => p.into_inner().to_string(),
             None => String::new(),
         };
         if !out.contains_key(&prefix)
             && let (ResolveResult::Bound(Namespace(uri)), _) =
                 ns_reader.resolver().resolve_element(e.name())
         {
-            out.insert(prefix, String::from_utf8_lossy(uri).into_owned());
+            out.insert(prefix, uri.to_string());
         }
 
         // Attributes: only prefixed ones carry a namespace; xmlns* are bindings,
         // not usages, so skip them.
         for attr in e.attributes().flatten() {
             let key = attr.key.as_ref();
-            if key == b"xmlns" || key.starts_with(b"xmlns:") {
+            if key == "xmlns" || key.starts_with("xmlns:") {
                 continue;
             }
             if let Some(p) = attr.key.prefix() {
-                let prefix = String::from_utf8_lossy(p.as_ref()).into_owned();
+                let prefix = p.into_inner().to_string();
                 if out.contains_key(&prefix) {
                     continue;
                 }
                 if let (ResolveResult::Bound(Namespace(uri)), _) =
                     ns_reader.resolver().resolve_attribute(attr.key)
                 {
-                    out.insert(prefix, String::from_utf8_lossy(uri).into_owned());
+                    out.insert(prefix, uri.to_string());
                 }
             }
         }
@@ -951,7 +943,7 @@ mod tests {
 
         // open root element, and arrive at child1
         parser
-            .open(Some(Namespace(b"urn:ietf:example")), "root")
+            .open(Some(Namespace("urn:ietf:example")), "root")
             .expect("failed to open root");
         assert_eq!(parser.peek(), &Event::Start(BytesStart::new("child1")));
 
@@ -990,7 +982,7 @@ mod tests {
 
         // open root element, and arrive at text
         parser
-            .open(Some(Namespace(b"urn:ietf:example")), "root")
+            .open(Some(Namespace("urn:ietf:example")), "root")
             .expect("failed to open root");
         assert_eq!(
             parser.peek(),
@@ -1011,13 +1003,13 @@ mod tests {
         assert!(is_match);
 
         parser.open(None, "root").expect("failed to open root");
-        let is_match = parser.is_tag(Some(Namespace(b"https://example.com")), "child");
+        let is_match = parser.is_tag(Some(Namespace("https://example.com")), "child");
         assert!(is_match);
 
-        let is_not_match = parser.is_tag(Some(Namespace(b"https://wrong.com")), "child");
+        let is_not_match = parser.is_tag(Some(Namespace("https://wrong.com")), "child");
         assert!(!is_not_match);
 
-        let is_not_match = parser.is_tag(Some(Namespace(b"https://example.com")), "wrong");
+        let is_not_match = parser.is_tag(Some(Namespace("https://example.com")), "wrong");
         assert!(!is_not_match);
     }
 
@@ -1040,14 +1032,14 @@ mod tests {
         assert_eq!(parser.previous(), &Event::Eof);
 
         // Open root
-        let result_root = parser.open(Some(Namespace(b"https://example.com")), "root");
+        let result_root = parser.open(Some(Namespace("https://example.com")), "root");
         let expected_root = BytesStart::from_content("root xmlns=\"https://example.com\"", 4);
         assert_eq!(result_root, Ok(expected_root.clone()));
         assert_eq!(parser.parents, vec![Event::Start(expected_root.clone())]);
         assert_eq!(parser.previous(), &Event::Start(expected_root.clone()));
 
         // Open child
-        let result_child = parser.open(Some(Namespace(b"https://example.com")), "child");
+        let result_child = parser.open(Some(Namespace("https://example.com")), "child");
         let expected_child = BytesStart::new("child");
         assert_eq!(result_child, Ok(expected_child.clone()));
         assert_eq!(
@@ -1075,7 +1067,7 @@ mod tests {
         let xml = r#"<root xmlns="https://example.com"><child/></root>"#;
         let mut parser = create_parser(xml);
 
-        let result = parser.open(Some(Namespace(b"https://example.com")), "wrong");
+        let result = parser.open(Some(Namespace("https://example.com")), "wrong");
         assert_eq!(
             result,
             Err(ParsingError::WrongToken {
@@ -1103,7 +1095,7 @@ mod tests {
             BytesStart::from_content("root xmlns=\"https://example.com\"", 4).into_owned(),
         ));
 
-        let result = parser.maybe_open(Some(Namespace(b"https://example.com")), "root");
+        let result = parser.maybe_open(Some(Namespace("https://example.com")), "root");
         assert_eq!(result, expected);
         // check pointer did move after the `maybe_open` succeeded
         assert_eq!(
@@ -1117,7 +1109,7 @@ mod tests {
         let xml = r#"<root xmlns="https://example.com"><child/></root>"#;
         let mut parser = create_parser(xml);
         let expected = Ok(None);
-        let result = parser.maybe_open(Some(Namespace(b"https://example.com")), "wrong");
+        let result = parser.maybe_open(Some(Namespace("https://example.com")), "wrong");
         assert_eq!(result, expected);
 
         // check pointer didn't move after the `maybe_open` didn't return anything
@@ -1231,12 +1223,8 @@ mod tests {
     fn test_writer_creation() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns_to_apply =
-            IndexMap::from([(Namespace(b"https://example.com"), "xmlns".to_string())]);
-        let cow_bindings = IndexMap::from([(
-            Cow::Owned(b"https://example.com".to_vec()),
-            "xmlns".to_string(),
-        )]);
+        let ns_to_apply = IndexMap::from([(Namespace("https://example.com"), "xmlns".to_string())]);
+        let cow_bindings = IndexMap::from([("https://example.com".into(), "xmlns".to_string())]);
         let xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply.clone())
             .expect("failed creating writer");
         assert_eq!(xml_writer.namespace_bindings, vec![cow_bindings]);
@@ -1251,7 +1239,7 @@ mod tests {
             .expect("failed creating writer");
 
         let element = xml_writer.create_element("root");
-        assert_eq!(element.name().as_ref(), b"root");
+        assert_eq!(element.name().into_inner(), "root");
         assert!(xml_writer.ns_applied);
     }
 
@@ -1261,27 +1249,27 @@ mod tests {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
         let ns_to_apply = IndexMap::from([
-            (Namespace(b"https://example.com"), "".to_string()),
-            (Namespace(b"https://custom.com"), "ns".to_string()),
+            (Namespace("https://example.com"), "".to_string()),
+            (Namespace("https://custom.com"), "ns".to_string()),
         ]);
         let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
             .expect("failed creating writer");
 
         let element = xml_writer.create_element("root");
-        assert_eq!(element.name().as_ref(), b"root");
+        assert_eq!(element.name().as_ref(), "root");
         // Namespaces should be cleared after creating element
         assert!(xml_writer.ns_applied);
 
         // Check attributes were added
-        let mut attrs: Vec<(Box<[u8]>, Box<[u8]>)> = element
+        let mut attrs: Vec<(String, String)> = element
             .attributes()
             .map(|x| x.expect("failed to decode attribute"))
-            .map(|x| (x.key.as_ref().into(), x.value.as_ref().into()))
+            .map(|x| (x.key.into_inner().to_string(), x.value.as_ref().to_owned()))
             .collect();
         attrs.sort_by(|x, y| x.0.cmp(&y.0));
-        let expected: Vec<(Box<[u8]>, Box<[u8]>)> = vec![
-            ((*b"xmlns").into(), (*b"https://example.com").into()),
-            ((*b"xmlns:ns").into(), (*b"https://custom.com").into()),
+        let expected: Vec<(String, String)> = vec![
+            ("xmlns".to_string(), "https://example.com".to_string()),
+            ("xmlns:ns".to_string(), "https://custom.com".to_string()),
         ];
         assert_eq!(attrs, expected);
     }
@@ -1294,7 +1282,7 @@ mod tests {
         let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
             .expect("failed creating writer");
 
-        let element = xml_writer.create_ns_element(Namespace(b"ns"), "child");
+        let element = xml_writer.create_ns_element(Namespace("ns"), "child");
         assert!(element.is_err());
         assert!(!xml_writer.ns_applied);
     }
@@ -1303,7 +1291,7 @@ mod tests {
     fn test_create_ns_element_with_namespace() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns = Namespace(b"https://custom.com");
+        let ns = Namespace("https://custom.com");
         let ns_to_apply = IndexMap::from([(ns, "ns".to_string())]);
         let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
             .expect("failed creating writer");
@@ -1311,15 +1299,15 @@ mod tests {
         let element = xml_writer
             .create_ns_element(ns, "child")
             .expect("failed to create an xml element with namespace prefix");
-        assert_eq!(element.name().as_ref(), b"ns:child");
+        assert_eq!(element.name().as_ref(), "ns:child");
         // Namespaces should be cleared after creating element
         assert!(xml_writer.ns_applied);
 
         // Check attributes were added
         let mut attrs = element.attributes();
         let attr = attrs.next().unwrap().unwrap();
-        assert_eq!(attr.key.as_ref(), b"xmlns:ns");
-        assert_eq!(attr.value.as_ref(), b"https://custom.com");
+        assert_eq!(attr.key.as_ref(), "xmlns:ns");
+        assert_eq!(attr.value.as_ref(), "https://custom.com");
     }
 
     #[test]
@@ -1364,7 +1352,7 @@ mod tests {
         root.push_attribute(("xmlns", "https://example.com"));
         xml_writer.write_event(Event::Start(root)).unwrap();
 
-        let ns = Namespace(b"https://example2.com");
+        let ns = Namespace("https://example2.com");
         xml_writer
             .push_namespace_binding(IndexMap::from([(ns, "ns".to_string())]))
             .expect("failed adding namespace binding");
@@ -1399,8 +1387,8 @@ mod tests {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
         let ns_to_apply = IndexMap::from([
-            (Namespace(b"https://example.com"), "".to_string()),
-            (Namespace(b"https://custom.com"), "ns".to_string()),
+            (Namespace("https://example.com"), "".to_string()),
+            (Namespace("https://custom.com"), "ns".to_string()),
         ]);
         let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
             .expect("failed creating writer");
@@ -1599,7 +1587,7 @@ mod tests {
         parser
             .open(
                 Some(Namespace(
-                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                    "urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
                 )),
                 "datastore-xpath-filter",
             )
@@ -1629,7 +1617,7 @@ mod tests {
         parser
             .open(
                 Some(Namespace(
-                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                    "urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
                 )),
                 "datastore-xpath-filter",
             )
@@ -1659,7 +1647,7 @@ mod tests {
         parser
             .open(
                 Some(Namespace(
-                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                    "urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
                 )),
                 "filters",
             )
@@ -1668,7 +1656,7 @@ mod tests {
         parser
             .open(
                 Some(Namespace(
-                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                    "urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
                 )),
                 "datastore-xpath-filter",
             )
@@ -1699,7 +1687,7 @@ mod tests {
         parser
             .open(
                 Some(Namespace(
-                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                    "urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
                 )),
                 "datastore-xpath-filter",
             )
@@ -1729,7 +1717,7 @@ mod tests {
         parser
             .open(
                 Some(Namespace(
-                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                    "urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
                 )),
                 "datastore-xpath-filter",
             )
@@ -1747,7 +1735,7 @@ mod tests {
         // identityref values inside string literals. The `t:` token appears
         // only inside quotes, so even though it's declared, it shouldn't end
         // up in the namespace map (find_xpath_prefixes correctly skips it).
-        // Conversely `if:` is live and must be kept.
+        // Conversely, `if:` is live and must be kept.
         let xml = r#"<datastore-xpath-filter
         xmlns="urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications"
         xmlns:if="urn:example:interfaces"
@@ -1756,7 +1744,7 @@ mod tests {
         parser
             .open(
                 Some(Namespace(
-                    b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
+                    "urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications",
                 )),
                 "datastore-xpath-filter",
             )

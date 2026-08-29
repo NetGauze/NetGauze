@@ -362,7 +362,7 @@ impl XmlSerialize for DatastoreXPathFilter {
         let mut new_namespaces: IndexMap<Namespace<'_>, String> =
             IndexMap::with_capacity(self.namespaces.len() + 1);
         for (prefix, namespace) in &self.namespaces {
-            let ns = Namespace(namespace.as_bytes());
+            let ns = Namespace(namespace);
             new_namespaces.insert(ns, prefix.clone().into());
         }
         if writer.get_namespace_prefix(YANG_PUSH_NS).is_none()
@@ -425,7 +425,7 @@ impl XmlSerialize for DatastoreSubtreeFilter {
         let mut new_namespaces: IndexMap<Namespace<'_>, String> =
             IndexMap::with_capacity(self.namespaces.len() + 1);
         for (prefix, namespace) in &self.namespaces {
-            let ns = Namespace(namespace.as_bytes());
+            let ns = Namespace(namespace);
             new_namespaces.insert(ns, prefix.clone().into());
         }
         if writer.get_namespace_prefix(YANG_PUSH_NS).is_none()
@@ -459,7 +459,7 @@ impl<'a> XmlDeserialize<'a, DatastoreSubtreeFilter> for DatastoreSubtreeFilter {
                 expecting: "<datastore-subtree-filter>".to_string(),
                 found: parser.peek().clone().into_owned(),
             })??;
-        let subtree = parser.copy_buffer_till_with_namespaces(b"datastore-subtree-filter")?;
+        let subtree = parser.copy_buffer_till_with_namespaces("datastore-subtree-filter")?;
 
         parser.close()?;
         Ok(Self {
@@ -548,7 +548,7 @@ impl XmlSerialize for StreamXPathFilter {
         let mut new_namespaces: IndexMap<Namespace<'_>, String> =
             IndexMap::with_capacity(self.namespaces.len() + 1);
         for (prefix, namespace) in &self.namespaces {
-            let ns = Namespace(namespace.as_bytes());
+            let ns = Namespace(namespace);
             new_namespaces.insert(ns, prefix.clone().into());
         }
         if writer
@@ -613,7 +613,7 @@ impl XmlSerialize for StreamSubtreeFilter {
         let mut new_namespaces: IndexMap<Namespace<'_>, String> =
             IndexMap::with_capacity(self.namespaces.len() + 1);
         for (prefix, namespace) in &self.namespaces {
-            let ns = Namespace(namespace.as_bytes());
+            let ns = Namespace(namespace);
             new_namespaces.insert(ns, prefix.clone().into());
         }
         if writer
@@ -650,7 +650,7 @@ impl<'a> XmlDeserialize<'a, StreamSubtreeFilter> for StreamSubtreeFilter {
                 expecting: "<stream-subtree-filter>".to_string(),
                 found: parser.peek().clone().into_owned(),
             })??;
-        let subtree = parser.copy_buffer_till_with_namespaces(b"stream-subtree-filter")?;
+        let subtree = parser.copy_buffer_till_with_namespaces("stream-subtree-filter")?;
 
         parser.close()?;
         Ok(Self {

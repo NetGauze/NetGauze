@@ -42,11 +42,11 @@ mod tests;
 pub mod types;
 
 pub const YANG_PUSH_NS: Namespace<'static> =
-    Namespace(b"urn:ietf:params:xml:ns:yang:ietf-yang-push");
+    Namespace("urn:ietf:params:xml:ns:yang:ietf-yang-push");
 pub const SUBSCRIBED_NOTIFICATIONS_NS: Namespace<'static> =
-    Namespace(b"urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications");
+    Namespace("urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications");
 pub const DISTRIBUTED_NOTIF_NS: Namespace<'static> =
-    Namespace(b"urn:ietf:params:xml:ns:yang:ietf-distributed-notif");
+    Namespace("urn:ietf:params:xml:ns:yang:ietf-distributed-notif");
 
 pub const YANG_PUSH_REVISION: Namespace<'static> =
-    Namespace(b"urn:ietf:params:xml:ns:yang:ietf-yang-push-revision");
+    Namespace("urn:ietf:params:xml:ns:yang:ietf-yang-push-revision");

@@ -60,12 +60,12 @@ impl<'a> XmlDeserialize<'a, NetConfMessage> for NetConfMessage {
         parser.skip_text()?;
         match parser.peek() {
             Event::Start(a) => match a.local_name().into_inner() {
-                b"hello" => Ok(NetConfMessage::Hello(Hello::xml_deserialize(parser)?)),
-                b"rpc" => Ok(NetConfMessage::Rpc(Rpc::xml_deserialize(parser)?)),
-                b"rpc-reply" => Ok(NetConfMessage::RpcReply(RpcReply::xml_deserialize(parser)?)),
+                "hello" => Ok(NetConfMessage::Hello(Hello::xml_deserialize(parser)?)),
+                "rpc" => Ok(NetConfMessage::Rpc(Rpc::xml_deserialize(parser)?)),
+                "rpc-reply" => Ok(NetConfMessage::RpcReply(RpcReply::xml_deserialize(parser)?)),
                 _ => Err(ParsingError::InvalidValue(format!(
                     "invalid start value: {}",
-                    std::str::from_utf8(a.local_name().into_inner())?
+                    a.local_name().into_inner()
                 ))),
             },
             token => Err(ParsingError::WrongToken {
@@ -232,7 +232,7 @@ pub enum RpcOperation {
     WellKnown(WellKnownOperation),
 }
 
-fn extract_attribute(bytes_start: &BytesStart<'_>, attribute_name: &[u8]) -> Option<Box<str>> {
+fn extract_attribute(bytes_start: &BytesStart<'_>, attribute_name: &str) -> Option<Box<str>> {
     bytes_start
         .attributes()
         .map(|attr| match attr {
@@ -264,7 +264,7 @@ fn extract_attribute(bytes_start: &BytesStart<'_>, attribute_name: &[u8]) -> Opt
 /// </xs:simpleType>
 /// ```
 fn extract_message_id(open: &BytesStart<'_>) -> Result<Option<Box<str>>, ParsingError> {
-    let msg_id_attr = extract_attribute(open, b"message-id");
+    let msg_id_attr = extract_attribute(open, "message-id");
     if let Some(msg_id) = &msg_id_attr
         && msg_id.len() > 4095
     {
@@ -289,7 +289,7 @@ impl<'a> XmlDeserialize<'a, Rpc> for Rpc {
         let operation = match WellKnownOperation::xml_deserialize(parser) {
             Ok(operation) => RpcOperation::WellKnown(operation),
             Err(ParsingError::Recoverable) => {
-                let operation = parser.copy_buffer_till(b"rpc")?;
+                let operation = parser.copy_buffer_till("rpc")?;
                 RpcOperation::Raw(operation)
             }
             Err(e) => return Err(e),
@@ -692,14 +692,14 @@ impl<'a> XmlDeserialize<'a, Filter> for Filter {
     fn xml_deserialize(parser: &mut XmlParser<'a, impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         let filter_start = parser.open(Some(NETCONF_NS), "filter")?;
-        let filter_type = extract_attribute(&filter_start, b"type").unwrap_or("subtree".into());
+        let filter_type = extract_attribute(&filter_start, "type").unwrap_or("subtree".into());
         let filter = match filter_type.as_ref() {
             "subtree" => {
-                let value = parser.copy_buffer_till(b"filter")?;
+                let value = parser.copy_buffer_till("filter")?;
                 Filter::Subtree(value)
             }
             "xpath" => {
-                let select = extract_attribute(&filter_start, b"select")
+                let select = extract_attribute(&filter_start, "select")
                     .ok_or(ParsingError::MissingAttribute("select".into()))?;
                 Filter::XPath(select)
             }
@@ -759,7 +759,7 @@ impl<'a> XmlDeserialize<'a, EditConfig> for EditConfig {
             parser.close()?;
             EditConfig::Url(url)
         } else if parser.maybe_open(Some(NETCONF_NS), "config")?.is_some() {
-            let value = parser.copy_buffer_till(b"config")?;
+            let value = parser.copy_buffer_till("config")?;
             parser.close()?;
             EditConfig::Config(value)
         } else {
@@ -1181,11 +1181,11 @@ impl<'a> XmlDeserialize<'a, RpcReply> for RpcReply {
             });
         }
         let errors: Vec<RpcError> =
-            parser.collect_xml_sequence_with_tag(Some(NETCONF_NS), b"rpc-error")?;
+            parser.collect_xml_sequence_with_tag(Some(NETCONF_NS), "rpc-error")?;
         let responses = match WellKnownRpcResponse::xml_deserialize(parser) {
             Ok(response) => RpcResponse::WellKnown(response),
             Err(ParsingError::Recoverable) => {
-                let responses = parser.copy_buffer_till(b"rpc-reply")?;
+                let responses = parser.copy_buffer_till("rpc-reply")?;
                 RpcResponse::Raw(responses)
             }
             Err(e) => return Err(e),
@@ -1346,7 +1346,7 @@ impl<'a> XmlDeserialize<'a, WellKnownRpcResponse> for WellKnownRpcResponse {
                 let yang_lib = YangLibrary::xml_deserialize(parser)?;
                 return Ok(Self::YangLibrary(Arc::new(yang_lib)));
             }
-            let data = parser.copy_buffer_till(b"data")?;
+            let data = parser.copy_buffer_till("data")?;
             // close data
             parser.close()?;
             return Ok(Self::Data(data));
@@ -1884,7 +1884,7 @@ impl<'a> XmlDeserialize<'a, ErrorInfo> for ErrorInfo {
         loop {
             if let Event::End(end) = parser.peek() {
                 let (ns, local) = parser.ns_reader().resolver().resolve(end.name(), true);
-                if ns == ResolveResult::Bound(NETCONF_NS) && local.into_inner() == b"error-info" {
+                if ns == ResolveResult::Bound(NETCONF_NS) && local.into_inner() == "error-info" {
                     break;
                 } else {
                     parser.skip()?;
