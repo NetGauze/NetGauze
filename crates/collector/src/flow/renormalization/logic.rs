@@ -114,7 +114,8 @@ fn calculate_renormalization_factor(
     if let Some(alg) = params.selector_algorithm_304 {
         match alg {
             selectorAlgorithm::SystematiccountbasedSampling => {
-                // should have fields samplingPacketInterval and samplingPacketSpace
+                // should have fields samplingPacketInterval and
+                // samplingPacketSpace
                 if let (Some(interval), Some(space)) = (
                     params.sampling_packet_interval_305,
                     params.sampling_packet_space_306,
@@ -323,7 +324,8 @@ fn renormalize_fields(
 
     stats.flows_processed.add(1, stats_tags);
 
-    // we expect records that have been already enriched with packet sampling IEs
+    // we expect records that have been already enriched with packet sampling
+    // IEs
     for field in &fields {
         match field {
             Field::samplingInterval(v) => params.sampling_interval_34 = Some(*v),
@@ -384,9 +386,9 @@ pub(crate) fn renormalize(
     stats: &RenormalizationStats,
     stats_tags: &[KeyValue],
 ) -> FlowInfo {
-    // If there is any packet sampling information in the packet, then we adjust the
-    // flow packets and bytes and then add the isRenormalized boolean field to
-    // true. Otherwise, we leave the flow as is.
+    // If there is any packet sampling information in the packet, then we adjust
+    // the flow packets and bytes and then add the isRenormalized boolean
+    // field to true. Otherwise, we leave the flow as is.
     match info {
         FlowInfo::NetFlowV9(pkt) => {
             let sys_up_time = pkt.sys_up_time();

@@ -249,8 +249,8 @@ impl NetconfYangLibraryFetcher {
             ssh_handler,
             Arc::clone(&cfg.client_config),
         );
-        // Empty subscription info returned in case of errors to keep track of peer and
-        // subscription ID
+        // Empty subscription info returned in case of errors to keep track of
+        // peer and subscription ID
         let empty = SubscriptionInfo::new_empty(
             collector,
             interface.clone().map(String::from),
@@ -286,7 +286,8 @@ impl NetconfYangLibraryFetcher {
                     match &stream_target.filter {
                         StreamSelectionFilterObjects::ByReference(name) => {
                             // references are resolved in the NETCONF client,
-                            // if we reach this point, there must be a misconfigured router,
+                            // if we reach this point, there must be a
+                            // misconfigured router,
                             return Err((
                                 empty,
                                 YangLibraryCacheError::IoError(std::io::Error::other(format!(

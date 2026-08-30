@@ -314,7 +314,8 @@ fn test_enrich_netflowv9_with_cached_metadata() {
         }]),
     ));
 
-    // Create expected enriched flow — same structure with enrichment fields added
+    // Create expected enriched flow — same structure with enrichment fields
+    // added
     let expected_flow = FlowInfo::NetFlowV9(NetFlowV9Packet::new(
         1000,
         unix_time,

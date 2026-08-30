@@ -91,10 +91,11 @@ impl From<BgpRouteRefreshMessageParsingError> for RouteRefreshError {
     fn from(_value: BgpRouteRefreshMessageParsingError) -> Self {
         // Mapping all RouteRefresh errors to invalid length
         // TODO implement RFC 7313 error handling: If the length, excluding the
-        // fixed-size message header, of the received ROUTE-REFRESH message with Message
-        // Subtype 1 and 2 is not 4, then the BGP speaker MUST send a NOTIFICATION
-        // message with the Error Code of "ROUTE-REFRESH Message Error" and the subcode
-        // of "Invalid Message Length". The Data field of the NOTIFICATION message MUST
+        // fixed-size message header, of the received ROUTE-REFRESH message with
+        // Message Subtype 1 and 2 is not 4, then the BGP speaker MUST
+        // send a NOTIFICATION message with the Error Code of
+        // "ROUTE-REFRESH Message Error" and the subcode of "Invalid
+        // Message Length". The Data field of the NOTIFICATION message MUST
         // obtain the complete ROUTE-REFRESH message.
         RouteRefreshError::InvalidMessageLength {
             value: vec![].into(),

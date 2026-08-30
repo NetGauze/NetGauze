@@ -116,8 +116,8 @@ impl XmlDeserialize<'_, Filters> for Filters {
                 let selection_filter = SelectionFilter::xml_deserialize(parser)?;
                 selection_filters.push(selection_filter);
             } else {
-                // Could be an IETF or vendor-specific extension that we don't understand,
-                // skip it
+                // Could be an IETF or vendor-specific extension that we don't
+                // understand, skip it
                 parser.skip()?;
             }
             parser.skip_text()?;

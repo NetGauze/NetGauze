@@ -372,7 +372,8 @@ where
                     Err((err, rec)) => {
                         match err {
                             KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) => {
-                                // Exponential backoff when the librdkafka is full
+                                // Exponential backoff when the librdkafka is
+                                // full
                                 if polling_interval > MAX_POLLING_INTERVAL {
                                     error!("Kafka polling interval exceeded, dropping record");
                                     self.stats.error_send.add(

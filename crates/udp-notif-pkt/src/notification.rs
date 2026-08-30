@@ -1075,7 +1075,8 @@ mod tests {
         let deserialized_envelope: NotificationEnvelope =
             serde_json::from_value(serialized_envelope).expect("Deserialization failed");
 
-        // Assert that the deserialized NotificationEnvelope matches the original
+        // Assert that the deserialized NotificationEnvelope matches the
+        // original
         assert_eq!(notification_envelope, deserialized_envelope);
     }
 
@@ -1276,7 +1277,8 @@ mod tests {
         let deserialized_envelope: NotificationEnvelope =
             serde_json::from_value(serialized_envelope).expect("Deserialization failed");
 
-        // Assert that the deserialized NotificationEnvelope matches the original
+        // Assert that the deserialized NotificationEnvelope matches the
+        // original
         assert_eq!(notification_envelope, deserialized_envelope);
     }
 
@@ -1442,7 +1444,8 @@ mod tests {
         let deserialized_envelope: NotificationEnvelope =
             serde_json::from_value(serialized_envelope).expect("Deserialization failed");
 
-        // Assert that the deserialized NotificationEnvelope matches the original
+        // Assert that the deserialized NotificationEnvelope matches the
+        // original
         assert_eq!(notification_envelope, deserialized_envelope);
     }
 

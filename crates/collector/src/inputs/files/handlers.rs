@@ -78,8 +78,8 @@ impl FilesLineHandler<crate::flow::enrichment::EnrichmentOperation> for FlowUpse
                 )])
             }
             LineChangeType::Removed => {
-                // If line was removed: generate delete payload from upsert payload (one-way
-                // conversion)
+                // If line was removed: generate delete payload from upsert
+                // payload (one-way conversion)
                 let delete: crate::flow::enrichment::DeletePayload = upsert.into();
                 Ok(vec![crate::flow::enrichment::EnrichmentOperation::Delete(
                     delete,
@@ -141,8 +141,8 @@ impl FilesLineHandler<crate::yang_push::EnrichmentOperation> for YangPushUpserts
                 Ok(vec![crate::yang_push::EnrichmentOperation::Upsert(upsert)])
             }
             LineChangeType::Removed => {
-                // If line was removed: generate delete payload from upsert payload (one-way
-                // conversion)
+                // If line was removed: generate delete payload from upsert
+                // payload (one-way conversion)
                 let delete: crate::yang_push::DeletePayload = upsert.into();
                 Ok(vec![crate::yang_push::EnrichmentOperation::Delete(delete)])
             }
@@ -562,7 +562,8 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
             .unwrap();
         result.sort();
 
-        // Should generate two operations: one for ingress VRF, one for egress VRF
+        // Should generate two operations: one for ingress VRF, one for egress
+        // VRF
         assert_eq!(result.len(), 2);
 
         let mut expected = vec![

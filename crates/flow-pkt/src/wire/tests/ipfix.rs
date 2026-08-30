@@ -1876,10 +1876,10 @@ fn test_octet_array_variable_length() -> Result<(), IpfixPacketWritingError> {
 
 #[test]
 fn test_padding_min_length_issue_360() -> Result<(), IpfixPacketWritingError> {
-    // data packet with one padding byte after an u8 field, and 3 variable lengths
-    // strings. This test ensures that the padding byte is correctly handled
-    // when calculating the min record value and the single padding octet is not
-    // considered a new data record.
+    // data packet with one padding byte after an u8 field, and 3 variable
+    // lengths strings. This test ensures that the padding byte is correctly
+    // handled when calculating the min record value and the single padding
+    // octet is not considered a new data record.
     let data_wire = [
         0x00, 0x0a, 0x00, 0x51, 0x69, 0x49, 0x2a, 0x58, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
         0x00, 0x01, 0xf4, 0x00, 0x41, 0xee, 0x07, 0x73, 0x6f, 0x6d, 0x65, 0x2d, 0x69, 0x64, 0x17,

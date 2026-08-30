@@ -188,8 +188,8 @@ pub fn parse_val_name_desc_u8_registry(node: &Node<'_, '_>) -> (u16, Vec<ValueNa
         // Populate name, display_name, and description
         // - name is always a usable enum variant type name (if not there in the
         //   registry, take it from the description)
-        // - display_name matches the IANA registry name (apart from when name is
-        //   populated from description field)
+        // - display_name matches the IANA registry name (apart from when name
+        //   is populated from description field)
         let mut name: String;
         let mut display_name: String;
         let description: String;

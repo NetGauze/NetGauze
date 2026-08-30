@@ -276,7 +276,8 @@ async fn test_subscription_unsubscribe() {
         .await
         .expect("failed to send test BMP message");
 
-    // The receiving channel should now be closed by the sender (actor dropped tx)
+    // The receiving channel should now be closed by the sender (actor dropped
+    // tx)
     timeout(Duration::from_millis(200), rx.recv())
         .await
         .expect("Timed out waiting for channel closure")
@@ -286,8 +287,8 @@ async fn test_subscription_unsubscribe() {
 #[tokio::test]
 #[tracing_test::traced_test]
 async fn test_subscription_updates_existing_connection() {
-    // This test ensures that an existing connection picks up new subscriptions via
-    // the broadcast channel
+    // This test ensures that an existing connection picks up new subscriptions
+    // via the broadcast channel
     let meter = opentelemetry::global::meter("test_subs_update");
     let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
     let (_join_handle, handle) = BmpActorHandle::new(

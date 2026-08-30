@@ -188,8 +188,8 @@ impl YangLibrary {
                 topo_sort
             );
         }
-        // safe to unwrap since we constructed the graph above and checked the root
-        // module exists
+        // safe to unwrap since we constructed the graph above and checked the
+        // root module exists
         let root_index = root_index.unwrap();
         let mut supplied_references: HashMap<
             &str,
@@ -342,9 +342,11 @@ impl YangLibrary {
         let registered_schema_result = client.register_schema(&subject, schema, false).await;
         let registered_schema = match registered_schema_result {
             Ok(registered_schema) => {
-                // version number is only returned from schema registry 7.4 and higher
-                // older versions don't return the version number, thus we need to make
-                // more calls to the schema registry to obtain the version number.
+                // version number is only returned from schema registry 7.4 and
+                // higher older versions don't return the
+                // version number, thus we need to make
+                // more calls to the schema registry to obtain the version
+                // number.
                 if registered_schema.version.is_none() {
                     let schema = client
                         .get_by_subject_and_id(Some(&subject), registered_schema.id.unwrap(), None)
@@ -1872,8 +1874,8 @@ impl ModuleSetBuilder {
     where
         C: BackwardCompatibilityChecker,
     {
-        // Check the module which is the submodule is attached to is already defined in
-        // the module set.
+        // Check the module which is the submodule is attached to is already
+        // defined in the module set.
         let module = if let Some(module) = self.module_set.modules.get(module_name) {
             module
         } else {
@@ -2668,7 +2670,8 @@ mod tests {
 
     #[test]
     fn test_rfc8525_appendix_c_advanced_server_serde() {
-        // RFC 8525 Appendix C - Example YANG Library Instance for an Advanced Server
+        // RFC 8525 Appendix C - Example YANG Library Instance for an Advanced
+        // Server
         let xml = r#"<yang-library
        xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library"
        xmlns:ds="urn:ietf:params:xml:ns:yang:ietf-datastores">

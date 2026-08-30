@@ -322,7 +322,8 @@ fn roundtrip_within_wrapper<
         "Deserialized value differs:\n  expected: {expected:#?}\n  parsed:   {parsed:#?}"
     );
 
-    // 2. Serialize the expected value back out, then re-parse to confirm round-trip
+    // 2. Serialize the expected value back out, then re-parse to confirm
+    //    round-trip
     let serialized = serialize_within_wrapper(&expected, wrapper_ns, wrapper_tag);
     let reparsed: T = parse_within_wrapper(&serialized, wrapper_ns, wrapper_tag)
         .expect("re-deserialization from serialized output failed");

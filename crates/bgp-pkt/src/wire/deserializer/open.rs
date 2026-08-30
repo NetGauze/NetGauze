@@ -80,10 +80,10 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessage {
 
         let my_as = cur.read_u16_be()?;
         let hold_time = cur.peek_u16_be()?;
-        // RFC 4271: If the Hold Time field of the OPEN message is unacceptable, then
-        // the Error Subcode MUST be set to Unacceptable Hold Time. An implementation
-        // MUST reject Hold Time values of one or two seconds. An implementation MAY
-        // reject any proposed Hold Time.
+        // RFC 4271: If the Hold Time field of the OPEN message is unacceptable,
+        // then the Error Subcode MUST be set to Unacceptable Hold Time.
+        // An implementation MUST reject Hold Time values of one or two
+        // seconds. An implementation MAY reject any proposed Hold Time.
         if hold_time == 1 || hold_time == 2 {
             return Err(BgpOpenMessageParsingError::UnacceptableHoldTime {
                 offset: cur.offset() - 2,
@@ -95,11 +95,12 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessage {
 
         let bgp_id = cur.peek_u32_be()?;
         let bgp_id = Ipv4Addr::from(bgp_id);
-        // RFC 4271: If the BGP Identifier field of the OPEN message is syntactically
-        // incorrect, then the Error Subcode MUST be set to Bad BGP Identifier.
-        // Syntactic correctness means that the BGP Identifier field represents
-        // a valid unicast IP host address. NOTE: not all BGP implementation
-        // check for syntactic correctness
+        // RFC 4271: If the BGP Identifier field of the OPEN message is
+        // syntactically incorrect, then the Error Subcode MUST be set
+        // to Bad BGP Identifier. Syntactic correctness means that the
+        // BGP Identifier field represents a valid unicast IP host
+        // address. NOTE: not all BGP implementation check for syntactic
+        // correctness
         if bgp_id.is_broadcast() || bgp_id.is_multicast() || bgp_id.is_unspecified() {
             return Err(BgpOpenMessageParsingError::InvalidBgpId {
                 offset: cur.offset(),
@@ -169,8 +170,9 @@ fn parse_capability_param<'a>(
             }
             Err(err) => {
                 if !ctx.fail_on_capability_error {
-                    // RFC 5492 defines that a BGP speaker should ignore capabilities it
-                    // does not understand and not report any error.
+                    // RFC 5492 defines that a BGP speaker should ignore
+                    // capabilities it does not understand
+                    // and not report any error.
                     // It will only report a notification if the capability is
                     // understood but not supported by the speaker
                     ctx.parsing_errors.capability_errors.push(err);

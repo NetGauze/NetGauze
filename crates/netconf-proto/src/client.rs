@@ -769,8 +769,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
         if let Some(RpcResponse::WellKnown(WellKnownRpcResponse::Data(data))) =
             rpc_reply.reply().responses()
         {
-            // Parse the response streams if any returned, filters if any returned
-            // and then the subscription details
+            // Parse the response streams if any returned, filters if any
+            // returned and then the subscription details
             let mut reader = NsReader::from_str(data);
             reader.config_mut().trim_text(true);
             let mut parser = crate::xml_utils::XmlParser::new(reader)?;

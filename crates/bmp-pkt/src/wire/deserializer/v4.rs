@@ -181,7 +181,8 @@ impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v4::RouteMonitori
         bgp_ctx.set_asn4(peer_header.is_asn4());
 
         // Determine if we need to track Adj-RIB-Out based on Peer Type,
-        // which is useful to select ADD-Path behavior for either sending or receive
+        // which is useful to select ADD-Path behavior for either sending or
+        // receive
         let adj_rib_out = match peer_header.peer_type() {
             BmpPeerType::GlobalInstancePeer { adj_rib_out, .. }
             | BmpPeerType::RdInstancePeer { adj_rib_out, .. }
@@ -190,16 +191,17 @@ impl<'a> ParseFromWithOneInput<'a, &mut BmpParsingContext> for v4::RouteMonitori
         };
 
         // Context represents what we learnt from the BGP Open
-        // We do not want to alter it permanently based on TLVs that are punctual in the
-        // messages
+        // We do not want to alter it permanently based on TLVs that are
+        // punctual in the messages
         let mut ctx_clone = bgp_ctx.clone();
 
         let (update_pdu, tlvs) = {
             let mut tlvs = Vec::new();
             let mut bgp_pdu = None;
             while !cur.is_empty() {
-                // Peek the TLV Type, if we have a BGP PDU we keep it for later and we'll decode
-                // it when we've decoded all the Stateless Parsing TLVs on which
+                // Peek the TLV Type, if we have a BGP PDU we keep it for later
+                // and we'll decode it when we've decoded all
+                // the Stateless Parsing TLVs on which
                 // the PDU decoding depends
                 match cur.peek_u16_be()? {
                     tlv_type if tlv_type == v4::RouteMonitoringTlvType::BgpUpdatePdu as u16 => {
@@ -284,8 +286,8 @@ impl<'a> ParseFromWithTwoInputs<'a, &mut BgpParsingContext, bool> for v4::RouteM
         adj_rib_out: bool,
     ) -> Result<Self, Self::Error> {
         let offset = cur.offset();
-        // Can't use read_tlv_header_t16_l16 because Index is in the middle of the
-        // header and not counted in Length
+        // Can't use read_tlv_header_t16_l16 because Index is in the middle of
+        // the header and not counted in Length
         let tlv_type = cur.read_u16_be()?;
         let tlv_length = cur.read_u16_be()?;
         let index = cur.read_u16_be()?;

@@ -361,7 +361,8 @@ where
             };
 
         // Load and register provided custom schemas
-        // (custom schemas are already extended with the telemetry-message schema)
+        // (custom schemas are already extended with the telemetry-message
+        // schema)
         let mut schema_id_cache = HashMap::new();
 
         for yang_lib_ref in custom_schemas.values() {

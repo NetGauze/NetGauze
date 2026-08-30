@@ -228,8 +228,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv4MplsVpnUnicastAddr
         } else {
             prefix_len.div_ceil(8)
         };
-        // consuming only the bytes specified by the prefix length field, since MPLS
-        // stack is read until the last bit is set.
+        // consuming only the bytes specified by the prefix length field, since
+        // MPLS stack is read until the last bit is set.
         let mut prefix_buf = cur.take_slice(prefix_bytes as usize)?;
         let label_stack =
             parse_mpls_label_stack(&mut prefix_buf, is_unreach, multiple_labels_limit)?;
@@ -305,8 +305,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv6MplsVpnUnicastAddr
         } else {
             prefix_len.div_ceil(8)
         };
-        // consuming only the bytes specified by the prefix length field, since MPLS
-        // stack is read until the last bit is set.
+        // consuming only the bytes specified by the prefix length field, since
+        // MPLS stack is read until the last bit is set.
         let mut prefix_buf = cur.take_slice(prefix_bytes as usize)?;
         let label_stack =
             parse_mpls_label_stack(&mut prefix_buf, is_unreach, multiple_labels_limit)?;

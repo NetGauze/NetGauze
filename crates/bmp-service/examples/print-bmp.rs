@@ -23,9 +23,9 @@ use tower::buffer::Buffer;
 use netgauze_bmp_service::handle::BmpServerHandle;
 
 fn init_tracing() {
-    // Very simple setup at the moment to validate the instrumentation in the code
-    // is working in the future that should be configured automatically based on
-    // configuration options
+    // Very simple setup at the moment to validate the instrumentation in the
+    // code is working in the future that should be configured automatically
+    // based on configuration options
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(tracing::Level::TRACE)
         .finish();

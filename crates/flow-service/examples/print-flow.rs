@@ -9,9 +9,9 @@ use tokio_util::udp::UdpFramed;
 use tracing::info;
 
 fn init_tracing() {
-    // Very simple setup at the moment to validate the instrumentation in the code
-    // is working in the future that should be configured automatically based on
-    // configuration options
+    // Very simple setup at the moment to validate the instrumentation in the
+    // code is working in the future that should be configured automatically
+    // based on configuration options
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(tracing::Level::TRACE)
         .finish();
@@ -31,8 +31,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     while let Some(next) = stream.next().await {
         match next {
             Ok((mut buf, addr)) => {
-                // If we haven't seen the client before, create a new FlowInfoCodec for it.
-                // FlowInfoCodec handles the decoding/encoding of packets and caches
+                // If we haven't seen the client before, create a new
+                // FlowInfoCodec for it. FlowInfoCodec handles
+                // the decoding/encoding of packets and caches
                 // the templates learned from the client
                 let result = clients
                     .entry(addr)

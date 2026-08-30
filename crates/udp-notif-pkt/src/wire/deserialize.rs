@@ -46,7 +46,8 @@ impl<'a> ParseFrom<'a> for UdpNotifOption {
                 let high = value.read_u8()?;
                 let low = value.read_u8()?;
                 let number = ((high as u16) << 7) | ((low as u16) >> 1);
-                // Extract the L flag (the least significant bit of the last byte)
+                // Extract the L flag (the least significant bit of the last
+                // byte)
                 let last = (low & 0x01) != 0;
                 Ok(UdpNotifOption::Segment { number, last })
             }

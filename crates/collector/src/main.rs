@@ -245,7 +245,8 @@ fn main() -> anyhow::Result<()> {
         std::process::exit(0);
     }
 
-    // Safe to unwrap: clap guarantees config_file is Some when --version is absent
+    // Safe to unwrap: clap guarantees config_file is Some when --version is
+    // absent
     let config_file = args.config_file.unwrap();
     let file = File::open(&config_file)?;
     let reader = BufReader::new(file);
