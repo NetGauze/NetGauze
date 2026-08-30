@@ -3252,7 +3252,8 @@ mod tests {
 
     #[test]
     fn test_yang_library_rfc8525() -> Result<(), ParsingError> {
-        // RFC 8525 Appendix C - Example YANG Library Instance for an Advanced Server
+        // RFC 8525 Appendix C - Example YANG Library Instance for an Advanced
+        // Server
         let library_str = r#"<yang-library xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library" xmlns:ds="urn:ietf:params:xml:ns:yang:ietf-datastores">
      <module-set>
        <name>state-only-modules</name>

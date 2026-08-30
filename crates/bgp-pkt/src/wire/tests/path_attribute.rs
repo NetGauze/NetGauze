@@ -2004,8 +2004,8 @@ fn test_mp_reach_multi_labels_vp_ipv4() -> Result<(), PathAttributeWritingError>
         &good,
     );
 
-    // Test with no limit spec, should default to one label and fail since there's
-    // two labels
+    // Test with no limit spec, should default to one label and fail since
+    // there's two labels
     test_parse_error_with_one_input_bytes_reader::<
         PathAttribute,
         &mut BgpParsingContext,

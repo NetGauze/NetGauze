@@ -83,9 +83,9 @@ fn main() {
         ]
     );
 
-    // Deserialize the message from binary format (this will also add the Template
-    // to templates_map, otherwise the packet will be generated with all the
-    // default lengths)
+    // Deserialize the message from binary format (this will also add the
+    // Template to templates_map, otherwise the packet will be generated
+    // with all the default lengths)
     let msg_back = IpfixPacket::parse(&mut SliceReader::new(&buf), &mut templates_map).unwrap();
     assert_eq!(ipfix_template, msg_back);
 

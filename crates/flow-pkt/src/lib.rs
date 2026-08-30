@@ -277,8 +277,8 @@ mod tests {
         assert!(!IE::ipv6ExtensionHeadersFull.supports_arithmetic_ops());
         assert!(IE::mibObjectValueInteger.supports_arithmetic_ops());
         assert!(IE::absoluteError.supports_arithmetic_ops());
-        // numbers that are identifiers, flags, or have subregistries don't support
-        // arithmetic ops
+        // numbers that are identifiers, flags, or have subregistries don't
+        // support arithmetic ops
         assert!(!IE::ipClassOfService.supports_arithmetic_ops());
         assert!(!IE::egressInterface.supports_arithmetic_ops());
         assert!(!IE::forwardingStatus.supports_arithmetic_ops());
@@ -310,8 +310,8 @@ mod tests {
         assert!(IE::postMCastPacketDeltaCount.supports_bitwise_ops());
         assert!(IE::ipv6ExtensionHeadersFull.supports_bitwise_ops());
         assert!(IE::mibObjectValueInteger.supports_bitwise_ops());
-        // numbers that are identifiers, flags, or have subregistries support bitwise
-        // ops
+        // numbers that are identifiers, flags, or have subregistries support
+        // bitwise ops
         assert!(IE::ipClassOfService.supports_bitwise_ops());
         assert!(IE::egressInterface.supports_bitwise_ops());
         assert!(IE::forwardingStatus.supports_bitwise_ops());
@@ -339,8 +339,8 @@ mod tests {
         assert!(IE::postMCastPacketDeltaCount.supports_comparison_ops());
         assert!(!IE::ipv6ExtensionHeadersFull.supports_comparison_ops());
         assert!(IE::mibObjectValueInteger.supports_comparison_ops());
-        // numbers that are identifiers, flags, or have subregistries support comparison
-        // ops
+        // numbers that are identifiers, flags, or have subregistries support
+        // comparison ops
         assert!(IE::ipClassOfService.supports_comparison_ops());
         assert!(IE::egressInterface.supports_comparison_ops());
         assert!(IE::forwardingStatus.supports_comparison_ops());

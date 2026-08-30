@@ -341,9 +341,9 @@ impl FlowCollectorActor {
     /// decoding error), it logs the error and returns None.
     pub fn decode_pkt(&mut self, next: (BytesMut, SocketAddr)) -> Option<FlowRequest> {
         let (mut buf, addr) = next;
-        // If we haven't seen the client before, create a new FlowInfoCodec for it.
-        // FlowInfoCodec handles the decoding/encoding of packets and caches
-        // the templates learned from the client
+        // If we haven't seen the client before, create a new FlowInfoCodec for
+        // it. FlowInfoCodec handles the decoding/encoding of packets
+        // and caches the templates learned from the client
         let mut attrs = vec![
             opentelemetry::KeyValue::new("netgauze.flow.actor", format!("{}", self.actor_id)),
             opentelemetry::KeyValue::new("network.peer.address", format!("{}", addr.ip())),
@@ -421,8 +421,8 @@ impl FlowCollectorActor {
         sent_counter: opentelemetry::metrics::Counter<u64>,
         drop_counter: opentelemetry::metrics::Counter<u64>,
     ) {
-        // The send operation is bounded by timeout period to avoid blocking on a slow
-        // subscriber.
+        // The send operation is bounded by timeout period to avoid blocking on
+        // a slow subscriber.
         let ref_clone = pkt.clone();
         let drop_counter_clone = drop_counter.clone();
         let timeout_ret = tokio::time::timeout(timeout, async move {
@@ -540,7 +540,8 @@ impl FlowCollectorActor {
                 );
                 send_handlers.push(send_handler);
             }
-            // Avoid blocking on sending the packet to the subscribers, and focus on
+            // Avoid blocking on sending the packet to the subscribers, and
+            // focus on
             futures::future::join_all(send_handlers).await;
         }
     }
@@ -841,7 +842,8 @@ impl FlowCollectorActor {
                 ));
             }
         };
-        // Get the local address of the socket, handy in cases where the port is 0
+        // Get the local address of the socket, handy in cases where the port is
+        // 0
         self.socket_addr = socket.local_addr().map_err(|err| {
             FlowCollectorActorError::GetLocalAddressError(self.actor_id, socket_addr, err)
         })?;
@@ -1080,8 +1082,8 @@ impl FlowCollectorActorHandle {
         duration: Duration,
     ) -> Result<Vec<SocketAddr>, FlowCollectorActorHandleError> {
         let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
-        // If the command fails, the recv after will fail, no need to double handle the
-        // error
+        // If the command fails, the recv after will fail, no need to double
+        // handle the error
         self.cmd_tx
             .send(FlowCollectorActorCommand::PurgeUnusedPeers(duration, tx))
             .await

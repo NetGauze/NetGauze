@@ -278,8 +278,8 @@ impl UdpNotifActor {
         next: (BytesMut, SocketAddr),
     ) -> Option<(SocketAddr, UdpNotifPacket)> {
         let (mut buf, addr) = next;
-        // If we haven't seen the client before, create a new UdpPacketCodec for it.
-        // UdpPacketCodec handles the decoding/encoding of packets.
+        // If we haven't seen the client before, create a new UdpPacketCodec for
+        // it. UdpPacketCodec handles the decoding/encoding of packets.
         let result = self.clients.entry(addr).or_default().decode(&mut buf);
         match result {
             Ok(Some(pkt)) => {
@@ -367,8 +367,8 @@ impl UdpNotifActor {
         sent_counter: opentelemetry::metrics::Counter<u64>,
         drop_counter: opentelemetry::metrics::Counter<u64>,
     ) {
-        // The send operation is bounded by timeout period to avoid blocking on a slow
-        // subscriber.
+        // The send operation is bounded by timeout period to avoid blocking on
+        // a slow subscriber.
         let ref_clone = msg.clone();
         let drop_counter_clone = drop_counter.clone();
         let peer = msg.peer_address();
@@ -804,7 +804,8 @@ impl UdpNotifActor {
             .map_err(|err| {
                 UdpNotifActorError::SocketBindError(self.actor_id, self.socket_addr, err)
             })?;
-        // Get the local address of the socket, handy in cases where the port is 0
+        // Get the local address of the socket, handy in cases where the port is
+        // 0
         self.socket_addr = socket.local_addr().map_err(|err| {
             UdpNotifActorError::GetLocalAddressError(self.actor_id, self.socket_addr, err)
         })?;
@@ -1004,8 +1005,8 @@ impl ActorHandle {
         duration: Duration,
     ) -> Result<Vec<SocketAddr>, ActorHandleError> {
         let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
-        // If the command fails, the recv after will fail, no need to double handle the
-        // error
+        // If the command fails, the recv after will fail, no need to double
+        // handle the error
         self.cmd_tx
             .send(ActorCommand::PurgeUnusedPeers(duration, tx))
             .await

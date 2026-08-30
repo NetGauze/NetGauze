@@ -130,11 +130,12 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
         // Spawn a task to print received BMP messages
         tokio::spawn(async move {
             while let Ok(pkt) = pkt_rx.recv().await {
-                // pkt: Arc<BmpRequest> where BmpRequest = (AddrInfo, BmpMessage)
+                // pkt: Arc<BmpRequest> where BmpRequest = (AddrInfo,
+                // BmpMessage)
                 let (addrinfo, bmp_msg) = &*pkt;
 
-                // try to produce a JSON representation of the BMP message, fall back to debug
-                // if serialization fails
+                // try to produce a JSON representation of the BMP message, fall
+                // back to debug if serialization fails
                 let json_msg = match serde_json::to_string(&bmp_msg) {
                     Ok(s) => s,
                     Err(e) => {
@@ -143,8 +144,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
                     }
                 };
 
-                // use tracing structured fields and print AddrInfo inside brackets plus the
-                // JSON message
+                // use tracing structured fields and print AddrInfo inside
+                // brackets plus the JSON message
                 tracing::info!(
                     local_addr = %addrinfo.local_socket(),
                     peer_addr = %addrinfo.remote_socket(),

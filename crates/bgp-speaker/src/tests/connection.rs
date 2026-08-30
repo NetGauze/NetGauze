@@ -411,8 +411,8 @@ async fn test_open_confirm_hold_timer_expires() -> io::Result<()> {
     let event = connection.handle_event(&mut policy, event).await;
     assert_eq!(event, Ok(ConnectionEvent::KeepAliveTimerExpires));
 
-    // Receive and handle HoldTimer expire after multiple Keep Alive messages sent
-    // without response
+    // Receive and handle HoldTimer expire after multiple Keep Alive messages
+    // sent without response
     let event =
         tokio::time::timeout(Duration::from_secs(hold_time_seconds), connection.next()).await;
     assert_eq!(event, Ok(Some(ConnectionEvent::HoldTimerExpires)));

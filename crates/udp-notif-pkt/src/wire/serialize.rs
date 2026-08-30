@@ -33,8 +33,8 @@ impl WritablePdu<UdpNotifOptionWritingError> for UdpNotifOption {
     fn len(&self) -> usize {
         match self {
             UdpNotifOption::Segment { .. } => {
-                // base length + two octets for segment length of which the last bit is a `last
-                // segment` flag
+                // base length + two octets for segment length of which the last
+                // bit is a `last segment` flag
                 Self::BASE_LENGTH + 2
             }
             UdpNotifOption::PrivateEncoding(value) => Self::BASE_LENGTH + value.len(),

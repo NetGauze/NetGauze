@@ -51,7 +51,8 @@ fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
     use tracing_subscriber::{EnvFilter, fmt};
 
     // Set up the log -> tracing bridge first
-    // tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");
+    // tracing_log::LogTracer::init().expect("Failed to initialize tracing
+    // logger");
 
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))

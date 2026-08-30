@@ -201,7 +201,8 @@ fn get_vmware_config(
         954,
     )];
 
-    // // Protocol Numbers SubRegistry Path is either loaded from IANA or locally
+    // // Protocol Numbers SubRegistry Path is either loaded from IANA or
+    // locally
     if poll_iana_registry {
         external_sub_registries.push(ExternalSubRegistrySource::new(
             RegistrySource::Http(PROTOCOL_NUMBERS_URL.to_string()),

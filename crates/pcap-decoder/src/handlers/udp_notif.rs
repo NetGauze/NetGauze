@@ -50,8 +50,8 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                 .or_insert((UdpPacketCodec::default(), BytesMut::new()));
             buffer.extend_from_slice(packet_data);
 
-            // because of implementation specification UDP-Notif exports maximum 1 message
-            // per packet payload
+            // because of implementation specification UDP-Notif exports maximum
+            // 1 message per packet payload
             let mut results = Vec::new();
             decode_buffer(buffer, codec, flow_key, &mut results);
             if !results.is_empty() {
@@ -70,7 +70,8 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                 let (flow_key, udp_notif_packet) = m;
                 let mut value = serde_json::to_value(&udp_notif_packet)
                     .expect("Couldn't serialize UDP-Notif message to json");
-                // Convert when possible inner payload into human-readable format
+                // Convert when possible inner payload into human-readable
+                // format
                 match udp_notif_packet.media_type() {
                     MediaType::YangDataJson => {
                         let payload = serde_json::from_slice(&udp_notif_packet.payload())
@@ -185,10 +186,12 @@ mod tests {
             &packet_data1,
             &mut exporter_peers,
         );
-        // UDP is datagram oriented, so the codec will wait for the full datagram.
-        // The test setup simulates fragmentation at a higher level.
+        // UDP is datagram oriented, so the codec will wait for the full
+        // datagram. The test setup simulates fragmentation at a higher
+        // level.
         assert!(result1.is_none());
-        // The buffer for this flow key should now contain the first part, so not empty
+        // The buffer for this flow key should now contain the first part, so
+        // not empty
         assert!(!exporter_peers.get(&flow_key).unwrap().1.is_empty());
 
         let result2 = handler.decode(

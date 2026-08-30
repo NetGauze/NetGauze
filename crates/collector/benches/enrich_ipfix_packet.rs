@@ -172,8 +172,8 @@ fn create_enrichment_cache(peer_ip: IpAddr, cache_scale: u32) -> EnrichmentCache
         }
     }
 
-    // Add combined ingress+egress scopes for a small subset (only for obs_domain_id
-    // 10)
+    // Add combined ingress+egress scopes for a small subset (only for
+    // obs_domain_id 10)
     for ingress_if in 100..(110) {
         for egress_if in 200..(210) {
             cache.apply_enrichment(EnrichmentOperation::Upsert(UpsertPayload {

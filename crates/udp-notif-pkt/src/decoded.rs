@@ -392,8 +392,8 @@ mod tests {
         let packet =
             UdpNotifPacket::new(MediaType::Unknown(99), 1234, 5678, HashMap::new(), payload);
 
-        // Attempt to decode the packet (will throw an error since the media type is
-        // unknown)
+        // Attempt to decode the packet (will throw an error since the media
+        // type is unknown)
         let result = UdpNotifPacketDecoded::try_from(&packet);
         assert!(matches!(
             result,
@@ -408,8 +408,8 @@ mod tests {
         let packet =
             UdpNotifPacket::new(MediaType::YangDataJson, 1234, 5678, HashMap::new(), payload);
 
-        // Attempt to decode the packet (will throw an error since the payload is not
-        // valid JSON)
+        // Attempt to decode the packet (will throw an error since the payload
+        // is not valid JSON)
         let result = UdpNotifPacketDecoded::try_from(&packet);
 
         assert!(

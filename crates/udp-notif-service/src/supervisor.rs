@@ -134,8 +134,9 @@ impl UdpNotifSupervisor {
             let awaited = futures::future::select_all(handles);
             handles = match awaited.await {
                 (Ok(ret), _, rest) => {
-                    // TODO(AH): Have some policy to allow to restart actors or terminate supervisor
-                    //           if failed
+                    // TODO(AH): Have some policy to allow to restart actors or
+                    // terminate supervisor           if
+                    // failed
                     if let Err(err) = ret {
                         error!("[Supervisor] actor terminated with error: {}", err);
                     }

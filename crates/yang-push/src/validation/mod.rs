@@ -526,7 +526,8 @@ impl ValidationActor {
         let publisher_id = packet.publisher_id();
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
 
-        // Decode the UDP-Notif packet to get subscription ID and payload information
+        // Decode the UDP-Notif packet to get subscription ID and payload
+        // information
         match UdpNotifPacketDecoded::try_from(packet) {
             Ok(decoded) => {
                 let notif_contents = decoded.payload().notification_contents();

@@ -82,9 +82,11 @@ impl ProtocolHandler<(BgpMessage, BgpParsingIgnoredErrors), BgpCodec, BgpCodecDe
             DecodeOutcome::Success(m) => {
                 let (flow_key, (bgp_message, bgp_parsing_error)) = m;
                 if !bgp_parsing_error.eq(&BgpParsingIgnoredErrors::default()) {
-                    // the bgp message was parsed with some ignored errors, we will not serialize it
-                    // we will report that some ignored errors were found and that this behavior
-                    // by the CLI tool is not expected
+                    // the bgp message was parsed with some ignored errors, we
+                    // will not serialize it we will report
+                    // that some ignored errors were found and that this
+                    // behavior by the CLI tool is not
+                    // expected
                     return Ok(serde_json::Value::String("Encountered BGP parsing errors that were ignored during the decoding of the bgp message, this behaviour is not expected, please file a bug report to the developers".to_string()));
                 }
                 serialize_success(flow_key, bgp_message)
@@ -174,7 +176,8 @@ mod tests {
             &mut exporter_peers,
         );
         assert!(result1.is_none());
-        // The buffer for this flow key should now contain the first part, so not empty
+        // The buffer for this flow key should now contain the first part, so
+        // not empty
         assert!(!exporter_peers.get(&flow_key).unwrap().1.is_empty());
 
         // Second packet completes it
@@ -272,8 +275,8 @@ mod tests {
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
             179,
         );
-        // The packet data contains a BGP message with some errors that can potentially
-        // be ignored
+        // The packet data contains a BGP message with some errors that can
+        // potentially be ignored
         let packet_data = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0x00, 0x59, 0x02, 0x00, 0x00, 0x00, 0x30, 0x40, 0x01, 0x01,

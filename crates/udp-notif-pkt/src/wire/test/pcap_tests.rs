@@ -98,8 +98,8 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
     let iter = PcapIter::new(Box::new(pcap_reader));
     let mut peers = HashMap::new();
     for (src_ip, src_port, dst_ip, dst_port, protocol, value) in iter {
-        // The filter for 161 is included because n7-sa1_yang-push.pcap have some snmp
-        // traffic
+        // The filter for 161 is included because n7-sa1_yang-push.pcap have
+        // some snmp traffic
         if protocol != TransportProtocol::UDP
             || ![10003, 10100, 57499].contains(&dst_port)
             || src_port == 161
@@ -117,7 +117,8 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                 Ok(Some(msg)) => {
                     let mut udp_notif_value = serde_json::to_value(&msg)
                         .expect("Couldn't serialize UDP-Notif message to json");
-                    // Convert when possible inner payload into human-readable format
+                    // Convert when possible inner payload into human-readable
+                    // format
                     let decoded = UdpNotifPacketDecoded::try_from(&msg)
                         .map_err(|err| format!("Couldn't decode UDP-Notif message: {err}"));
                     match msg.media_type() {
@@ -178,8 +179,8 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                     (udp_notif_value, decoded)
                 }
                 Ok(None) => {
-                    // packet is fragmented, need to read the next PDU first before attempting to
-                    // deserialize it
+                    // packet is fragmented, need to read the next PDU first
+                    // before attempting to deserialize it
                     break;
                 }
                 Err(err) => {
@@ -219,7 +220,8 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                 );
                 let expected = lines.next().expect(&err_msg).expect("Error reading");
 
-                // Compare JSON values to succeed even when key order in string values differs
+                // Compare JSON values to succeed even when key order in string
+                // values differs
                 let expected_json: Value =
                     serde_json::from_str(&expected).expect("Failed to parse expected JSON");
 

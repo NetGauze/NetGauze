@@ -110,8 +110,9 @@ fn parse_nlri<'a>(
                 nlri_vec.push(address);
             }
             Err(err) => {
-                // RFC 4271: If a prefix in the NLRI field is semantically incorrect (e.g., an
-                // unexpected multicast IP address), an error SHOULD be logged locally, and the
+                // RFC 4271: If a prefix in the NLRI field is semantically
+                // incorrect (e.g., an unexpected multicast IP
+                // address), an error SHOULD be logged locally, and the
                 // prefix SHOULD be ignored.
                 if is_update && ctx.fail_on_non_unicast_update_nlri {
                     ctx.parsing_errors.non_unicast_update_nlri.push(ipv4_net);
@@ -364,9 +365,10 @@ fn handle_path_error<'a>(
 
 impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
     fn from(value: BgpUpdateMessageParsingError) -> Self {
-        // For EoF errors we follow: RFC 4271 Error checking of an UPDATE message begins
-        // by examining the path attributes. If the Withdrawn Routes Length or
-        // Total Attribute Length is too large (i.e., if Withdrawn Routes Length
+        // For EoF errors we follow: RFC 4271 Error checking of an UPDATE
+        // message begins by examining the path attributes. If the
+        // Withdrawn Routes Length or Total Attribute Length is too
+        // large (i.e., if Withdrawn Routes Length
         // + Total Attribute Length + 23 exceeds the message Length), then the
         // Error Subcode MUST be set to Malformed Attribute List.
         match value {
@@ -517,11 +519,12 @@ impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
                 }
             }
             BgpUpdateMessageParsingError::InvalidIpv4UnicastNetwork { .. } => {
-                // RFC 4271: If a prefix in the NLRI field is semantically incorrect (e.g., an
-                // unexpected multicast IP address), an error SHOULD be logged locally, and the
+                // RFC 4271: If a prefix in the NLRI field is semantically
+                // incorrect (e.g., an unexpected multicast IP
+                // address), an error SHOULD be logged locally, and the
                 // prefix SHOULD be ignored.
-                // If parser is configured to be strict and this error triggered, then report
-                // Unspecific error
+                // If parser is configured to be strict and this error
+                // triggered, then report Unspecific error
                 UpdateMessageError::Unspecific {
                     value: vec![].into(),
                 }

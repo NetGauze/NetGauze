@@ -104,10 +104,12 @@ impl TryFrom<netflow::DataRecord> for OptionsDataRecord {
                     // peer IP address as the system identifier.
                 }
                 netflow::ScopeField::Interface(iface) => {
-                    // In the case of interface scope we push both ingress and egress
-                    // interfaces as scope fields. Thanks to the normalize_interface_type()
-                    // they will be split into two IndexedDataRecord with the same interface
-                    // ID but different ingress/egress specific fields.
+                    // In the case of interface scope we push both ingress and
+                    // egress interfaces as scope fields.
+                    // Thanks to the normalize_interface_type()
+                    // they will be split into two IndexedDataRecord with the
+                    // same interface ID but different
+                    // ingress/egress specific fields.
                     scope_fields.extend([
                         Field::ingressInterface(iface.0),
                         Field::egressInterface(iface.0),

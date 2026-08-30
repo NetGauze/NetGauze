@@ -157,8 +157,8 @@ impl Decoder for SshCodec {
         loop {
             // The message terminator MUST be tested first, and at the top
             // of the loop: it may arrive in a read of its own, after the
-            // last chunk was already consumed and buffered. This allows the loop
-            // work across TCP/SSH segementation boundaries.
+            // last chunk was already consumed and buffered. This allows the
+            // loop work across TCP/SSH segementation boundaries.
             if src.starts_with(MESSAGE_TERMINATOR.as_bytes()) {
                 src.advance(MESSAGE_TERMINATOR.len());
                 let data = self.buf.split();

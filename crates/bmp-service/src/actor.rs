@@ -407,8 +407,8 @@ impl BmpActor {
 
         // Broadcast updated subscribers to all connections tasks
         if let Err(e) = self.subscribers_tx.send(self.subscribers.clone()) {
-            // This only happens if there are no active receivers (connection tasks), which
-            // is fine
+            // This only happens if there are no active receivers (connection
+            // tasks), which is fine
             debug!(
                 actor_id = self.actor_id,
                 local_addr = %self.local_addr,
@@ -455,8 +455,8 @@ impl BmpActor {
 
         // Broadcast updated subscribers to all connections tasks
         if let Err(e) = self.subscribers_tx.send(self.subscribers.clone()) {
-            // This only happens if there are no active receivers (connection tasks), which
-            // is fine
+            // This only happens if there are no active receivers (connection
+            // tasks), which is fine
             debug!(
                 actor_id = self.actor_id,
                 local_addr = %self.local_addr,

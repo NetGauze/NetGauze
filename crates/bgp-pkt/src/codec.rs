@@ -104,7 +104,8 @@ impl Decoder for BgpCodec {
                 if enabled!(Level::TRACE) {
                     trace!(buffer=?buf, length=buf.len(), "decoding buffered message")
                 }
-                // ASN4 capability is used only when both peers agree on enabling ASN4
+                // ASN4 capability is used only when both peers agree on
+                // enabling ASN4
                 let asn4 = self.asn4_received.unwrap_or(false) && self.asn4_sent.unwrap_or(false);
                 self.ctx.set_asn4(asn4);
                 let frame = buf.split_to(length);

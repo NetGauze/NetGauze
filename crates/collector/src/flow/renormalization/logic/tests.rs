@@ -243,7 +243,8 @@ fn test_selector_algorithm_uniform_probabilistic_missing() {
 #[test]
 #[traced_test]
 fn test_selector_algorithm_unsupported() {
-    // 2 = Systematic time-based Sampling (not currently implemented in renormalize)
+    // 2 = Systematic time-based Sampling (not currently implemented in
+    // renormalize)
     let fields: Box<[Field]> = vec![Field::selectorAlgorithm(
         selectorAlgorithm::SystematictimebasedSampling,
     )]

@@ -1286,8 +1286,8 @@ impl Ipv4NlriMplsLabelsAddress {
         prefix: Ipv4Net,
     ) -> Result<Self, InvalidIpv4NlriMplsLabelsAddress> {
         let labels: Box<[MplsLabel]> = labels.into();
-        // Total length should not exceed 255, each MPLS Label is 24 bit and account for
-        // 32 bit IP prefix length
+        // Total length should not exceed 255, each MPLS Label is 24 bit and
+        // account for 32 bit IP prefix length
         if labels.len() * 24 + prefix.prefix_len() as usize > u8::MAX as usize {
             Err(InvalidIpv4NlriMplsLabelsAddress::InvalidLabelsLength(
                 labels.len(),
@@ -1387,8 +1387,8 @@ impl Ipv6NlriMplsLabelsAddress {
         prefix: Ipv6Net,
     ) -> Result<Self, InvalidIpv6NlriMplsLabelsAddress> {
         let labels: Box<[MplsLabel]> = labels.into();
-        // Total length should not exceed 255, each MPLS Label is 24 bit and account for
-        // 32 bit IP prefix length
+        // Total length should not exceed 255, each MPLS Label is 24 bit and
+        // account for 32 bit IP prefix length
         if labels.len() * 24 + prefix.prefix_len() as usize > u8::MAX as usize {
             Err(InvalidIpv6NlriMplsLabelsAddress::InvalidLabelsLength(
                 labels.len(),

@@ -157,7 +157,8 @@ mod tests {
             &mut exporter_peers,
         );
         assert!(result1.is_none());
-        // The buffer for this flow key should now contain the first part, so not empty
+        // The buffer for this flow key should now contain the first part, so
+        // not empty
         assert!(!exporter_peers.get(&flow_key).unwrap().1.is_empty());
 
         let result2 = handler.decode(

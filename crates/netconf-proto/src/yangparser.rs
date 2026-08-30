@@ -225,8 +225,9 @@ impl<'a> YangParser<'a> {
                 || self.match_keyword("description")
                 || self.match_keyword("reference")
             {
-                // once we reach the meta-stmt we can stop parsing for imports/includes
-                // since they are not allowed in meta-stmts or any statement after them.
+                // once we reach the meta-stmt we can stop parsing for
+                // imports/includes since they are not allowed
+                // in meta-stmts or any statement after them.
                 break;
             } else {
                 // Skip one token at a time instead of entire statements

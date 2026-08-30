@@ -337,8 +337,8 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpMessage {
             });
         }
 
-        // Parse both length and type together, since we need to do input validation on
-        // the length based on the type of the message
+        // Parse both length and type together, since we need to do input
+        // validation on the length based on the type of the message
         let (length, message_type, mut bgp_message_buf) =
             match parse_bgp_message_length_and_type(cur) {
                 Ok(value) => value,
@@ -429,8 +429,8 @@ impl From<BgpMessageParsingError> for BgpNotificationMessage {
                 BgpNotificationMessage::UpdateMessageError(update_err.into())
             }
             BgpMessageParsingError::BgpNotificationMessageParsingError(_notification) => {
-                // Notification messages parsing should be ignored and consider a session
-                // closed.
+                // Notification messages parsing should be ignored and consider
+                // a session closed.
                 BgpNotificationMessage::FiniteStateMachineError(
                     FiniteStateMachineError::Unspecific {
                         value: vec![].into(),

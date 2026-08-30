@@ -482,7 +482,8 @@ pub async fn init_bmp_collection(
                 PublisherEndpoint::BmpKafkaAvro(config) => {
                     for bmp_recv in &bmp_recvs {
                         // pass writer_id to the converter
-                        // (workaround until we have an enrichment actor for bmp)
+                        // (workaround until we have an enrichment actor for
+                        // bmp)
                         let mut config = config.clone();
                         config.avro_converter.writer_id = config.writer_id.clone();
 

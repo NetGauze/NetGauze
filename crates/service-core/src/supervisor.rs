@@ -499,8 +499,8 @@ impl<W: Worker> CollectionSupervisor<W> {
         let stats: Box<[Arc<W::Stats>]> = (0..cores.len())
             .map(|i| W::build_stats(WorkerIndex::new(i), &config, &meter))
             .collect();
-        // Channel capacity is the number of workers, since each worker expected to
-        // send max one exit message.
+        // Channel capacity is the number of workers, since each worker expected
+        // to send max one exit message.
         let (exit_tx, exit_rx) = mpsc::channel(cores.len());
 
         let workers: io::Result<Vec<WorkerThread<W::Command>>> = cores
@@ -664,8 +664,8 @@ impl<W: Worker> CollectionSupervisor<W> {
         // AdminHandle clones hold sender clones that would keep every
         // command channel open past the drop below.
         // Swap each slot to a pre-closed sender first,
-        // so admins get WorkerGone from here on and the workers' channels actually
-        // close.
+        // so admins get WorkerGone from here on and the workers' channels
+        // actually close.
         for slot in admin.senders.iter() {
             let (dead_tx, dead_rx) = mpsc::channel(1);
             drop(dead_rx);
@@ -935,8 +935,8 @@ impl<W: Worker> CollectionSupervisor<W> {
                 });
             })?;
         // detached the JoinHandle deliberately since every exit, including
-        // panics, is caught in the code above and the exit channel communicates the
-        // exit reason.
+        // panics, is caught in the code above and the exit channel communicates
+        // the exit reason.
         drop(join);
 
         Ok(WorkerThread { cmd_tx })

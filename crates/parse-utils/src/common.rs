@@ -40,8 +40,8 @@ impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv4Net {
         prefix_len: u8,
         prefix_offset: usize,
     ) -> Result<Self, Self::Error> {
-        // The prefix value must fall into the octet boundary, even if the prefix_len
-        // doesn't. For example,
+        // The prefix value must fall into the octet boundary, even if the
+        // prefix_len doesn't. For example,
         // prefix_len=24 => prefix_size=24 while prefix_len=19 => prefix_size=24
         let prefix_size = if prefix_len >= u8::MAX - 7 {
             u8::MAX
@@ -90,8 +90,8 @@ impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv6Net {
         prefix_len: u8,
         prefix_offset: usize,
     ) -> Result<Self, Self::Error> {
-        // The prefix value must fall into the octet boundary, even if the prefix_len
-        // doesn't. For example,
+        // The prefix value must fall into the octet boundary, even if the
+        // prefix_len doesn't. For example,
         // prefix_len=24 => prefix_size=24 while prefix_len=19 => prefix_size=24
         let prefix_size = if prefix_len >= u8::MAX - 7 {
             u8::MAX
@@ -207,7 +207,8 @@ mod tests {
 
     #[test]
     fn ipv4_prefix_len_out_of_range() {
-        // Needs >= 4 bytes so the read succeeds and Ipv4Net::new is what rejects.
+        // Needs >= 4 bytes so the read succeeds and Ipv4Net::new is what
+        // rejects.
         let data = [1, 2, 3, 4, 5];
         let expected = Err(Ipv4PrefixParsingError::InvalidIpv4PrefixLen {
             offset: 7,

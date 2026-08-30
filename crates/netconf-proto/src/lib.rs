@@ -128,8 +128,8 @@ mod tests {
             "Expecting:\n{expected:#?}\nparsed:\n{parsed:#?}"
         );
 
-        // Check after we serialize the test value we can deserialize back the same
-        // value
+        // Check after we serialize the test value we can deserialize back the
+        // same value
         let writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
         let mut writer = XmlWriter::new(writer);
         parsed.xml_serialize(&mut writer)?;

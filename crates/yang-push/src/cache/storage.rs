@@ -1170,14 +1170,15 @@ impl YangLibraryCache {
             }
         }
 
-        // Step 3: Check if any other subscriptions are still using this content_id
+        // Step 3: Check if any other subscriptions are still using this
+        // content_id
         let content_id_still_in_use = self
             .cache_by_subscription_info
             .values()
             .any(|lib_ref| lib_ref.content_id() == yang_lib_ref.content_id());
 
-        // Step 4: Only remove YangLibraryReference and delete files if no subscriptions
-        // remain
+        // Step 4: Only remove YangLibraryReference and delete files if no
+        // subscriptions remain
         if !content_id_still_in_use {
             if let Some(yang_lib_ref) = self.cache_by_content_id.remove(yang_lib_ref.content_id()) {
                 // Remove subscription from the reference's internal list
@@ -1195,8 +1196,8 @@ impl YangLibraryCache {
                 }
             }
         } else {
-            // Step 5: Content is still in use - just remove this subscription from the
-            // reference
+            // Step 5: Content is still in use - just remove this subscription
+            // from the reference
             if let Some(yang_lib_ref) = self.cache_by_content_id.get_mut(yang_lib_ref.content_id())
             {
                 yang_lib_ref.remove_subscription_info(subscription_info)?;
@@ -1970,8 +1971,8 @@ mod tests {
         assert_eq!(cache.cache_by_subscription_info.len(), 1);
         assert_eq!(cache.cache_by_subscription_id.len(), 1);
 
-        // Create second subscription info with different peer and target but same
-        // content_id
+        // Create second subscription info with different peer and target but
+        // same content_id
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::from(([192, 168, 1, 100], 10000)),
             None,

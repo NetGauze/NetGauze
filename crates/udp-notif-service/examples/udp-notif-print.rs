@@ -10,9 +10,9 @@ use tracing::{error, info};
 use netgauze_udp_notif_pkt::codec::UdpPacketCodec;
 
 fn init_tracing() {
-    // Very simple setup at the moment to validate the instrumentation in the code
-    // is working in the future that should be configured automatically based on
-    // configuration options
+    // Very simple setup at the moment to validate the instrumentation in the
+    // code is working in the future that should be configured automatically
+    // based on configuration options
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(tracing::Level::DEBUG)
         .finish();
@@ -32,8 +32,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     while let Some(next) = stream.next().await {
         match next {
             Ok((mut buf, addr)) => {
-                // If we haven't seen the client before, create a new UdpPacketCodec for it.
-                // UdpPacketCodec handles the decoding/encoding of udp-notif packets.
+                // If we haven't seen the client before, create a new
+                // UdpPacketCodec for it. UdpPacketCodec handles
+                // the decoding/encoding of udp-notif packets.
                 let result = clients
                     .entry(addr)
                     .or_insert(UdpPacketCodec::default())

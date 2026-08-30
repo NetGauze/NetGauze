@@ -567,8 +567,8 @@ fn test_peer_metadata_get_enrichment_fields_multiple_scopes_some_matching() {
         WeightedField::new(100, Field::udpExID(29)),
     );
 
-    // Domain-specific scoped fields that won't match (obs_domain_id = 20, no scope
-    // fields)
+    // Domain-specific scoped fields that won't match (obs_domain_id = 20, no
+    // scope fields)
     let mut specific_obs_id_nomatch_map = FxHashMap::default();
     specific_obs_id_nomatch_map.insert(
         FieldRef::new(IE::internalAddressRealm, 0),
@@ -644,8 +644,8 @@ fn test_peer_metadata_get_enrichment_fields_weight_priority() {
         ),
     );
 
-    // Domain-specific scope with scope fields (obs_domain_id = 1000, selectorId =
-    // 1)
+    // Domain-specific scope with scope fields (obs_domain_id = 1000, selectorId
+    // = 1)
     let mut more_specific_fields = FxHashMap::default();
     more_specific_fields.insert(
         FieldRef::new(IE::samplerName, 0),
@@ -748,8 +748,8 @@ fn test_peer_metadata_get_enrichment_fields_same_weight_specificity_tiebreaker()
         WeightedField::new(100, Field::meteringProcessId(2000)),
     );
 
-    // Domain-specific scope with scope fields (obs_domain_id = 1000, selectorId =
-    // 5)
+    // Domain-specific scope with scope fields (obs_domain_id = 1000, selectorId
+    // = 5)
     let mut more_specific_fields = FxHashMap::default();
     more_specific_fields.insert(
         FieldRef::new(IE::applicationName, 0),

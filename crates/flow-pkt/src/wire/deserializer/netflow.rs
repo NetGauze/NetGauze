@@ -178,8 +178,9 @@ impl<'a> ParseFromWithOneInput<'a, &mut TemplatesMap> for Set {
             }
             NETFLOW_OPTIONS_TEMPLATE_SET_ID => {
                 let mut option_templates = vec![];
-                // THE RFC is not super clear about padding length allowed in the Options
-                // Template set. Like Wireshark implementation, we assume anything
+                // THE RFC is not super clear about padding length allowed in
+                // the Options Template set. Like Wireshark
+                // implementation, we assume anything
                 // less than 4-octets (min field size) is padding
                 while buf.remaining() > 3 {
                     option_templates.push(OptionsTemplateRecord::parse(&mut buf, templates_map)?);
@@ -223,7 +224,8 @@ impl<'a> ParseFromWithOneInput<'a, &mut TemplatesMap> for Set {
                 };
                 // buf could be a non zero value for padding
                 check_padding_value(&mut buf)?;
-                // We can safely unwrap DataSetId here since we already checked the range
+                // We can safely unwrap DataSetId here since we already checked
+                // the range
                 Set::Data {
                     id: DataSetId::new(id).unwrap(),
                     records: records.into_boxed_slice(),
@@ -271,8 +273,8 @@ impl<'a> ParseFromWithOneInput<'a, &mut TemplatesMap> for OptionsTemplateRecord 
     ) -> Result<Self, Self::Error> {
         let template_id_offset = cur.offset();
         let template_id = cur.peek_u16_be()?;
-        // from RFC7011: Each Template Record is given a unique Template ID in the range
-        // 256 to 65535.
+        // from RFC7011: Each Template Record is given a unique Template ID in
+        // the range 256 to 65535.
         if template_id < 256 {
             return Err(OptionsTemplateRecordParsingError::InvalidTemplateId {
                 offset: template_id_offset,
@@ -330,8 +332,8 @@ impl<'a> ParseFromWithOneInput<'a, &mut TemplatesMap> for TemplateRecord {
     ) -> Result<Self, Self::Error> {
         let template_id_offset = cur.offset();
         let template_id = cur.peek_u16_be()?;
-        // from RFC7011: Each Template Record is given a unique Template ID in the range
-        // 256 to 65535.
+        // from RFC7011: Each Template Record is given a unique Template ID in
+        // the range 256 to 65535.
         if template_id < 256 {
             return Err(TemplateRecordParsingError::InvalidTemplateId {
                 offset: template_id_offset,

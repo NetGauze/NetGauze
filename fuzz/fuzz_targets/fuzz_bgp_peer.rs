@@ -443,7 +443,8 @@ fuzz_target!(
                         if peer.fsm_state() == FsmState::Idle
                             || peer.fsm_state() == FsmState::Active
                         {
-                            // Peer with terminated or reached an active state in which it waits for
+                            // Peer with terminated or reached an active state
+                            // in which it waits for
                             // TCP connection
                             return;
                         }

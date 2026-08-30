@@ -303,7 +303,8 @@ impl<'a> PcapIter<'a> {
                 Ipv4::Udp(udp) => {
                     let src_port = udp.source_port();
                     let dst_port = udp.destination_port();
-                    // UDP payload length, to avoiding parsing any padding bytes.
+                    // UDP payload length, to avoiding parsing any padding
+                    // bytes.
                     let len = udp.length() as usize - 8;
                     match udp.inner() {
                         Err(_) => None,

@@ -137,8 +137,9 @@ impl FlowCollectorsSupervisorActor {
             let awaited = futures::future::select_all(join_handles);
             join_handles = match awaited.await {
                 (Ok(ret), _, rest) => {
-                    // TODO(AH): Have some policy to allow to restart actors or terminate supervisor
-                    //           if failed
+                    // TODO(AH): Have some policy to allow to restart actors or
+                    // terminate supervisor           if
+                    // failed
                     if let Err(err) = ret {
                         error!("[Supervisor] actor terminated with error: {err}");
                     }
@@ -695,8 +696,8 @@ mod test {
         assert_eq!(unsubscribe_results.len(), 3);
         assert!(unsubscribe_results.iter().all(|r| r.is_some()));
         tokio::time::sleep(Duration::from_secs(1)).await;
-        // Try to receive a message (should return None denoting channel is closed as
-        // we've unsubscribed)
+        // Try to receive a message (should return None denoting channel is
+        // closed as we've unsubscribed)
         let timeout_result = timeout(Duration::from_secs(1), pkt_rx.recv()).await;
         assert!(matches!(timeout_result, Ok(Err(_))));
 
