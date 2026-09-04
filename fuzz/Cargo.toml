@@ -8,7 +8,7 @@ license = "Apache-2.0"
 readme = "README.md"
 description = """Fuzzers for NetGauze"""
 repository = "https://github.com/NetGauze/NetGauze"
-homepage = "https://github.com/NetGauze/NetGauze"
+homepage = "https://netgauze.io"
 
 [package.metadata]
 cargo-fuzz = true
