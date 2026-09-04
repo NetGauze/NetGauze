@@ -6,7 +6,7 @@ authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/NetGauze/NetGauze"
-homepage = "https://github.com/NetGauze/NetGauze"
+homepage = "https://netgauze.io"
 description = """
 Shared-nothing, thread-per-core service scaffolding for NetGauze
 collectors: worker trait, supervisor, CPU affinity, and core assignment.

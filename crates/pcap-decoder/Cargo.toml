@@ -8,7 +8,7 @@ authors = ["Riccardo Negri <hello@riccardonegri.dev>"]
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/NetGauze/NetGauze"
-homepage = "https://github.com/NetGauze/NetGauze"
+homepage = "https://netgauze.io"
 description = """
 CLI Utility to convert NetFlow, IPFIX, BGP, BMP or UDP-Nofif data from a PCAP file to a JSON Lines file.
 """
