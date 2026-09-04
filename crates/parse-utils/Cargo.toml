@@ -6,7 +6,6 @@ version = "0.13.0"
 edition = "2024"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
-readme = "README.md"
 repository = "https://github.com/NetGauze/NetGauze"
 homepage = "https://netgauze.io"
 description = """
