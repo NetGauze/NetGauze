@@ -596,7 +596,7 @@ fn is_numeric(ie: &InformationElement) -> bool {
 }
 
 fn is_comparable(ie: &InformationElement) -> bool {
-    if [
+    ![
         "string",
         "octetArray",
         "basicList",
@@ -605,14 +605,10 @@ fn is_comparable(ie: &InformationElement) -> bool {
         "unsigned256",
     ]
     .contains(&ie.data_type.as_str())
-    {
-        return false;
-    }
-    true
 }
 
 fn is_bitwise(ie: &InformationElement) -> bool {
-    if [
+    !([
         "string",
         "float32",
         "float64",
@@ -621,11 +617,7 @@ fn is_bitwise(ie: &InformationElement) -> bool {
         "subTemplateMultiList",
     ]
     .contains(&ie.data_type.as_str())
-        | ie.data_type.starts_with("dateTime")
-    {
-        return false;
-    }
-    true
+        | ie.data_type.starts_with("dateTime"))
 }
 
 fn generate_ie_field_enum_for_ie(
