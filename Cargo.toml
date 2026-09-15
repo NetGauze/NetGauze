@@ -78,7 +78,7 @@ anyhow = { version = "1" }
 serde_with = { version = "3.22" }
 indexmap = { version = "2.14" }
 apache-avro = { version = "0.21" }
-schema_registry_converter = { version = "4.10", default-features = false }
+schema_registry_converter = { version = "5.0", default-features = false }
 rdkafka = { version = "0.39", default-features = false }
 tracing-test = { version = "0.2" }
 syn = { version = "3.0", default-features = false }
