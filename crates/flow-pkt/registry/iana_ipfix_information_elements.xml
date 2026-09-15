@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="ipfix">
 <title>IP Flow Information Export (IPFIX) Entities</title>
 <created>2007-05-10</created>
-<updated>2026-07-22</updated>
+<updated>2026-09-11</updated>
 
 <note><xref type="rfc" data="rfc7012"/> has obsoleted <xref type="rfc" data="rfc5102"/>. However, references to <xref type="rfc" data="rfc5102"/>
 remain as part of the historical record.</note>
@@ -6480,7 +6480,7 @@ the packet passed the Observation Point.
 
 See <xref type="rfc" data="rfc8200"/> for the definition of the Source Address field in the IPv6
 header. See <xref type="rfc" data="rfc3234"/> for the definition of middleboxes. See
-<xref type="rfc" data="rfc6146"/> for nat64 specification.
+<xref type="draft" data="RFC-ietf-v6ops-rfc6146-bis-16"/> for NAT64 specification.
 </paragraph>
 </description>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
@@ -6502,7 +6502,7 @@ after the packet passed the Observation Point.
 
 See <xref type="rfc" data="rfc8200"/> for the definition of the Destination Address field in the
 IPv6 header. See <xref type="rfc" data="rfc3234"/> for the definition of middleboxes. See
-<xref type="rfc" data="rfc6146"/> for nat64 specification.
+<xref type="draft" data="RFC-ietf-v6ops-rfc6146-bis-16"/> for NAT64 specification.
 </paragraph>
 </description>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
@@ -6893,7 +6893,7 @@ Values are listed in the natType registry.
 See the "natType (Value 297)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
 See <xref type="rfc" data="rfc3022"/> for the definition of NAT (commonly named NAT44).
 See <xref type="rfc" data="rfc6144"/> for the definition of NAT46.
-See <xref type="rfc" data="rfc6146"/> for the definition of NAT64.
+See <xref type="draft" data="RFC-ietf-v6ops-rfc6146-bis-16"/> for the definition of NAT64.
 See <xref type="rfc" data="rfc6296"/> for the definition of NPTv6.
 See <xref type="rfc" data="rfc791"/> for the definition of IPv4.
 See <xref type="rfc" data="rfc8200"/> for the definition of IPv6.
