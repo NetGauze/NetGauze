@@ -293,6 +293,7 @@ jobs:
             cmake \
             git \
             libcurl-devel \
+            rpm-build \
       - name: Install stable
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
