@@ -125,7 +125,7 @@ See <xref type="rfc" data="rfc791"/> for the specification of the IPv4
 protocol field.
 See <xref type="rfc" data="rfc8200"/> for the specification of the
 IPv6 protocol field.
-See the list of protocol numbers assigned by IANA at <xref type="uri" data="https://www.iana.org/assignments/protocol-numbers"/>.
+See the list of protocol numbers assigned by IANA at <xref type="registry" data="protocol-numbers">Protocol Numbers</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -150,7 +150,7 @@ value of the Traffic Class field in the IPv6 packet header.
 </description>
 <references>
 <paragraph>
-See <xref type="rfc" data="rfc1812"/> (Section 5.3.2) and <xref type="rfc" data="rfc791"/> for the definition of the IPv4 TOS field.
+See <xref type="rfc" data="rfc1812" section="5.3.2" label-format="parens"/> and <xref type="rfc" data="rfc791"/> for the definition of the IPv4 TOS field.
 See <xref type="rfc" data="rfc8200"/> for the definition of the IPv6
 Traffic Class field.
 </paragraph>
@@ -176,7 +176,7 @@ Traffic Class field.
 <paragraph>
   Per <xref type="rfc" data="rfc9293"/>, the assignment of TCP control 
   bits is managed by IANA via the "TCP Header Flags" registry 
-  <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-header-flags"/>. 
+  <xref type="registry" data="tcp-parameters#tcp-header-flags">TCP Header Flags</xref>. 
   Implementers can retrieve the current TCP control bits from that
   registry, which is authoritative for them.
 </paragraph>
@@ -192,10 +192,9 @@ Traffic Class field.
   in the TCP headers of the packets of this Flow.
 </paragraph>
 <paragraph>
-  If exported as a single octet with reduced-size encoding (Section 6.2 of 
-  <xref type="rfc" data="rfc7011"/>), this Information Element covers the 
+  If exported as a single octet with reduced-size encoding (<xref type="rfc" data="rfc7011" section="6.2" label-format="of"/>), this Information Element covers the 
   low-order octet of this field (i.e., bit offset positions 8 to 15) 
-  <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-header-flags"/>. 
+  <xref type="registry" data="tcp-parameters#tcp-header-flags">TCP Header Flags</xref>. 
   A Collector receiving this Information Element with reduced-size encoding must 
   not assume anything about the content of the four bits with bit offset positions 
   4 to 7.
@@ -216,7 +215,7 @@ Traffic Class field.
 </paragraph>
 <paragraph>
   Note also that the "TCP Header Flags" registry
-  <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-header-flags"/> 
+  <xref type="registry" data="tcp-parameters#tcp-header-flags">TCP Header Flags</xref> 
   indexes the bit offset from the most significant bit of octet 12 to the 
   least significant bit of octet 13 in the TCP header, but the tcpControlBits is 
   encoded as a regular unsigned 16-bit integer.
@@ -224,7 +223,7 @@ Traffic Class field.
 </description>
 <references>
  <paragraph>See the assigned TCP control bits in the "TCP Header Flags" registry
-  <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-header-flags"/>.
+  <xref type="registry" data="tcp-parameters#tcp-header-flags">TCP Header Flags</xref>.
 </paragraph>  
 </references>
 <xref type="rfc" data="rfc9293"/>
@@ -263,7 +262,7 @@ DCCP source port field.
 </paragraph>
 <paragraph>
 See the assigned transport protocol (e.g., UDP, TCP, SCTP, and DCCP) port numbers
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -376,7 +375,7 @@ destination port field.
 </paragraph>
 <paragraph>
 See the assigned transport protocol (e.g., UDP, TCP, SCTP, and DCCP) port numbers
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -880,7 +879,7 @@ both values is reported as (ICMP type * 256) + ICMP code.
 </description>
 <references>
 <paragraph>
-See the "ICMP Type Numbers" registry <xref type="uri" data="https://www.iana.org/assignments/icmp-parameters"/>
+See the "ICMP Type Numbers" registry <xref type="registry" data="icmp-parameters">Internet Control Message Protocol (ICMP) Parameters</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -904,7 +903,7 @@ The type field of the IGMP message.
 </description>
 <references>
 <paragraph>
-See the "IGMP Type Numbers" registry <xref type="uri" data="https://www.iana.org/assignments/igmp-type-numbers"/>
+See the "IGMP Type Numbers" registry <xref type="registry" data="igmp-type-numbers">Internet Group Management Protocol (IGMP) Type Numbers</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -953,7 +952,7 @@ algorithm used for sampled NetFlow:
 The values are not compatible with the selectorAlgorithm IE, where
 "Deterministic" has been replaced by "Systematic count-based" (1)
 or "Systematic time-based" (2), and "Random" is (3).  Conversion
-is required; see <xref type="uri" data="https://www.iana.org/assignments/psamp-parameters">Packet Sampling (PSAMP) Parameters.</xref>
+is required; see <xref type="registry" data="psamp-parameters">Packet Sampling (PSAMP) Parameters.</xref>
 </paragraph>
 </description>
 <xref type="rfc" data="rfc7270"/>
@@ -1196,7 +1195,7 @@ label type registry.
 </description>
 <references>
 <paragraph>
-See the IPFIX MPLS label type (Value 46) <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+See the IPFIX MPLS label type (Value 46) <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 See <xref type="rfc" data="rfc3031"/> for the MPLS label structure.
 </paragraph>
 </references>
@@ -1524,7 +1523,7 @@ field in the IPv4 packet header.
 See <xref type="rfc" data="rfc8200"/> for the definition of the
 version field in the IPv6 packet header.
 Additional information on defined version numbers can be found at
-<xref type="uri" data="https://www.iana.org/assignments/version-numbers"/>.
+<xref type="registry" data="version-numbers">IP Version Numbers</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -1615,7 +1614,7 @@ IE.
 This Information Element was initially specified in <xref type="rfc" data="rfc5102"/>.
 
 <xref type="rfc" data="rfc7012"/> has obsoleted <xref type="rfc" data="rfc5102"/> and specifies that
-<xref type="uri" data="https://www.iana.org/assignments/ipfix">IANA-IPFIX</xref> is the normative reference for
+<xref type="registry" data="ipfix">IANA-IPFIX</xref> is the normative reference for
 this Information Element.
 
 The diagram provided in <xref type="rfc" data="rfc5102"/> is incorrect; see <xref type="rfc-errata" data="1738"/>.      
@@ -2186,7 +2185,7 @@ decode: 10        -&gt; Drop
 <references>
 <paragraph>
 See "NetFlow Version 9 Flow-Record Format" <xref type="uri" data="https://www.cisco.com/en/US/technologies/tk648/tk362/technologies_white_paper09186a00800a3db9.html">CCO-NF9FMT</xref>.
-See the "Forwarding Status (Value 89)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+See the "Forwarding Status (Value 89)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 </paragraph>
 </references>
 <xref type="rfc-errata" data="5262"/>
@@ -2335,7 +2334,7 @@ Specifies an Application ID per <xref type="rfc" data="rfc6759"/>.
 </description>
 <references>
 <paragraph>
-See section 4 of <xref type="rfc" data="rfc6759"/> for the applicationId Information Element Specification.
+See <xref type="rfc" data="rfc6759" section="4" label-format="of"/> for the applicationId Information Element Specification.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc6759"/>
@@ -2395,7 +2394,7 @@ Point.
 <references>
 <paragraph>
 See <xref type="rfc" data="rfc3260"/> for the definition of the Differentiated 
-Services Field.  See section 5.3.2 of <xref type="rfc" data="rfc1812"/> and 
+Services Field.  See <xref type="rfc" data="rfc1812" section="5.3.2" label-format="of"/> and 
 <xref type="rfc" data="rfc791"/> for the definition of the IPv4 TOS field.  See 
 <xref type="rfc" data="rfc8200"/> for the definition of the IPv6 Traffic Class 
 field.  See the IPFIX Information Model <xref type="rfc" data="rfc5102"/> for the 
@@ -2468,7 +2467,7 @@ Engine IDs registry.
 </description>
 <references>
 <paragraph>
-See the "Classification Engine IDs (Value 101)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>
+See the "Classification Engine IDs (Value 101)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc6759"/>
@@ -2745,7 +2744,7 @@ The reason for Flow termination. Values are listed in the flowEndReason registry
 </description>
 <references>
 <paragraph>
-See the "flowEndReason (Value 136)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+See the "flowEndReason (Value 136)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -2813,7 +2812,7 @@ both values is reported as (ICMP type * 256) + ICMP code.
 </description>
 <references>
 <paragraph>
-See the "ICMPv6 'type' Numbers" and "ICMPv6 'Code' Fields" registries <xref type="uri" data="https://www.iana.org/assignments/icmpv6-parameters"/>
+See the "ICMPv6 'type' Numbers" and "ICMPv6 'Code' Fields" registries <xref type="registry" data="icmpv6-parameters">Internet Control Message Protocol version 6 (ICMPv6) Parameters</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -3645,7 +3644,7 @@ Type of the IPv4 ICMP message.
 </description>
 <references>
 <paragraph>
-See the "ICMP Type Numbers" registry <xref type="uri" data="https://www.iana.org/assignments/icmp-parameters"/>
+See the "ICMP Type Numbers" registry <xref type="registry" data="icmp-parameters">Internet Control Message Protocol (ICMP) Parameters</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -3669,7 +3668,7 @@ Code of the IPv4 ICMP message.
 </description>
 <references>
 <paragraph>
-See the "ICMP Type Numbers" registry <xref type="uri" data="https://www.iana.org/assignments/icmp-parameters"/>
+See the "ICMP Type Numbers" registry <xref type="registry" data="icmp-parameters">Internet Control Message Protocol (ICMP) Parameters</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -3693,7 +3692,7 @@ Type of the IPv6 ICMP message.
 </description>
 <references>
 <paragraph>
-See the "ICMPv6 'type' Numbers" registry <xref type="uri" data="https://www.iana.org/assignments/icmpv6-parameters"/>
+See the "ICMPv6 'type' Numbers" registry <xref type="registry" data="icmpv6-parameters">Internet Control Message Protocol version 6 (ICMPv6) Parameters</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -3717,7 +3716,7 @@ Code of the IPv6 ICMP message.
 </description>
 <references>
 <paragraph>
-See the "ICMPv6 'Code' Fields" registry <xref type="uri" data="https://www.iana.org/assignments/icmpv6-parameters"/>
+See the "ICMPv6 'Code' Fields" registry <xref type="registry" data="icmpv6-parameters">Internet Control Message Protocol version 6 (ICMPv6) Parameters</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -3744,7 +3743,7 @@ The source port identifier in the UDP header.
 See <xref type="rfc" data="rfc768"/> for the definition of the UDP
 source port field.
 Additional information on defined UDP port numbers can be found at
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -3770,7 +3769,7 @@ The destination port identifier in the UDP header.
 See <xref type="rfc" data="rfc768"/> for the definition of the UDP
 destination port field.
 Additional information on defined UDP port numbers can be found at
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -3796,7 +3795,7 @@ The source port identifier in the TCP header.
 See <xref type="rfc" data="rfc9293"/> for the definition of the TCP
 source port field.
 Additional information on defined TCP port numbers can be found at
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -3822,7 +3821,7 @@ The destination port identifier in the TCP header.
 See <xref type="rfc" data="rfc9293"/> for the definition of the TCP
 destination port field.
 Additional information on defined TCP port numbers can be found at
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -4088,7 +4087,7 @@ Protocol Numbers registry.
 <paragraph>
 See <xref type="rfc" data="rfc8200"/> for the definition of the IPv6
 Next Header field.
-See the list of protocol numbers assigned by IANA at <xref type="uri" data="https://www.iana.org/assignments/protocol-numbers"/>.
+See the list of protocol numbers assigned by IANA at <xref type="registry" data="protocol-numbers">Protocol Numbers</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -4149,7 +4148,7 @@ range from 0 to 63.
 <paragraph>
 See <xref type="rfc" data="rfc3260"/> for the definition of the
 Differentiated Services field.
-See <xref type="rfc" data="rfc1812"/> (Section 5.3.2) and <xref type="rfc" data="rfc791"/> for the definition of the IPv4 TOS field.
+See <xref type="rfc" data="rfc1812" section="5.3.2" label-format="parens"/> and <xref type="rfc" data="rfc791"/> for the definition of the IPv4 TOS field.
 See <xref type="rfc" data="rfc8200"/> for the definition of the IPv6
 Traffic Class field.
 </paragraph>
@@ -4181,8 +4180,8 @@ Therefore, its value may range from 0 to 7.
 <range>0-7</range>
 <references>
 <paragraph>
-See <xref type="rfc" data="rfc1812"/> (Section 5.3.3) and <xref type="rfc" data="rfc791"/> for the definition of the IP Precedence.
-See <xref type="rfc" data="rfc1812"/> (Section 5.3.2) and <xref type="rfc" data="rfc791"/> for the definition of the IPv4 TOS field.
+See <xref type="rfc" data="rfc1812" section="5.3.3" label-format="parens"/> and <xref type="rfc" data="rfc791"/> for the definition of the IP Precedence.
+See <xref type="rfc" data="rfc1812" section="5.3.2" label-format="parens"/> and <xref type="rfc" data="rfc791"/> for the definition of the IPv4 TOS field.
 See <xref type="rfc" data="rfc8200"/> for the definition of the IPv6
 Traffic Class field.
 </paragraph>
@@ -4646,7 +4645,7 @@ The mapping is illustrated by the figure below.
 <paragraph>
 See <xref type="rfc" data="rfc791"/> for the definition of IPv4
 options.
-See the list of IPv4 option numbers assigned by IANA at <xref type="uri" data="https://www.iana.org/assignments/ip-parameters"/>.
+See the list of IPv4 option numbers assigned by IANA at <xref type="registry" data="ip-parameters">Internet Protocol Version 4 (IPv4) Parameters</xref>.
 The diagram provided in <xref type="rfc" data="rfc5102"/> is incorrect.  
 The diagram in this registry is taken from Errata 1737. See <xref type="rfc-errata" data="1737"/> .  
 </paragraph>
@@ -4675,7 +4674,7 @@ Deprecated in favor of the tcpOptionsFull IE.
 This Information Element was initially specified in <xref type="rfc" data="rfc5102"/>.
 
 <xref type="rfc" data="rfc7012"/> has obsoleted <xref type="rfc" data="rfc5102"/> and specifies that
-<xref type="uri" data="https://www.iana.org/assignments/ipfix">IANA-IPFIX</xref> is the normative reference for
+<xref type="registry" data="ipfix">IANA-IPFIX</xref> is the normative reference for
 this Information Element. The diagram provided in <xref type="rfc" data="rfc5102"/> is incorrect; see <xref type="rfc-errata" data="1739"/>.
 </paragraph>
 </references>
@@ -4835,7 +4834,7 @@ See <xref type="rfc" data="rfc791"/> for the specification of the IPv4
 protocol field.
 See <xref type="rfc" data="rfc8200"/> for the specification of the
 IPv6 protocol field.
-See the list of protocol numbers assigned by IANA at <xref type="uri" data="https://www.iana.org/assignments/protocol-numbers"/>.
+See the list of protocol numbers assigned by IANA at <xref type="registry" data="protocol-numbers">Protocol Numbers</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -4870,7 +4869,7 @@ destination port number field.
 </paragraph>
 <paragraph>
 See the assigned transport protocol (e.g., UDP, TCP, and SCTP) port numbers
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -4907,7 +4906,7 @@ source port number field.
 </paragraph>
 <paragraph>
 See the assigned transport protocol (e.g., UDP, TCP, and SCTP) port numbers 
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5102"/>
@@ -5176,7 +5175,7 @@ source port field.  See <xref type="rfc" data="rfc9260"/> for the definition of
 SCTP.     
 See <xref type="rfc" data="rfc3022"/> for the definition of NAPT.  See <xref type="rfc" data="rfc3234"/> for the definition of middleboxes. 
 See the assigned transport protocol (e.g., UDP, TCP, SCTP, and DCCP) port numbers
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
@@ -5207,7 +5206,7 @@ source port field.  See <xref type="rfc" data="rfc9260"/> for the definition of
 SCTP.     
 See <xref type="rfc" data="rfc3022"/> for the definition of NAPT.  See <xref type="rfc" data="rfc3234"/> for the definition of middleboxes. 
 See the assigned transport protocol (e.g., UDP, TCP, SCTP, and DCCP) port numbers
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.   
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.   
 </paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
@@ -5236,7 +5235,7 @@ Values are listed in the natOriginatingAddressRealm registry.
 <range>1-2</range>
 <references>
 <paragraph>
-See the "natOriginatingAddressRealm (Value 229)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+See the "natOriginatingAddressRealm (Value 229)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 </paragraph>
 </references>
@@ -5264,7 +5263,7 @@ etc. Values for this Information Element are listed in the
 </description>
 <references>
 <paragraph>
-See the "NAT Event Type (Value 230)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>. 
+See the "NAT Event Type (Value 230)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>. 
 See <xref type="rfc" data="rfc3022"/> for the definition of NAT.  
 See <xref type="rfc" data="rfc8158"/> for the definitions of values 4-16.
 </paragraph>
@@ -5338,7 +5337,7 @@ the firewallEvent registry.
 </description>
 <references>
 <paragraph>
-See the "firewallEvent (Value 233)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+See the "firewallEvent (Value 233)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 </paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
@@ -5480,7 +5479,7 @@ listed in the biflowDirection registry.
 </description>
 <references>
 <paragraph>
-See the "biflowDirection (Value 239)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+See the "biflowDirection (Value 239)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5103"/>
@@ -5760,7 +5759,7 @@ Pseudo Wire (PW) as defined in <xref type="rfc" data="rfc4446"/>.
 <references>
 <paragraph>         
 See <xref type="rfc" data="rfc4446"/> for the pseudowire type definition, and 
-<xref type="uri" data="https://www.iana.org/assignments/pwe3-parameters"/> for the IANA 
+<xref type="registry" data="pwe3-parameters">Pseudowire Name Spaces (PWE3)</xref> for the IANA 
 Pseudowire Types registry.
 </paragraph>
 </references>
@@ -5778,7 +5777,7 @@ Pseudowire Types registry.
 <description>
 <paragraph>
 The 32-bit Preferred Pseudo Wire (PW) MPLS Control Word as 
-defined in Section 3 of <xref type="rfc" data="rfc4385"/>. 
+defined in <xref type="rfc" data="rfc4385" section="3" label-format="of"/>. 
 </paragraph>
 </description>
 <references>
@@ -5928,10 +5927,9 @@ function after the packet passed the Observation Point.
 <range>0-7</range>
 <references>
 <paragraph>         
-See <xref type="rfc" data="rfc1812"/> (Section 5.3.3) and 
+See <xref type="rfc" data="rfc1812" section="5.3.3" label-format="parens"/> and 
 <xref type="rfc" data="rfc791"/> for the definition of the
-IP Precedence. See <xref type="rfc" data="rfc1812"/> 
-(Section 5.3.2) and <xref type="rfc" data="rfc791"/> for the
+IP Precedence. See <xref type="rfc" data="rfc1812" section="5.3.2" label-format="parens"/> and <xref type="rfc" data="rfc791"/> for the
 definition of the IPv4 TOS field. See 
 <xref type="rfc" data="rfc8200"/> for the definition of the 
 IPv6 Traffic Class field. 
@@ -6401,7 +6399,7 @@ observationPointType registry.
 </description>
 <references>
 <paragraph>
-See the "observationPointType (Value 277)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+See the "observationPointType (Value 277)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 </paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
@@ -6668,7 +6666,7 @@ Values are listed in the anonymizationTechnique registry.
 </description>
 <references>
 <paragraph>
-See the "anonymizationTechnique (Value 286)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix/"/>.
+See the "anonymizationTechnique (Value 286)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc6235"/>
@@ -6890,7 +6888,7 @@ Values are listed in the natType registry.
 <range/>
 <references>
 <paragraph>
-See the "natType (Value 297)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+See the "natType (Value 297)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 See <xref type="rfc" data="rfc3022"/> for the definition of NAT (commonly named NAT44).
 See <xref type="rfc" data="rfc6144"/> for the definition of NAT46.
 See <xref type="draft" data="RFC-ietf-v6ops-rfc6146-bis-16"/> for the definition of NAT64.
@@ -7047,7 +7045,7 @@ the Selection Process. Most of these methods have parameters.
 Further Information Elements are needed to fully specify packet
 selection with these methods and all of their parameters. For the
 methods parameters, Information Elements are defined in the
-IPFIX registry <xref type="uri" data="https://www.iana.org/assignments/ipfix">IANA-IPFIX</xref>.
+IPFIX registry <xref type="registry" data="ipfix">IANA-IPFIX</xref>.
 The names of these Information Elements are listed for each
 method identifier. Further method identifiers may be added
 to the list. It might be necessary to define new Information
@@ -7061,7 +7059,7 @@ no agreed parameters specified.
 </description>
 <references>
 <paragraph>
-See the "Packet Sampling (PSAMP) Parameters" registry <xref type="uri" data="https://www.iana.org/assignments/psamp-parameters"/>
+See the "Packet Sampling (PSAMP) Parameters" registry <xref type="registry" data="psamp-parameters">Packet Sampling (PSAMP) Parameters</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5477"/>
@@ -7328,8 +7326,7 @@ applies, and the octets MUST be from the start of the IP payload.
 <paragraph>
 The IPv4 payload is that part of the packet that follows the IPv4
 header and any options, which <xref type="rfc" data="rfc791"/> refers to as "data" or
-"data octets".  For example, see the examples in <xref type="rfc" data="rfc791"/>,
-Appendix A.
+"data octets".  For example, see the examples in <xref type="rfc" data="rfc791" appendix="A"/>.
 </paragraph>
 <paragraph>
 The IPv6 payload is the rest of the packet following the 40-octet
@@ -7405,8 +7402,7 @@ dataLinkFrameSize, are needed to specify the data link type and the
 size of the data link frame of this Information Element.  A set of
 these Information Elements MAY be contained in a structured data
 type, as expressed in <xref type="rfc" data="rfc6313"/>.  Or a set of these Information
-Elements MAY be contained in one Flow Record as shown in Appendix
-B of <xref type="rfc" data="rfc7133"/>.
+Elements MAY be contained in one Flow Record as shown in <xref type="rfc" data="rfc7133" appendix="B" label-format="of"/>.
 </paragraph>
 <paragraph>
 The data link layer is defined in [ISO/IEC.7498-1:1994].
@@ -7734,7 +7730,7 @@ nanoseconds of an observation.
 This Information Element specifies the value from the digest hash
 function.
 
-See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
+See also <xref type="rfc" data="rfc5475" section="6.2" label-format="of"/><xref type="rfc" data="rfc5475" section="3.8" label-format="bare"/><xref type="rfc" data="rfc5475" section="7.1" label-format="bare"/>.
 </paragraph>
 </description>
 <xref type="rfc" data="rfc5477"/>
@@ -7753,7 +7749,7 @@ See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
 This Information Element specifies the IP payload offset used by a
 Hash-based Selection Selector.
 
-See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
+See also <xref type="rfc" data="rfc5475" section="6.2" label-format="of"/><xref type="rfc" data="rfc5475" section="3.8" label-format="bare"/><xref type="rfc" data="rfc5475" section="7.1" label-format="bare"/>.
 </paragraph>
 </description>
 <xref type="rfc" data="rfc5477"/>
@@ -7770,8 +7766,7 @@ See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
 <description>
 <paragraph>
 This Information Element specifies the IP payload size used by a
-Hash-based Selection Selector.  See also Sections 6.2, 3.8 and 7.1 of
-<xref type="rfc" data="rfc5475"/>.
+Hash-based Selection Selector.  See also <xref type="rfc" data="rfc5475" section="6.2" label-format="of"/><xref type="rfc" data="rfc5475" section="3.8" label-format="bare"/><xref type="rfc" data="rfc5475" section="7.1" label-format="bare"/>.
 </paragraph>
 </description>
 <xref type="rfc" data="rfc5477"/>
@@ -7791,7 +7786,7 @@ This Information Element specifies the value for the beginning of
 a hash function's potential output range.
 </paragraph>
 <paragraph>
-See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
+See also <xref type="rfc" data="rfc5475" section="6.2" label-format="of"/><xref type="rfc" data="rfc5475" section="3.8" label-format="bare"/><xref type="rfc" data="rfc5475" section="7.1" label-format="bare"/>.
 </paragraph>
 </description>
 <xref type="rfc" data="rfc5477"/>
@@ -7811,7 +7806,7 @@ This Information Element specifies the value for the end of a hash
 function's potential output range.
 </paragraph>
 <paragraph>
-See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
+See also <xref type="rfc" data="rfc5475" section="6.2" label-format="of"/><xref type="rfc" data="rfc5475" section="3.8" label-format="bare"/><xref type="rfc" data="rfc5475" section="7.1" label-format="bare"/>.
 </paragraph>
 </description>
 <xref type="rfc" data="rfc5477"/>
@@ -7831,7 +7826,7 @@ This Information Element specifies the value for the beginning of
 a hash function's selected range.
 </paragraph>
 <paragraph>
-See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
+See also <xref type="rfc" data="rfc5475" section="6.2" label-format="of"/><xref type="rfc" data="rfc5475" section="3.8" label-format="bare"/><xref type="rfc" data="rfc5475" section="7.1" label-format="bare"/>.
 </paragraph>
 </description>
 <xref type="rfc" data="rfc5477"/>
@@ -7851,7 +7846,7 @@ This Information Element specifies the value for the end of a hash
 function's selected range.
 </paragraph>
 <paragraph>
-See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
+See also <xref type="rfc" data="rfc5475" section="6.2" label-format="of"/><xref type="rfc" data="rfc5475" section="3.8" label-format="bare"/><xref type="rfc" data="rfc5475" section="7.1" label-format="bare"/>.
 </paragraph>
 </description>
 <xref type="rfc" data="rfc5477"/>
@@ -7872,7 +7867,7 @@ the output from this hash Selector has been configured to be
 included in the packet report as a packet digest, else FALSE.
 </paragraph>
 <paragraph>
-See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
+See also <xref type="rfc" data="rfc5475" section="6.2" label-format="of"/><xref type="rfc" data="rfc5475" section="3.8" label-format="bare"/><xref type="rfc" data="rfc5475" section="7.1" label-format="bare"/>.
 </paragraph>
 </description>
 <xref type="rfc" data="rfc5477"/>
@@ -7892,7 +7887,7 @@ This Information Element specifies the initialiser value to the
 hash function.
 </paragraph>
 <paragraph>
-See also Sections 6.2, 3.8 and 7.1 of <xref type="rfc" data="rfc5475"/>.
+See also <xref type="rfc" data="rfc5475" section="6.2" label-format="of"/><xref type="rfc" data="rfc5475" section="3.8" label-format="bare"/><xref type="rfc" data="rfc5475" section="7.1" label-format="bare"/>.
 </paragraph>
 </description>
 <xref type="rfc" data="rfc5477"/>
@@ -8036,7 +8031,7 @@ to the IPFIX Protocol; as such, modifications require Standards Action
 </description>
 <references>
 <paragraph>
-See the "IPFIX Information Element Data Types" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>
+See the "IPFIX Information Element Data Types" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5610"/>
@@ -8062,7 +8057,7 @@ its own language tag; in this case, the description information in each language
 equivalent meaning. In the absence of any language tag, the "i-default" <xref type="rfc" data="rfc2277"/>
 language SHOULD be assumed.
 
-See Section 4 (Security Considerations) of <xref type="rfc" data="rfc5610"/> for notes on string
+See <xref type="rfc" data="rfc5610" section="4" label-format="of"/> (Security Considerations) for notes on string
 handling for Information Element type records.
 </paragraph>
 </description>
@@ -8152,7 +8147,7 @@ semantics to the IPFIX Protocol; as such, modifications require Standards Action
 <references>
 <paragraph>
 See the "IPFIX Information Element Semantics" registry
-<xref type="uri" data="https://www.iana.org/assignments/ipfix"/>
+<xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5610"/>
@@ -8179,7 +8174,7 @@ The special value 0x00 (none) is used to note that the field is unitless.
 </description>
 <references>
 <paragraph>
-See the "IPFIX Information Element Units" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>
+See the "IPFIX Information Element Units" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5610"/>
@@ -8214,7 +8209,7 @@ ignored by the Collecting Process.
 </description>
 <references>
 <paragraph>
-See the "Private Enterprise Numbers (PENs)" registry <xref type="uri" data="https://www.iana.org/assignments/enterprise-numbers"/>
+See the "Private Enterprise Numbers (PENs)" registry <xref type="registry" data="enterprise-numbers">Private Enterprise Numbers (PENs)</xref>
 </paragraph>
 </references>
 <xref type="rfc" data="rfc5610"/>
@@ -8559,7 +8554,7 @@ i.e., the range is defined in some other way.
 <references>
 <paragraph>
 See the assigned transport protocol (e.g., UDP, TCP, SCTP, and DCCP) port numbers
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
@@ -8584,7 +8579,7 @@ i.e., the range is defined in some other way.
 <references>
 <paragraph>
 See the assigned transport protocol (e.g., UDP, TCP, SCTP, and DCCP) port numbers
-<xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>.
+<xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>.
 </paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
@@ -8644,7 +8639,7 @@ The IEEE 802 MAC address of a wireless station (STA).
 </paragraph>
 </description>
 <references>
-<paragraph>See section 1.4 of <xref type="rfc" data="rfc5415"/> for the definition of STA.</paragraph>
+<paragraph>See <xref type="rfc" data="rfc5415" section="1.4" label-format="of"/> for the definition of STA.</paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
 <revision>1</revision>
@@ -8663,7 +8658,7 @@ The IPv4 address of a wireless station (STA).
 </paragraph>
 </description>
 <references>
-<paragraph>See section 1.4 of <xref type="rfc" data="rfc5415"/> for the definition of STA.</paragraph>
+<paragraph>See <xref type="rfc" data="rfc5415" section="1.4" label-format="of"/> for the definition of STA.</paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
 <revision>1</revision>
@@ -8682,7 +8677,7 @@ The IEEE 802 MAC address of a wireless access point (WTP).
 </paragraph>
 </description>
 <references>
-<paragraph>See section 1.4 of <xref type="rfc" data="rfc5415"/> for the definition of WTP.</paragraph>
+<paragraph>See <xref type="rfc" data="rfc5415" section="1.4" label-format="of"/> for the definition of WTP.</paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
 <revision>1</revision>
@@ -8703,7 +8698,7 @@ received. The value matches the value of managed object 'ifType'.
 </description>
 <references>
 <paragraph>See the "IANAifType-MIB" registry
-<xref type="uri" data="https://www.iana.org/assignments/ianaiftype-mib"/>.</paragraph>
+<xref type="registry" data="ianaiftype-mib">IANAifType-MIB</xref>.</paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
 <xref type="rfc" data="rfc9710"/>
@@ -8725,7 +8720,7 @@ The value matches the value of managed object 'ifType'.
 </description>
 <references>
 <paragraph>See the "IANAifType-MIB" registry
-<xref type="uri" data="https://www.iana.org/assignments/ianaiftype-mib"/>.</paragraph>
+<xref type="registry" data="ianaiftype-mib">IANAifType-MIB</xref>.</paragraph>
 </references>
 <xref type="person" data="ipfix-iana_at_cisco.com"/>
 <xref type="rfc" data="rfc9710"/>
@@ -9007,7 +9002,7 @@ is intended to list a complete set of possible value distribution methods.
 <references>
 <paragraph>
 See the "valueDistributionMethod (Value 384)" registry
-<xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+<xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc7015"/>
@@ -9024,7 +9019,7 @@ See the "valueDistributionMethod (Value 384)" registry
 <status>current</status>
 <description>
 <paragraph>
-Interarrival jitter as defined in section 6.4.1 of <xref type="rfc" data="rfc3550"/>, 
+Interarrival jitter as defined in <xref type="rfc" data="rfc3550" section="6.4.1" label-format="of"/>, 
 measured in milliseconds.
 </paragraph>
 </description>
@@ -9045,7 +9040,7 @@ measured in milliseconds.
 <status>current</status>
 <description>
 <paragraph>
-Interarrival jitter as defined in section 6.4.1 of <xref type="rfc" data="rfc3550"/>, 
+Interarrival jitter as defined in <xref type="rfc" data="rfc3550" section="6.4.1" label-format="of"/>, 
 measured in microseconds.
 </paragraph>
 </description>
@@ -9066,7 +9061,7 @@ measured in microseconds.
 <status>current</status>
 <description>
 <paragraph>
-Interarrival jitter as defined in section 6.4.1 of <xref type="rfc" data="rfc3550"/>, 
+Interarrival jitter as defined in <xref type="rfc" data="rfc3550" section="6.4.1" label-format="of"/>, 
 measured in nanoseconds.
 </paragraph>
 </description>
@@ -9149,7 +9144,7 @@ their parameters.
 <references>
 <paragraph>
 See the "flowSelectorAlgorithm (Value 390)" registry
-<xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+<xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 </paragraph>
 </references>
 <xref type="rfc" data="rfc7014"/>
@@ -9512,7 +9507,7 @@ together.
 </description>
 <references>
 <paragraph>See the "dataLinkFrameType (Value 408)" registry
-<xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+<xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
 </paragraph>
 <paragraph>More information about the data link layer can be found in
 (IEEE802.3)(IEEE802.11)(ISO/IEC.7498-1:1994).
@@ -10556,7 +10551,7 @@ Values are listed in the "mibCaptureTimeSemantics (Value 448)" registry.
 <references>
   <paragraph>
   See the "mibCaptureTimeSemantics (Value registry 448)"
-  <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>.
+  <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>.
   </paragraph>
   </references>
 <xref type="rfc" data="rfc8038"/>
@@ -10575,7 +10570,7 @@ Values are listed in the "mibCaptureTimeSemantics (Value 448)" registry.
 <paragraph>
 A mibContextEngineID that specifies the SNMP engine
 ID for a MIB field being exported over IPFIX.  Definition as per
-<xref type="rfc" data="rfc3411"/>, Section 3.3.
+<xref type="rfc" data="rfc3411" section="3.3"/>.
 </paragraph>
 </description>
 <units/>
@@ -10594,7 +10589,7 @@ ID for a MIB field being exported over IPFIX.  Definition as per
 <paragraph>
 An Information Element that denotes that a MIB
 context name is specified for a MIB field being exported over
-IPFIX.  Reference <xref type="rfc" data="rfc3411"/>, Section 3.3.
+IPFIX.  Reference <xref type="rfc" data="rfc3411" section="3.3"/>.
 </paragraph>
 </description>
 <units/>
@@ -10731,7 +10726,7 @@ ASCII/UTF-8 encoded digits (0x30 - 0x39).
 <description>
 <paragraph>
 The HTTP Response Status Code, as defined in 
-section 6 of <xref type="rfc" data="rfc7231"/>, 
+<xref type="rfc" data="rfc7231" section="6" label-format="of"/>, 
 associated with a flow. Implies that the flow 
 record represents a flow containing an HTTP 
 Response.
@@ -10783,8 +10778,7 @@ to grab more ports.
 <status>current</status>
 <description>
 <paragraph>
-The HTTP request method, as defined in section 4 of
-<xref type="rfc" data="rfc7231"/>, associated with a 
+The HTTP request method, as defined in <xref type="rfc" data="rfc7231" section="4" label-format="of"/>, associated with a 
 flow. String with up to 8 UTF-8 characters.
 </paragraph>
 </description>
@@ -10802,11 +10796,9 @@ flow. String with up to 8 UTF-8 characters.
 <status>current</status>
 <description>
 <paragraph>
-The HTTP request host, as defined in section 5.4 of
-<xref type="rfc" data="rfc7230"/> or, in the case of 
+The HTTP request host, as defined in <xref type="rfc" data="rfc7230" section="5.4" label-format="of"/> or, in the case of 
 HTTP/2, the content of the :authority pseudo-header 
-field as defined in section 8.1.2.3 of 
-<xref type="rfc" data="rfc7240"/>. Encoded in UTF-8.
+field as defined in <xref type="rfc" data="rfc7240" section="8.1.2.3" label-format="of"/>. Encoded in UTF-8.
 </paragraph>
 </description>
 <units/>
@@ -10823,11 +10815,9 @@ field as defined in section 8.1.2.3 of
 <status>current</status>
 <description>
 <paragraph>
-The HTTP request target, as defined in section 2 of
-<xref type="rfc" data="rfc7231"/> and in section 5.3 of 
-<xref type="rfc" data="rfc7230"/>, associated with a flow.
+The HTTP request target, as defined in <xref type="rfc" data="rfc7231" section="2" label-format="of"/> and in <xref type="rfc" data="rfc7230" section="5.3" label-format="of"/>, associated with a flow.
 Or the HTTP/2 ":path" pseudo-header field as defined in 
-section 8.1.2.3 of <xref type="rfc" data="rfc7240"/>. 
+<xref type="rfc" data="rfc7240" section="8.1.2.3" label-format="of"/>. 
 Encoded in UTF-8.
 </paragraph>
 </description>
@@ -10846,10 +10836,9 @@ Encoded in UTF-8.
 <description>
 <paragraph>
 The version of an HTTP/1.1 message as indicated by the
-HTTP-version field, defined in section 2.6 of 
-<xref type="rfc" data="rfc7230"/>, or the version
+HTTP-version field, defined in <xref type="rfc" data="rfc7230" section="2.6" label-format="of"/>, or the version
 identification of an HTTP/2 frame as defined in 
-<xref type="rfc" data="rfc7240"/> section 3.1. The length 
+<xref type="rfc" data="rfc7240" section="3.1"/>. The length 
 of this field is limited to 10 characters, UTF-8 encoded.
 </paragraph>
 </description>
@@ -10960,7 +10949,7 @@ Event Type (Value 466)" registry.
 </description>
 <references>
 <paragraph>
-See the "NAT Quota Exceeded Event Type (Value 466)" registry <xref type="uri" data="https://www.iana.org/assignments/ipfix"/>. 
+See the "NAT Quota Exceeded Event Type (Value 466)" registry <xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>. 
 See <xref type="rfc" data="rfc3022"/> for the definition of NAT.  
 </paragraph>
 </references>
@@ -10986,7 +10975,7 @@ Event Type (Value 467)" registry.
 <references>
 <paragraph>
 See the "NAT Threshold Event Type (Value 467)" registry
-<xref type="uri" data="https://www.iana.org/assignments/ipfix"/>. 
+<xref type="registry" data="ipfix">IP Flow Information Export (IPFIX) Entities</xref>. 
 See <xref type="rfc" data="rfc3022"/> for the definition of NAT. 
 </paragraph>
 </references>
@@ -11004,8 +10993,7 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <status>current</status>
 <description>
   <paragraph>
-    The HTTP User-Agent header field as defined in section 5.5.3 of  
-    <xref type="rfc" data="rfc7231"/>. Encoded in UTF-8.
+    The HTTP User-Agent header field as defined in <xref type="rfc" data="rfc7231" section="5.5.3" label-format="of"/>. Encoded in UTF-8.
   </paragraph>
 </description>
 <units/>
@@ -11028,8 +11016,7 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <status>current</status>
 <description>
   <paragraph>
-    The HTTP Content-Type header field as defined in section 3.1.1.5 of 
-    <xref type="rfc" data="rfc7231"/>. Encoded in UTF-8.
+    The HTTP Content-Type header field as defined in <xref type="rfc" data="rfc7231" section="3.1.1.5" label-format="of"/>. Encoded in UTF-8.
   </paragraph>
 </description>
 <units/>
@@ -11052,8 +11039,7 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <status>current</status>
 <description>
   <paragraph>
-    The HTTP reason phrase as defined in section 6.1 of of 
-    <xref type="rfc" data="rfc7231"/>.
+    The HTTP reason phrase as defined in <xref type="rfc" data="rfc7231" section="6.1" label-format="of"/>.
   </paragraph>
 </description>
 <units/>
@@ -11562,16 +11548,15 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <status>current</status>
 <description>
   <paragraph>
-    The 8-bit Flags field defined in the SRH (Section 2 of 
-    <xref type="rfc" data="rfc8754"/>). Assigned flags and 
-    their meanings are provided in the <xref type="uri" data="https://www.iana.org/assignments/ipv6-parameters/ipv6-parameters.xhtml#segment-routing-header-flags">"Segment Routing Header 
+    The 8-bit Flags field defined in the SRH (<xref type="rfc" data="rfc8754" section="2" label-format="of"/>). Assigned flags and 
+    their meanings are provided in the <xref type="registry" data="ipv6-parameters#segment-routing-header-flags">"Segment Routing Header 
     Flags"</xref> IANA registry.
   </paragraph>
 </description>
 <references>
   <paragraph>
   See the assignments in the "Segment Routing Header Flags" 
-  registry at <xref type="uri" data="https://www.iana.org/assignments/ipv6-parameters/ipv6-parameters.xhtml#segment-routing-header-flags"/>. See also <xref type="rfc" data="rfc8754"/> for the SRH specification.
+  registry at <xref type="registry" data="ipv6-parameters#segment-routing-header-flags">Segment Routing Header Flags</xref>. See also <xref type="rfc" data="rfc8754"/> for the SRH specification.
   </paragraph>
 </references>
 <xref type="rfc" data="rfc9487"/>
@@ -11587,15 +11572,14 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <status>current</status>
 <description>
   <paragraph>
-    The 16-bit Tag field defined in the SRH (Section 2 of 
-    <xref type="rfc" data="rfc8754"/>). A tag is used to mark a 
+    The 16-bit Tag field defined in the SRH (<xref type="rfc" data="rfc8754" section="2" label-format="of"/>). A tag is used to mark a 
     packet as part of a class or group of packets sharing the 
     same set of properties.
   </paragraph>
 </description>
 <references>
   <paragraph>
-  See Section 2 of <xref type="rfc" data="rfc8754"/> for more details about the Tag.
+  See <xref type="rfc" data="rfc8754" section="2" label-format="of"/> for more details about the Tag.
   </paragraph>
 </references>
 <xref type="rfc" data="rfc9487"/>
@@ -11616,8 +11600,8 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 </description>
 <references>
   <paragraph>
-  Specified in Section 1 of <xref type="rfc" data="rfc8402"/> and mentioned in "Segment List" 
-  in Section 2 of <xref type="rfc" data="rfc8754"/>.
+  Specified in <xref type="rfc" data="rfc8402" section="1" label-format="of"/> and mentioned in "Segment List" 
+  in <xref type="rfc" data="rfc8754" section="2" label-format="of"/>.
   </paragraph>
 </references>
 <xref type="rfc" data="rfc9487"/>
@@ -11638,7 +11622,7 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 </description>
 <references>
   <paragraph>
-  See Section 2 of <xref type="rfc" data="rfc8402"/> for the definition of "active segment".
+  See <xref type="rfc" data="rfc8402" section="2" label-format="of"/> for the definition of "active segment".
   </paragraph>
 </references>
 <xref type="rfc" data="rfc9487"/>
@@ -11656,7 +11640,7 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
   <paragraph>
   The ordered basicList <xref type="rfc" data="rfc6313"/> of zero or more 
   128-bit IPv6 addresses in the SRH that represents the SRv6 Segment List. 
-  As specified in Section 2 of <xref type="rfc" data="rfc8754"/>, the Segment List is encoded 
+  As specified in <xref type="rfc" data="rfc8754" section="2" label-format="of"/>, the Segment List is encoded 
   starting from the last segment of the SR Policy. That is, the first 
   element of the Segment List (Segment List[0]) contains the last segment 
   of the SR Policy, the second element contains the penultimate segment 
@@ -11665,7 +11649,7 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 </description>
 <references>
   <paragraph>
-  See Section 2 of <xref type="rfc" data="rfc8754"/> for more details about the SRv6 Segment List.
+  See <xref type="rfc" data="rfc8754" section="2" label-format="of"/> for more details about the SRv6 Segment List.
   </paragraph>
 </references>
 <xref type="rfc" data="rfc9487"/>
@@ -11681,12 +11665,12 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <status>current</status>
 <description>
   <paragraph>
-  The SRv6 Segment List as defined in Section 2 of <xref type="rfc" data="rfc8754"/> as a series of octets in IPFIX.
+  The SRv6 Segment List as defined in <xref type="rfc" data="rfc8754" section="2" label-format="of"/> as a series of octets in IPFIX.
   </paragraph>
 </description>
 <references>
   <paragraph>
-  See Section 2 of <xref type="rfc" data="rfc8754"/> for more details about the SRv6 Segment List.
+  See <xref type="rfc" data="rfc8754" section="2" label-format="of"/> for more details about the SRv6 Segment List.
   </paragraph>
 </references>
 <xref type="rfc" data="rfc9487"/>
@@ -11708,8 +11692,8 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 </description>
 <references>
   <paragraph>
-  Specified by the "Segments Left" field in Section 4.4 of <xref type="rfc" data="rfc8200"/> 
-  and mentioned in Section 2 of <xref type="rfc" data="rfc8754"/>.
+  Specified by the "Segments Left" field in <xref type="rfc" data="rfc8200" section="4.4" label-format="of"/> 
+  and mentioned in <xref type="rfc" data="rfc8754" section="2" label-format="of"/>.
   </paragraph>
 </references>
 <xref type="rfc" data="rfc9487"/>
@@ -11725,13 +11709,13 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <status>current</status>
 <description>
   <paragraph>
-  The SRH and its TLVs as defined in Section 2 of <xref type="rfc" data="rfc8754"/> 
+  The SRH and its TLVs as defined in <xref type="rfc" data="rfc8754" section="2" label-format="of"/> 
   as a series of octets in IPFIX.
   </paragraph>
 </description>
 <references>
   <paragraph>
-  See Section 2 of <xref type="rfc" data="rfc8754"/> for more details about the 
+  See <xref type="rfc" data="rfc8754" section="2" label-format="of"/> for more details about the 
   structure of an SRH.
   </paragraph>
 </references>
@@ -11751,13 +11735,13 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
     The designator of the routing protocol or PCEP
     extension where the active SRv6 segment has been learned
     from.  Values for this Information Element are listed in the
-    "IPFIX IPv6 SRH Segment Type (Value 500)” subregistry; see <xref type="uri" data="https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-ipv6-srh-segment-type"/>.
+    "IPFIX IPv6 SRH Segment Type (Value 500)” subregistry; see <xref type="registry" data="ipfix#ipfix-ipv6-srh-segment-type">IPFIX IPv6 SRH Segment Type (Value 500)</xref>.
   </paragraph>
 </description>
 <references>
   <paragraph>
     See the assigned types in the "IPFIX IPv6
-    SRH Segment (Value 500)" registry at <xref type="uri" data="https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-ipv6-srh-segment-type"/>.
+    SRH Segment (Value 500)" registry at <xref type="registry" data="ipfix#ipfix-ipv6-srh-segment-type">IPFIX IPv6 SRH Segment Type (Value 500)</xref>.
   </paragraph>
 </references>
 <xref type="rfc" data="rfc9487"/>
@@ -11779,7 +11763,7 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 </description>
 <references>
   <paragraph>
-  See Section 3.1 of <xref type="rfc" data="rfc8986"/> for more details about the SID format.
+  See <xref type="rfc" data="rfc8986" section="3.1" label-format="of"/> for more details about the SID format.
   </paragraph>
 </references>
 <xref type="rfc" data="rfc9487"/>
@@ -11796,16 +11780,15 @@ See <xref type="rfc" data="rfc3022"/> for the definition of NAT.
 <status>current</status>
 <description>
   <paragraph>
-    The 16-bit unsigned integer that represents an SRv6 Endpoint behavior as per Section 4 of  
-  <xref type="rfc" data="rfc8986"/>. Assigned values and their meanings are provided in the 
-  <xref type="uri" data="https://www.iana.org/assignments/segment-routing/segment-routing.xhtml#srv6-endpoint-behaviors">"SRV6 Endpoint Behaviors"</xref> registry.
+    The 16-bit unsigned integer that represents an SRv6 Endpoint behavior as per <xref type="rfc" data="rfc8986" section="4" label-format="of"/>. Assigned values and their meanings are provided in the 
+  <xref type="registry" data="segment-routing#srv6-endpoint-behaviors">"SRV6 Endpoint Behaviors"</xref> registry.
   </paragraph>
 </description>
 <references>
   <paragraph>
     See the assigned behaviors in the "SRv6 Endpoint Behaviors" registry at 
-  <xref type="uri" data="https://www.iana.org/assignments/segment-routing/segment-routing.xhtml#srv6-endpoint-behaviors"/>. 
-  See Section 4 of <xref type="rfc" data="rfc8986"/> for more details about 
+  <xref type="registry" data="segment-routing#srv6-endpoint-behaviors">SRv6 Endpoint Behaviors</xref>. 
+  See <xref type="rfc" data="rfc8986" section="4" label-format="of"/> for more details about 
   the processing of endpoint behaviors.
   </paragraph>
 </references>
@@ -12115,9 +12098,9 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See the "IPv6 Extension Header Types" registry at <xref type="uri" data="https://www.iana.org/assignments/ipv6-parameters/ipv6-parameters.xhtml#extension-header">IANA-EH</xref>.
+                          See the "IPv6 Extension Header Types" registry at <xref type="registry" data="ipv6-parameters#extension-header">IANA-EH</xref>.
 
-                          See Section 4 of <xref type="rfc" data="rfc8200"/> for the general definition of IPv6
+                          See <xref type="rfc" data="rfc8200" section="4" label-format="of"/> for the general definition of IPv6
                           extension headers.
                         </paragraph> 
                       </references>
@@ -12143,9 +12126,9 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See the "IPv6 Extension Header Types" registry at <xref type="uri" data="https://www.iana.org/assignments/ipv6-parameters/ipv6-parameters.xhtml#extension-header">IANA-EH</xref>.
+                          See the "IPv6 Extension Header Types" registry at <xref type="registry" data="ipv6-parameters#extension-header">IANA-EH</xref>.
 
-                          See Section 4 of <xref type="rfc" data="rfc8200"/> for the general definition of IPv6
+                          See <xref type="rfc" data="rfc8200" section="4" label-format="of"/> for the general definition of IPv6
                           extension headers.
                         </paragraph>
                       </references>
@@ -12169,13 +12152,13 @@ decode: 0001 - PDU Type value
                           extension header, the value of the corresponding bit is 0.
                         </paragraph>
                         <paragraph>
-                          The IPv6 extension header associated with each bit is provided in <xref type="uri" data="https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-ipv6extensionheaders-bits">IANA-IPFIX-IPv6EH</xref>.
+                          The IPv6 extension header associated with each bit is provided in <xref type="registry" data="ipfix#ipfix-ipv6extensionheaders-bits">IANA-IPFIX-IPv6EH</xref>.
                           Bit 0 corresponds to the least significant bit (LSB) in the ipv6ExtensionHeadersFull IE, while bit 255
                           corresponds to the most significant bit (MSB) of the IE. In doing so, few octets will be needed to
                           encode common IPv6 extension headers when observed in a Flow.
                         </paragraph>
                         <paragraph>
-                          The "No Next Header" (bit 2) value (Section 4.7 of <xref type="rfc" data="rfc8200"/>) is used if
+                          The "No Next Header" (bit 2) value (<xref type="rfc" data="rfc8200" section="4.7" label-format="of"/>) is used if
                           there is no upper-layer header in an IPv6 packet. Even if the value is not considered as an
                           extension header as such, the corresponding bit is set in the ipv6ExtensionHeadersFull IE
                           whenever that value is encountered in the Flow.
@@ -12195,22 +12178,22 @@ decode: 0001 - PDU Type value
                         </paragraph>
                         <paragraph>
                           The value of ipv6ExtensionHeadersFull IE may be encoded in fewer octets per the guidelines in
-                          Section 6.2 of <xref type="rfc" data="rfc7011"/>
+                          <xref type="rfc" data="rfc7011" section="6.2" label-format="of"/>
                         </paragraph>
                       </description>
                       <references>
                         <paragraph>
-                          See the "IPFIX ipv6ExtensionHeaders Bits" registry at <xref type="uri" data="https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-ipv6extensionheaders-bits">IANA-IPFIX-IPv6EH</xref>.
+                          See the "IPFIX ipv6ExtensionHeaders Bits" registry at <xref type="registry" data="ipfix#ipfix-ipv6extensionheaders-bits">IANA-IPFIX-IPv6EH</xref>.
 
-                          See the "IPv6 Extension Header Types" registry at <xref type="uri" data="https://www.iana.org/assignments/ipv6-parameters/ipv6-parameters.xhtml#extension-header">IANA-EH</xref>.
+                          See the "IPv6 Extension Header Types" registry at <xref type="registry" data="ipv6-parameters#extension-header">IANA-EH</xref>.
 
-                          See Section 4 of <xref type="rfc" data="rfc8200"/> for the general definition of IPv6
+                          See <xref type="rfc" data="rfc8200" section="4" label-format="of"/> for the general definition of IPv6
                           extension headers.
 
                           The ipv6ExtensionHeadersFull IE deprecates the ipv6ExtensionHeaders IE (64) that was initially defined in
                           <xref type="rfc" data="rfc5102"/>.
 
-                          <xref type="rfc" data="rfc7012"/> obsoletes <xref type="rfc" data="rfc5102"/> and specifies that <xref type="uri" data="https://www.iana.org/assignments/ipfix">IANA-IPFIX</xref>
+                          <xref type="rfc" data="rfc7012"/> obsoletes <xref type="rfc" data="rfc5102"/> and specifies that <xref type="registry" data="ipfix">IANA-IPFIX</xref>
                           is the normative reference for the ipv6ExtensionHeaders IE (64).
                         </paragraph>
                       </references>
@@ -12227,7 +12210,7 @@ decode: 0001 - PDU Type value
                       <status>current</status>
                       <description>
                         <paragraph>
-                          As per Section 4.1 of <xref type="rfc" data="rfc8200"/>, IPv6 nodes must accept
+                          As per <xref type="rfc" data="rfc8200" section="4.1" label-format="of"/>, IPv6 nodes must accept
                           and attempt to process extension headers occurring any number of times in the
                           same packet. This IE echoes the order of extension headers and number of 
                           onsecutive occurrences of the same extension header type in a Flow.
@@ -12261,15 +12244,15 @@ decode: 0001 - PDU Type value
                           (including an extension header that it does not support), then the exact observed code of that
                           extension header MUST be echoed in the ipv6ExtensionHeaderTypeCountList IE. How an implementation
                           disambiguates between unknown upper-layer protocols vs. extension headers is not IPFIX-specific.
-                          Refer, for example, to Section 2.2 of <xref type="rfc" data="rfc8883"/> for a behavior of an
+                          Refer, for example, to <xref type="rfc" data="rfc8883" section="2.2" label-format="of"/> for a behavior of an
                           intermediate node that encounters an unknown Next Header type.
                         </paragraph>
                       </description>
                       <references>
                         <paragraph>
-                          See the "IPv6 Extension Header Types" registry at <xref type="uri" data="https://www.iana.org/assignments/ipv6-parameters/ipv6-parameters.xhtml#extension-header">IANA-EH</xref>.
+                          See the "IPv6 Extension Header Types" registry at <xref type="registry" data="ipv6-parameters#extension-header">IANA-EH</xref>.
 
-                          See Section 4 of <xref type="rfc" data="rfc8200"/> for the general definition of IPv6 extension headers.
+                          See <xref type="rfc" data="rfc8200" section="4" label-format="of"/> for the general definition of IPv6 extension headers.
                         </paragraph>
                       </references>
                       <xref type="rfc" data="rfc9740"/>
@@ -12297,7 +12280,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See Section 4 of <xref type="rfc" data="rfc8200"/> for the general definition of IPv6 extension headers.
+                          See <xref type="rfc" data="rfc8200" section="4" label-format="of"/> for the general definition of IPv6 extension headers.
                           
                           See <xref type="rfc" data="rfc8883"/> for an example of IPv6 packet processing due to limits on extension headers.
                         </paragraph>
@@ -12320,7 +12303,7 @@ decode: 0001 - PDU Type value
                           extension headers were often dropped in the Internet (e.g., <xref type="rfc" data="rfc7872"/>).
                         </paragraph>
                         <paragraph>
-                          As discussed in Section 1.2 of <xref type="rfc" data="rfc8883"/>, some hardware devices implement
+                          As discussed in <xref type="rfc" data="rfc8883" section="1.2" label-format="of"/>, some hardware devices implement
                           a parsing buffer of a fixed size to process packets, including all the headers. When the aggregate
                           length of headers of an IPv6 packet exceeds that size, the packet will be discarded or deferred to
                           a slow path.
@@ -12338,7 +12321,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See Section 4 of <xref type="rfc" data="rfc8200"/> for the general definition of IPv6 extension headers.
+                          See <xref type="rfc" data="rfc8200" section="4" label-format="of"/> for the general definition of IPv6 extension headers.
                           
                           See <xref type="rfc" data="rfc9098"/> for an overview of operational implications of IPv6 packets with extension headers.
                         </paragraph>
@@ -12368,9 +12351,9 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See the "IPv6 Extension Header Types" registry at <xref type="uri" data="https://www.iana.org/assignments/ipv6-parameters/ipv6-parameters.xhtml#extension-header">IANA-EH</xref>.
+                          See the "IPv6 Extension Header Types" registry at <xref type="registry" data="ipv6-parameters#extension-header">IANA-EH</xref>.
 
-                          See Section 4 of <xref type="rfc" data="rfc8200"/> for the general definition of IPv6 extension headers.
+                          See <xref type="rfc" data="rfc8200" section="4" label-format="of"/> for the general definition of IPv6 extension headers.
                         </paragraph>
                       </references>
                       <xref type="rfc" data="rfc9740"/>
@@ -12401,7 +12384,7 @@ decode: 0001 - PDU Type value
                         </paragraph>
                         <paragraph>
                           The value of tcpOptionsFull IE may be encoded in fewer octets per the guidelines in
-                          Section 6.2 of <xref type="rfc" data="rfc7011"/>.
+                          <xref type="rfc" data="rfc7011" section="6.2" label-format="of"/>.
                         </paragraph>
                         <paragraph>
                           The presence of tcpSharedOptionExID16List or tcpSharedOptionExID32List IEs is an indication
@@ -12415,14 +12398,14 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See the "TCP Option Kind Numbers" registry at <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-parameters-1">IANA-TCP</xref>.
+                          See the "TCP Option Kind Numbers" registry at <xref type="registry" data="tcp-parameters#tcp-parameters-1">IANA-TCP</xref>.
 
                           See <xref type="rfc" data="rfc9293"/> for the general definition of TCP options.
 
                           The tcpOptionsFull IE deprecates the tcpOptions IE (209) that was initially defined in <xref type="rfc" data="rfc5102"/>.
                           
                           <xref type="rfc" data="rfc7012"/> obsoletes <xref type="rfc" data="rfc5102"/> and specifies that 
-                          <xref type="uri" data="https://www.iana.org/assignments/ipfix">IANA-IPFIX</xref> is the normative reference
+                          <xref type="registry" data="ipfix">IANA-IPFIX</xref> is the normative reference
                           for the tcpOptions IE (209).
                         </paragraph>
                       </references>
@@ -12447,7 +12430,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-udp-exids">IANA_TCP-UDP_ExIDs</xref>.
+                          See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="registry" data="tcp-parameters#tcp-udp-exids">IANA_TCP-UDP_ExIDs</xref>.
 
                           See <xref type="rfc" data="rfc9293"/> for the general definition of TCP options.
 
@@ -12475,7 +12458,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-udp-exids">IANA_TCP-UDP_ExIDs</xref>.
+                          See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="registry" data="tcp-parameters#tcp-udp-exids">IANA_TCP-UDP_ExIDs</xref>.
 
                           See <xref type="rfc" data="rfc9293"/> for the general definition of TCP options.
 
@@ -12503,7 +12486,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-udp-exids">IANA_TCP-UDP_ExIDs</xref>.
+                          See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="registry" data="tcp-parameters#tcp-udp-exids">IANA_TCP-UDP_ExIDs</xref>.
 
                           See <xref type="rfc" data="rfc9293"/> for the general definition of TCP options.
 
@@ -12531,7 +12514,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                          See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-udp-exids">IANA_TCP-UDP_ExIDs</xref>.
+                          See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="registry" data="tcp-parameters#tcp-udp-exids">IANA_TCP-UDP_ExIDs</xref>.
 
                           See <xref type="rfc" data="rfc9293"/> for the general definition of TCP options.
 
@@ -12559,7 +12542,7 @@ decode: 0001 - PDU Type value
                           the Flow. The 64 most significant bits MUST be set to 0.
                         </paragraph>
                         <paragraph>
-                          The reduced-size encoding per Section 6.2 of <xref type="rfc" data="rfc7011"/> is followed whenever fewer octets are
+                          The reduced-size encoding per <xref type="rfc" data="rfc7011" section="6.2" label-format="of"/> is followed whenever fewer octets are
                           needed to report observed SAFE UDP options. For example, if only option Kinds &lt;= 31 are
                           observed, then the value of the udpSafeOptions IE can be encoded as unsigned32, or if only
                           option Kinds &lt;= 63 are observed, then the value of the udpSafeOptions IE can be encoded as
@@ -12573,7 +12556,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                        See the "UDP Option Kind Numbers" registry at <xref type="uri" data="https://www.iana.org/assignments/udp">UDP_OPTIONS</xref>.
+                        See the "UDP Option Kind Numbers" registry at <xref type="registry" data="udp">UDP_OPTIONS</xref>.
                         </paragraph>
                         <paragraph>
                         See <xref type="rfc" data="rfc9868"/> for more details about UDP options.
@@ -12600,7 +12583,7 @@ decode: 0001 - PDU Type value
                           Flow.
                         </paragraph>
                         <paragraph>
-                          The reduced-size encoding per Section 6.2 of <xref type="rfc" data="rfc7011"/> is followed
+                          The reduced-size encoding per <xref type="rfc" data="rfc7011" section="6.2" label-format="of"/> is followed
                           whenever fewer octets are needed to report observed UNSAFE UDP options.
                         </paragraph>
                         <paragraph>
@@ -12611,7 +12594,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                        See the "UDP Option Kind Numbers" registry at <xref type="uri" data="https://www.iana.org/assignments/udp">UDP_OPTIONS</xref>.
+                        See the "UDP Option Kind Numbers" registry at <xref type="registry" data="udp">UDP_OPTIONS</xref>.
                         </paragraph>
                         <paragraph>
                         See <xref type="rfc" data="rfc9868"/> for more details about UDP options.
@@ -12638,7 +12621,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                        See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-udp-exids">UDP_ExIDs</xref>.
+                        See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="registry" data="tcp-parameters#tcp-udp-exids">UDP_ExIDs</xref>.
                         </paragraph>
                         <paragraph>
                         See <xref type="rfc" data="rfc9868"/> for more details about ExIDs.
@@ -12666,7 +12649,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                        See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-udp-exids">UDP_ExIDs</xref>.
+                        See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="registry" data="tcp-parameters#tcp-udp-exids">UDP_ExIDs</xref>.
                         </paragraph>
                         <paragraph>
                         See <xref type="rfc" data="rfc9868"/> for more details about ExIDs.
@@ -12694,7 +12677,7 @@ decode: 0001 - PDU Type value
                       </description>
                       <references>
                         <paragraph>
-                        See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="uri" data="https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml#tcp-udp-exids">UDP_ExIDs</xref>.
+                        See the "TCP/UDP Experimental Option Experiment Identifiers (TCP/UDP ExIDs)" registry at <xref type="registry" data="tcp-parameters#tcp-udp-exids">UDP_ExIDs</xref>.
                         </paragraph>
                         <paragraph>
                         See <xref type="rfc" data="rfc9868"/> for more details about ExIDs.
@@ -13182,7 +13165,7 @@ node), according to OWDelay_HybridType1_IP_RFC9951_Seconds_Sum in the IANA <xref
 
 <record>
 <value>1</value>
-<description>IANA-L3: The Assigned Internet Protocol Number (layer 3 (L3)) is exported in the Selector ID. See <xref type="uri" data="https://www.iana.org/assignments/protocol-numbers"/>.
+<description>IANA-L3: The Assigned Internet Protocol Number (layer 3 (L3)) is exported in the Selector ID. See <xref type="registry" data="protocol-numbers">Protocol Numbers</xref>.
 </description>
 <length>1</length>
 <xref type="rfc" data="rfc6759"/>
@@ -13199,7 +13182,7 @@ node), according to OWDelay_HybridType1_IP_RFC9951_Seconds_Sum in the IANA <xref
 <record>
 <value>3</value>
 <description>IANA-L4: The IANA layer 4 (L4) well-known port
-number is exported in the Selector ID. See <xref type="uri" data="https://www.iana.org/assignments/service-names-port-numbers"/>. Note: as an IPFIX flow is unidirectional,
+number is exported in the Selector ID. See <xref type="registry" data="service-names-port-numbers">Service Name and Transport Protocol Port Number Registry</xref>. Note: as an IPFIX flow is unidirectional,
 it contains the destination port in a flow from
 the client to the server.
 </description>
@@ -13364,7 +13347,7 @@ value is used in this Selector ID.
 <value>20</value>
 <description>PANA-L7-PEN: Proprietary layer 7 definition,
 including a Private Enterprise Number (PEN) 
-<xref type="uri" data="https://www.iana.org/assignments/enterprise-numbers"/>
+<xref type="registry" data="enterprise-numbers">Private Enterprise Numbers (PENs)</xref>
 to identify that the application registry being
 used is not owned by the Exporter manufacturer or to identify the
 original enterprise in the case of a mediator or
