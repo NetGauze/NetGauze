@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="segment-routing">
   <title>Segment Routing</title>
   <created>2021-01-08</created>
-  <updated>2026-08-24</updated>
+  <updated>2026-10-12</updated>
   
   <registry id="srv6-endpoint-behaviors">
     <title>SRv6 Endpoint Behaviors</title>
@@ -822,11 +822,12 @@
       <xref type="rfc" data="rfc9800"/>
       <controller>IETF</controller>
     </record>
-    <record>
+    <record date="2026-10-12">
       <value>113</value>
       <hex>0x0071</hex>
-      <description>Unassigned</description>
-      <controller/>
+      <description>End.M with REPLACE-CSID</description>
+      <xref type="draft" data="draft-ietf-rtgwg-srv6-egress-protection-26"/>
+      <controller><xref type="person" data="Tao_He"/></controller>
     </record>
     <record date="2023-04-14" updated="2025-02-12">
       <value>114</value>
@@ -1564,6 +1565,11 @@
       <name>Ran Chen</name>
       <uri>mailto:chen.ran&amp;zte.com.cn</uri>
       <updated>2026-07-22</updated>
+    </person>
+    <person id="Tao_He">
+      <name>Tao He</name>
+      <uri>mailto:het21&amp;chinaunicom.cn</uri>
+      <updated>2026-10-12</updated>
     </person>
     <person id="Yuya_Kawakami">
       <name>Yuya Kawakami</name>

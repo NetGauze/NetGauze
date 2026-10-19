@@ -14,7 +14,7 @@ bit field.  In Internet Protocol version 6 (IPv6) <xref type="rfc" data="rfc8200
 is called the "Next Header" field.
     </note>
     <note>Values that are also IPv6 Extension Header Types should be listed in the 
-IPv6 Extension Header Types registry at <xref type="registry" data="ipv6-parameters"/>.
+IPv6 Extension Header Types registry at <xref type="registry" data="ipv6-parameters">Internet Protocol Version 6 (IPv6) Parameters</xref>.
     </note>
     <record>
       <value>0</value>
