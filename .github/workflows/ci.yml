@@ -45,6 +45,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
+          # Remove libxxhash-dev since libyang has issue with static link to it
+          sudo apt-get remove -y libxxhash-dev
       - name: Install stable
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -71,6 +73,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
+          # Remove libxxhash-dev since libyang has issue with static link to it
+          sudo apt-get remove -y libxxhash-dev
       - name: Enable type layout randomization
         run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
         if: matrix.rust == 'nightly'
@@ -143,6 +147,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
+          # Remove libxxhash-dev since libyang has issue with static link to it
+          sudo apt-get remove -y libxxhash-dev
       - uses: Swatinem/rust-cache@v2
       - name: cargo doc
         run: cargo doc --locked --no-deps --all-features
@@ -158,6 +164,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
+          # Remove libxxhash-dev since libyang has issue with static link to it
+          sudo apt-get remove -y libxxhash-dev
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@clippy
         with:
@@ -186,6 +194,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
+          # Remove libxxhash-dev since libyang has issue with static link to it
+          sudo apt-get remove -y libxxhash-dev
       - uses: Swatinem/rust-cache@v2
       - name: cargo install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
