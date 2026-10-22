@@ -44,7 +44,7 @@ jobs:
       - name: Install curl-dev
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
+          sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
       - name: Install stable
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -70,7 +70,7 @@ jobs:
       - name: Install curl-dev
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
+          sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
       - name: Enable type layout randomization
         run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
         if: matrix.rust == 'nightly'
@@ -142,7 +142,7 @@ jobs:
       - name: Install curl-dev
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
+          sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
       - uses: Swatinem/rust-cache@v2
       - name: cargo doc
         run: cargo doc --locked --no-deps --all-features
@@ -157,7 +157,7 @@ jobs:
       - name: Install curl-dev
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
+          sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@clippy
         with:
@@ -185,7 +185,7 @@ jobs:
       - name: Install curl-dev
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
+          sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
       - uses: Swatinem/rust-cache@v2
       - name: cargo install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

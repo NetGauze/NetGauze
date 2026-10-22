@@ -50,7 +50,7 @@ jobs:
       - name: Install curl-dev
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
+          sudo apt-get install -y libcurl4-openssl-dev libpcre2-dev
       - name: Publish crates
         uses: katyo/publish-crates@v2
         with:
