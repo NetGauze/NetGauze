@@ -190,13 +190,15 @@ fn parse_capability_param<'a>(
 impl From<BgpParameterParsingError> for OpenMessageError {
     fn from(param_err: BgpParameterParsingError) -> Self {
         match param_err {
-            // RFC 4271: If one of the Optional Parameters in the OPEN message is recognized, but is
-            // malformed, then the Error Subcode MUST be set to 0 (Unspecific)
+            // RFC 4271: If one of the Optional Parameters in the OPEN message
+            // is recognized, but is malformed, then the Error Subcode MUST be
+            // set to 0 (Unspecific)
             BgpParameterParsingError::Parse(_) => OpenMessageError::Unspecific {
                 value: vec![].into(),
             },
-            // RFC 4271: If one of the Optional Parameters in the OPEN message is not recognized,
-            // then the Error Subcode MUST be set to Unsupported Optional Parameters.
+            // RFC 4271: If one of the Optional Parameters in the OPEN message
+            // is not recognized, then the Error Subcode MUST be set to
+            // Unsupported Optional Parameters.
             BgpParameterParsingError::UndefinedParameterType { offset: _, code } => {
                 OpenMessageError::UnsupportedOptionalParameter {
                     value: vec![code].into(),
@@ -205,8 +207,8 @@ impl From<BgpParameterParsingError> for OpenMessageError {
             // RFC 5492 defines that a BGP speaker should ignore capabilities it
             // does not understand and not report any error.
             // It will only report a notification if the capability is
-            // understood but not supported by the speaker. If an error is reported anyways by the
-            // parser we set the notif to Unspecific
+            // understood but not supported by the speaker. If an error is
+            // reported anyways by the parser we set the notif to Unspecific
             BgpParameterParsingError::CapabilityError(_) => OpenMessageError::Unspecific {
                 value: vec![].into(),
             },
@@ -220,12 +222,14 @@ impl From<BgpOpenMessageParsingError> for OpenMessageError {
             BgpOpenMessageParsingError::Parse(_) => OpenMessageError::Unspecific {
                 value: vec![].into(),
             },
-            // RFC 4271: If the version number in the Version field of the received OPEN message is
-            // not supported, then the Error Subcode MUST be set to Unsupported Version Number.
-            // The Data field is a 2-octet unsigned integer, which indicates the largest,
-            // locally-supported version number less than the version the remote BGP peer bid (as
-            // indicated in the received OPEN message), or if the smallest, locally-supported
-            // version number is greater than the version the remote BGP peer bid, then the
+            // RFC 4271: If the version number in the Version field of the
+            // received OPEN message is not supported, then the Error Subcode
+            // MUST be set to Unsupported Version Number. The Data field is a
+            // 2-octet unsigned integer, which indicates the largest,
+            // locally-supported version number less than the version the remote
+            // BGP peer bid (as indicated in the received OPEN message), or if
+            // the smallest, locally-supported version number is greater than
+            // the version the remote BGP peer bid, then the
             // smallest, locally-supported version number.
             BgpOpenMessageParsingError::UnsupportedVersionNumber { .. } => {
                 OpenMessageError::UnsupportedVersionNumber {
@@ -237,9 +241,10 @@ impl From<BgpOpenMessageParsingError> for OpenMessageError {
                     value: time.to_be_bytes().into(),
                 }
             }
-            // RFC 4271: If the BGP Identifier field of the OPEN message is syntactically incorrect,
-            // then the Error Subcode MUST be set to Bad BGP Identifier. Syntactic correctness means
-            // that the BGP Identifier field represents a valid unicast IP host address.
+            // RFC 4271: If the BGP Identifier field of the OPEN message is
+            // syntactically incorrect, then the Error Subcode MUST be set to
+            // Bad BGP Identifier. Syntactic correctness means that the BGP
+            // Identifier field represents a valid unicast IP host address.
             // NOTE: not all BGP implementation check for syntactic correctness
             BgpOpenMessageParsingError::InvalidBgpId { bgp_id, .. } => {
                 OpenMessageError::BadBgpIdentifier {

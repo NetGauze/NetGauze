@@ -62,7 +62,8 @@ impl From<XmlWriterError> for quick_xml::Error {
 /// Transform a Rust object into an XML stream of characters
 pub struct XmlWriter<T: io::Write> {
     inner: quick_xml::writer::Writer<T>,
-    // Stack of multiple namespace bindings since XML allows to overwrite the bindings
+    // Stack of multiple namespace bindings
+    // since XML allows to overwrite the bindings
     namespace_bindings: Vec<IndexMap<Cow<'static, str>, String>>,
     // Namespaces has been appended to the xml element
     ns_applied: bool,

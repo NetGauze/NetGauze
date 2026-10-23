@@ -318,7 +318,8 @@ impl FieldConfig {
                 )))
             }
 
-            // Single or Coalesce selection cannot be used with aggregating transforms
+            // Single or Coalesce selection cannot be used with aggregating
+            // transforms
             (
                 FieldSelectFunction::Single(_)
                 | FieldSelectFunction::Coalesce(_)
@@ -414,8 +415,8 @@ impl FieldConfig {
 
             // String transforms require TryInto<String>
             // - Generally implemented for all types except Bytes
-            // - Exception: also implemented for IE::mplsVpnRouteDistinguisher (octetArray with
-            //   custom string conversion)
+            // - Exception: also implemented for IE::mplsVpnRouteDistinguisher
+            //   (octetArray with custom string conversion)
             FieldTransformFunction::String
             | FieldTransformFunction::TrimmedString
             | FieldTransformFunction::LowercaseString

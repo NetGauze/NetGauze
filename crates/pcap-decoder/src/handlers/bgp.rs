@@ -308,8 +308,10 @@ mod tests {
                     BgpMessageParsingError::BgpUpdateMessageParsingError(
                         BgpUpdateMessageParsingError::PathAttributeError(
                             PathAttributeParsingError::OriginError(
-                                // 19-byte BGP header + 2 withdrawn-routes-length
-                                // + 2 path-attributes-length + 3 attribute header
+                                // 19-byte BGP header
+                                // + 2 withdrawn-routes-length
+                                // + 2 path-attributes-length
+                                // + 3 attribute header
                                 OriginParsingError::UndefinedOrigin {
                                     offset: 26,
                                     code: 255

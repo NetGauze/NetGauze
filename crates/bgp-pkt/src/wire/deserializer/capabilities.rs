@@ -363,7 +363,8 @@ impl<'a> ParseFrom<'a> for MultiProtocolExtensionsCapability {
             Err(err) => {
                 return Err(
                     MultiProtocolExtensionsCapabilityParsingError::AddressTypeError {
-                        // AFI (2 bytes), reserved (1 byte), and SAFI (1 byte) are the last 4 read
+                        // AFI (2 bytes), reserved (1 byte), and SAFI (1 byte)
+                        // are the last 4 read
                         offset: cur.offset() - 4,
                         afi: err.address_family().into(),
                         safi: err.subsequent_address_family().into(),
@@ -808,7 +809,8 @@ impl<'a> ParseFrom<'a> for ExtendedNextHopEncoding {
             Err(err) => {
                 return Err(
                     ExtendedNextHopEncodingCapabilityParsingError::AddressTypeError {
-                        // AFI (2 bytes) and SAFI (2 bytes) are the last 4 bytes read
+                        // AFI (2 bytes) and SAFI (2 bytes) are
+                        // the last 4 bytes read
                         offset: ehe_buf.offset() - 4,
                         afi: err.address_family().into(),
                         safi: err.subsequent_address_family().into(),
