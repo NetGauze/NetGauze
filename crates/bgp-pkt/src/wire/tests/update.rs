@@ -349,11 +349,13 @@ fn test_bgp_ls_attribute_does_not_swallow_subsequent_attributes()
         0x40, 0x02, 0x00, //
         // PA: LOCAL_PREF = 100
         0x40, 0x05, 0x04, 0x00, 0x00, 0x00, 0x64, //
-        // PA: BGP_LS_ATTRIBUTE (TLV 29), extended-length=5, NodeFlagBits TLV 1024
+        // PA: BGP_LS_ATTRIBUTE (TLV 29), extended-length=5,
+        //NodeFlagBits TLV 1024
         0x90, 0x1d, 0x00, 0x05, 0x04, 0x00, 0x00, 0x01, 0x00, //
         // PA: MP_REACH_NLRI (TLV 14), extended-length, length 173
         0x90, 0x0e, 0x00, 0xad, //
-        //   AFI=16388 (BGP-LS), SAFI=71, NextHopLen=4, NextHop=100.100.100.1, Reserved
+        // AFI=16388 (BGP-LS), SAFI=71, NextHopLen=4, NextHop=100.100.100.1,
+        // Reserved
         0x40, 0x04, 0x47, 0x04, 0x64, 0x64, 0x64, 0x01, 0x00, //
         //   NLRI #1: Node NLRI for 100.100.100.1
         0x00, 0x01, 0x00, 0x25, //

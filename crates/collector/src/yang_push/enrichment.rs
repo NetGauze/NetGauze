@@ -745,8 +745,8 @@ mod tests {
             None,
             TelemetryMessageMetadata::new(
                 Some(Utc.with_ymd_and_hms(2025, 4, 17, 15, 20, 14).unwrap()),
-                // copy the collection timestamp from the received message since it's the current
-                // system time
+                // copy the collection timestamp from the received message
+                // since it's the current system time
                 received_enriched
                     .message()
                     .telemetry_message_metadata()
@@ -807,8 +807,8 @@ mod tests {
             None,
             TelemetryMessageMetadata::new(
                 Some(Utc.with_ymd_and_hms(2025, 4, 17, 15, 20, 14).unwrap()),
-                // copy the collection timestamp from the received message since it's the current
-                // system time
+                // copy the collection timestamp from the received message
+                // since it's the current system time
                 received_enriched
                     .message()
                     .telemetry_message_metadata()

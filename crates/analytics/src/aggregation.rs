@@ -509,7 +509,8 @@ mod tests {
                 ts: Utc.with_ymd_and_hms(2025, 1, 1, 0, 1, 0).unwrap(),
                 value: 3,
             },
-            // Out-of-order event, but still within the allowed lateness of 10 seconds
+            // Out-of-order event,
+            // but still within the allowed lateness of 10 seconds
             TestItem {
                 key: "key1".to_string(),
                 ts: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 55).unwrap(),
@@ -525,7 +526,8 @@ mod tests {
                 ts: Utc.with_ymd_and_hms(2025, 1, 1, 0, 2, 10).unwrap(),
                 value: 5,
             },
-            // Out-of-order event, but not within the allowed lateness of 10 seconds
+            // Out-of-order event,
+            // but not within the allowed lateness of 10 seconds
             TestItem {
                 key: "key1".to_string(),
                 ts: Utc.with_ymd_and_hms(2025, 1, 1, 0, 1, 40).unwrap(),

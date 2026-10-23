@@ -76,7 +76,8 @@ impl<'a> ParseFrom<'a> for BgpRouteRefreshMessage {
             Ok(address_type) => address_type,
             Err(err) => {
                 return Err(BgpRouteRefreshMessageParsingError::AddressTypeError {
-                    // AFI (2 bytes), reserved (1 byte), and SAFI (1 byte) are the last 4 read
+                    // AFI (2 bytes), reserved (1 byte), and SAFI (1 byte)
+                    // are the last 4 read
                     offset: cur.offset() - 4,
                     afi: err.address_family().into(),
                     safi: err.subsequent_address_family().into(),

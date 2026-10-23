@@ -228,8 +228,8 @@ struct FlowCollectorActor {
     interface_bind: Option<String>,
     cmd_rx: mpsc::Receiver<FlowCollectorActorCommand>,
     next_subscriber_id: SubscriberId,
-    // TODO: in future allow subscribers to subscribe to a subset of events (i.e., specific peers
-    //       or specific record types)
+    // TODO: in future allow subscribers to subscribe to a subset of events
+    //      (i.e., specific peers or specific record types)
     subscribers: HashMap<SubscriberId, Vec<FlowSender>>,
     /// Timeout for sending a [FlowInfo] pkt to a subscriber before dropping it.
     subscriber_timeout: Duration,
