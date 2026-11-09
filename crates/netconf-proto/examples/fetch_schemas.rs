@@ -163,7 +163,6 @@ pub async fn main() -> anyhow::Result<()> {
 
     let modules = args
         .modules
-        .as_slice()
         .iter()
         .map(|x| x.as_str())
         .collect::<Vec<&str>>();
