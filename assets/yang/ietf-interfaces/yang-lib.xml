@@ -178,6 +178,16 @@
         <revision>2024-10-16</revision>
         <namespace>urn:ietf:params:xml:ns:yang:iana-tls-cipher-suite-algs</namespace>
     </module>
+    <module>
+      <name>ietf-yang-push-revision</name>
+      <revision>2025-12-07</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-push-revision</namespace>
+    </module>
+    <module>
+      <name>ietf-distributed-notif</name>
+      <revision>2026-04-13</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-distributed-notif</namespace>
+    </module>
 </module-set>
 <schema>
     <name>complete</name>
