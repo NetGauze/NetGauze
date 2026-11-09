@@ -224,7 +224,7 @@ use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
 use netgauze_netconf_proto::yang_push::types::SubscriptionId;
 use rustc_hash::FxHashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -311,7 +311,7 @@ pub enum CacheLookupCommand {
     LookupBySubscriptionId {
         collector: SocketAddr,
         interface: Option<String>,
-        peer: SocketAddr,
+        peer: IpAddr,
         subscription_id: SubscriptionId,
         tx: async_channel::Sender<CacheResponse>,
     },
@@ -319,7 +319,7 @@ pub enum CacheLookupCommand {
     LookupBySubscriptionIdOneShot {
         collector: SocketAddr,
         interface: Option<String>,
-        peer: SocketAddr,
+        peer: IpAddr,
         subscription_id: SubscriptionId,
         tx: oneshot::Sender<CacheResponse>,
     },
@@ -586,11 +586,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     &[
                         opentelemetry::KeyValue::new(
                             "network.peer.address",
-                            format!("{}", subscription_info.peer().ip()),
-                        ),
-                        opentelemetry::KeyValue::new(
-                            "network.peer.port",
-                            opentelemetry::Value::I64(subscription_info.peer().port().into()),
+                            format!("{}", subscription_info.peer()),
                         ),
                         opentelemetry::KeyValue::new(
                             OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
@@ -653,11 +649,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 let otl_tags = [
                     opentelemetry::KeyValue::new(
                         "network.peer.address",
-                        format!("{}", subscription_info.peer().ip()),
-                    ),
-                    opentelemetry::KeyValue::new(
-                        "network.peer.port",
-                        opentelemetry::Value::I64(subscription_info.peer().port().into()),
+                        format!("{}", subscription_info.peer()),
                     ),
                     opentelemetry::KeyValue::new(
                         OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
@@ -754,11 +746,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         Vec::from([
             opentelemetry::KeyValue::new(
                 "network.peer.address",
-                format!("{}", subscription_info.peer().ip()),
-            ),
-            opentelemetry::KeyValue::new(
-                "network.peer.port",
-                opentelemetry::Value::I64(subscription_info.peer().port().into()),
+                format!("{}", subscription_info.peer()),
             ),
             opentelemetry::KeyValue::new(
                 OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
@@ -932,11 +920,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 tx,
             } => {
                 let otel_tags = [
-                    opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
-                    opentelemetry::KeyValue::new(
-                        "network.peer.port",
-                        opentelemetry::Value::I64(peer.port().into()),
-                    ),
+                    opentelemetry::KeyValue::new("network.peer.address", format!("{peer}")),
                     opentelemetry::KeyValue::new(
                         OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
                         opentelemetry::Value::I64(subscription_id.into()),
@@ -950,7 +934,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 );
                 let response = self
                     .schema_cache
-                    .get_by_subscription_id(peer.ip(), subscription_id);
+                    .get_by_subscription_id(peer, subscription_id);
                 if let Some((subscription_info, yang_lib_ref)) = response {
                     self.stats.cache_hits.add(1, &otel_tags);
                     Self::send_yang_lib_ref(&subscription_info, yang_lib_ref, tx).await;
@@ -1037,11 +1021,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 tx,
             } => {
                 let mut otel_tags = vec![
-                    opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
-                    opentelemetry::KeyValue::new(
-                        "network.peer.port",
-                        opentelemetry::Value::I64(peer.port().into()),
-                    ),
+                    opentelemetry::KeyValue::new("network.peer.address", format!("{peer}")),
                     opentelemetry::KeyValue::new(
                         OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
                         opentelemetry::Value::I64(subscription_id.into()),
@@ -1054,7 +1034,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     "processing cache lookup by subscription id request (one shot)");
                 let response = self
                     .schema_cache
-                    .get_by_subscription_id(peer.ip(), subscription_id);
+                    .get_by_subscription_id(peer, subscription_id);
                 if let Some((subscription_info, yang_lib_ref)) = response {
                     self.stats.cache_hits.add(1, &otel_tags);
                     Self::send_yang_lib_ref_oneshot(&subscription_info, yang_lib_ref, tx);
@@ -1301,7 +1281,7 @@ pub(crate) mod tests {
         SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 10000),
             None,
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 200)), 830),
+            IpAddr::from([192, 168, 1, 200]),
             1,
             Target::new_datastore(
                 "ds:operational".into(),

@@ -115,7 +115,7 @@ impl
         input: &(Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper),
     ) -> Option<serde_json::Value> {
         let (_, subscription_info, _) = input;
-        let ip = subscription_info.peer().ip();
+        let ip = subscription_info.peer();
         Some(serde_json::Value::String(ip.to_string()))
     }
 
@@ -152,7 +152,7 @@ mod tests {
         SubscriptionInfo::new(
             SocketAddr::from(([127, 0, 0, 1], 10000)),
             None,
-            SocketAddr::new(ip, 8080),
+            ip,
             1,
             netgauze_udp_notif_pkt::notification::Target::new_datastore(
                 "ietf-datastores:operational".into(),
