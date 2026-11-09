@@ -347,6 +347,19 @@ enum ValidationActorCommand {
     Shutdown,
 }
 
+/// Run CPU-heavy, blocking work without stalling the async runtime: on the
+/// multi-thread runtime the worker hands its queued tasks to other workers for
+/// the duration (`block_in_place`); on a current-thread runtime (tests) the
+/// closure is simply called.
+fn run_blocking<T>(f: impl FnOnce() -> T) -> T {
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+            tokio::task::block_in_place(f)
+        }
+        _ => f(),
+    }
+}
+
 struct ValidationActor {
     max_cached_packets_per_peer: usize,
     max_cached_packets_per_subscription: usize,
@@ -1039,12 +1052,19 @@ impl ValidationActor {
         subscription_cache.subscription_info = subscription_info.clone();
         if let (Some(yang_lib_ref), Some(content_id)) = (yang_lib_ref, cached_content_id.clone()) {
             let search_dir = yang_lib_ref.search_dir();
-            let yang_ctx_result = yang5::context::Context::new_from_yang_library_file(
-                &yang_lib_ref.yang_library_path(),
-                DataFormat::XML,
-                &search_dir.as_path(),
-                yang5::context::ContextFlags::empty(),
-            );
+            // Building a libyang context for a device library (hundreds of
+            // modules) takes seconds of CPU. Doing that inline would stall the
+            // tokio worker, and with it the UDP listener that shares the
+            // runtime: the kernel socket buffer then overflows and packets are
+            // lost (observed with 44 subscriptions announced in one second).
+            let yang_ctx_result = run_blocking(|| {
+                yang5::context::Context::new_from_yang_library_file(
+                    &yang_lib_ref.yang_library_path(),
+                    DataFormat::XML,
+                    &search_dir.as_path(),
+                    yang5::context::ContextFlags::empty(),
+                )
+            });
             let yang_ctx = match yang_ctx_result {
                 Ok(yang_ctx) => {
                     self.stats.cache_yang_ctx_created.add(1, &otl_tags);
