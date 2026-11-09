@@ -1,7 +1,7 @@
 [
   {
     "collector": "127.0.0.1:10000",
-    "peer": "0.0.0.0:830",
+    "peer": "0.0.0.0",
     "id": 1,
     "target": {
       "ietf-yang-push:datastore": "ietf-datastores:operational",

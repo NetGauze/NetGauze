@@ -354,7 +354,7 @@ impl YangPushEnrichmentActor {
 
         let labels: Option<Vec<Label>> = self
             .labels
-            .get(&peer.ip())
+            .get(&peer)
             .map(|l_map| l_map.values().cloned().map(|wl| wl.label).collect());
 
         // Match on the wrapper and process the notification content
@@ -377,8 +377,8 @@ impl YangPushEnrichmentActor {
             EventType::Log,
             None,                      // we don't set sequence numbers for now
             SessionProtocol::YangPush, // only option at the moment
-            peer.ip(),
-            Some(peer.port()),
+            peer,
+            None,
             None,
             None,
             subscription_metadata,
@@ -449,11 +449,7 @@ impl YangPushEnrichmentActor {
                             let peer_tags = [
                                 opentelemetry::KeyValue::new(
                                     "network.peer.address",
-                                    format!("{}", peer.ip()),
-                                ),
-                                opentelemetry::KeyValue::new(
-                                    "network.peer.port",
-                                    opentelemetry::Value::I64(peer.port().into()),
+                                    format!("{peer}")
                                 ),
                                 opentelemetry::KeyValue::new(
                                     OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
@@ -691,7 +687,7 @@ mod tests {
         let subscription_info = SubscriptionInfo::new(
             collector,
             None,
-            peer,
+            peer.ip(),
             id,
             Target::new_datastore(
                 DatastoreName::Operational.to_string().into_boxed_str(),
@@ -724,7 +720,7 @@ mod tests {
         let collector = SocketAddr::from(([127, 0, 0, 1], 10000));
         let peer = SocketAddr::from(([127, 0, 0, 1], 12345));
         let (_subscription_info, json_payload, decoded) = create_subscription_started(peer, 1);
-        let empty_subscription_info = SubscriptionInfo::new_empty(collector, None, peer, 1);
+        let empty_subscription_info = SubscriptionInfo::new_empty(collector, None, peer.ip(), 1);
 
         msgs_tx
             .send((
@@ -755,7 +751,7 @@ mod tests {
                 None,
                 SessionProtocol::YangPush,
                 IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                Some(12345),
+                None,
                 None,
                 None,
                 None,
@@ -817,7 +813,7 @@ mod tests {
                 None,
                 SessionProtocol::YangPush,
                 IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                Some(12345),
+                None,
                 None,
                 None,
                 Some(expected_metadata),
@@ -866,7 +862,7 @@ mod tests {
             Bytes::from(payload),
         );
 
-        let subscription_info = SubscriptionInfo::new_empty(collector, None, peer, 1);
+        let subscription_info = SubscriptionInfo::new_empty(collector, None, peer.ip(), 1);
         // Attempt to decode the packet (should succeed)
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();
 

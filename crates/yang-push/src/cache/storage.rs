@@ -732,9 +732,9 @@ impl YangLibraryReference {
 /// - **interface**: The network interface name (if available) on which the
 ///   subscription was received.
 ///
-/// - **peer**: The socket address (IP and port) of the remote device that
-///   established the subscription. This identifies which network element sent
-///   the subscription-started notification.
+/// - **peer**: The IP address of the remote device that established the
+///   subscription. This identifies which network element sent the
+///   subscription-started notification.
 ///
 /// - **content_id**: The YANG Library content identifier associated with this
 ///   subscription. This links the subscription to a specific version of the
@@ -780,11 +780,11 @@ impl YangLibraryReference {
 /// println!("Subscription Target: {}", subscription_info.target());
 /// println!("Models: {:?}", subscription_info.models());
 /// ```
-#[derive(Clone, Debug, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SubscriptionInfo {
     pub collector: SocketAddr,
     pub interface: Option<String>,
-    pub peer: SocketAddr,
+    pub peer: IpAddr,
     pub id: SubscriptionId,
     pub target: Target,
 
@@ -808,42 +808,12 @@ pub struct SubscriptionInfo {
     pub content_id: ContentId,
 }
 
-impl std::hash::Hash for SubscriptionInfo {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.peer.ip().hash(state);
-        self.id.hash(state);
-        self.target.hash(state);
-        self.stop_time.hash(state);
-        self.transport.hash(state);
-        self.encoding.hash(state);
-        self.purpose.hash(state);
-        self.update_trigger.hash(state);
-        self.models.hash(state);
-        self.content_id.hash(state);
-    }
-}
-
-impl PartialEq for SubscriptionInfo {
-    fn eq(&self, other: &Self) -> bool {
-        self.peer.ip() == other.peer.ip()
-            && self.id == other.id
-            && self.target == other.target
-            && self.stop_time == other.stop_time
-            && self.transport == other.transport
-            && self.encoding == other.encoding
-            && self.purpose == other.purpose
-            && self.update_trigger == other.update_trigger
-            && self.models == other.models
-            && self.content_id == other.content_id
-    }
-}
-
 impl SubscriptionInfo {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         collector: SocketAddr,
         interface: Option<String>,
-        peer: SocketAddr,
+        peer: IpAddr,
         id: SubscriptionId,
         target: Target,
         stop_time: Option<DateTime<Utc>>,
@@ -876,7 +846,7 @@ impl SubscriptionInfo {
     pub fn new_empty(
         collector: SocketAddr,
         interface: Option<String>,
-        peer: SocketAddr,
+        peer: IpAddr,
         id: SubscriptionId,
     ) -> Self {
         Self {
@@ -901,7 +871,7 @@ impl SubscriptionInfo {
 
     /// The peer address of the device who sent the subscription started
     /// message.
-    pub const fn peer(&self) -> SocketAddr {
+    pub const fn peer(&self) -> IpAddr {
         self.peer
     }
 
@@ -1053,7 +1023,7 @@ impl YangLibraryCache {
             cache_by_content_id.insert(content_id, Arc::clone(&yang_lib_ref));
             for subscription_info in subscriptions_info {
                 cache_by_subscription_id
-                    .entry(subscription_info.peer().ip())
+                    .entry(subscription_info.peer())
                     .or_default()
                     .insert(subscription_info.id(), subscription_info.clone());
                 cache_by_subscription_info.insert(subscription_info, Arc::clone(&yang_lib_ref));
@@ -1094,7 +1064,7 @@ impl YangLibraryCache {
                 self.cache_by_subscription_info
                     .insert(subscription_info.clone(), Arc::clone(existing_ref));
                 self.cache_by_subscription_id
-                    .entry(subscription_info.peer().ip())
+                    .entry(subscription_info.peer())
                     .or_default()
                     .insert(subscription_info.id(), subscription_info);
             }
@@ -1115,7 +1085,7 @@ impl YangLibraryCache {
         self.cache_by_content_id
             .insert(content_id, Arc::clone(&yang_lib_ref));
         self.cache_by_subscription_id
-            .entry(subscription_info.peer().ip())
+            .entry(subscription_info.peer())
             .or_default()
             .insert(subscription_info.id(), subscription_info);
         Ok(yang_lib_ref)
@@ -1161,12 +1131,12 @@ impl YangLibraryCache {
         // Step 2: Remove from (peer_ip, sub_id) -> SubscriptionInfo mapping
         if let Some(sub_map) = self
             .cache_by_subscription_id
-            .get_mut(&subscription_info.peer().ip())
+            .get_mut(&subscription_info.peer())
         {
             sub_map.remove(&subscription_info.id());
             if sub_map.is_empty() {
                 self.cache_by_subscription_id
-                    .remove(&subscription_info.peer().ip());
+                    .remove(&subscription_info.peer());
             }
         }
 
@@ -1276,7 +1246,7 @@ mod tests {
         SubscriptionInfo::new(
             SocketAddr::from(([192, 168, 1, 100], 10000)),
             None,
-            SocketAddr::from(([192, 168, 1, 101], 830)),
+            IpAddr::from([192, 168, 1, 101]),
             1,
             Target::new_datastore(
                 "ds:operational".into(),
@@ -1485,7 +1455,7 @@ mod tests {
     #[tracing_test::traced_test]
     fn test_subscription_info_new() {
         let collector = SocketAddr::from(([192, 168, 1, 100], 10000));
-        let peer = SocketAddr::from(([192, 168, 1, 101], 12345));
+        let peer = IpAddr::from([192, 168, 1, 101]);
         let content_id = ContentId::from("content-123");
         let target = Target::new_datastore(
             "ds:operational".into(),
@@ -1530,7 +1500,7 @@ mod tests {
         let info = create_test_subscription_info("test-id");
         let display = format!("{info}");
 
-        assert!(display.contains("192.168.1.101:830"));
+        assert!(display.contains("192.168.1.101"));
         assert!(display.contains("test-id"));
         assert!(display.contains("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics"));
         assert!(display.contains("ietf-interfaces"));
@@ -1650,7 +1620,7 @@ mod tests {
         let cache = YangLibraryCache::from_disk(temp_dir.path().to_path_buf()).unwrap();
 
         let subscription_info = create_test_subscription_info(content_id);
-        let peer_ip = subscription_info.peer().ip();
+        let peer_ip = subscription_info.peer();
         let subscription_id = subscription_info.id();
 
         // Test successful lookup
@@ -1758,7 +1728,7 @@ mod tests {
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::from(([192, 168, 1, 100], 10000)),
             None,
-            SocketAddr::from(([192, 168, 1, 102], 830)),
+            IpAddr::from([192, 168, 1, 102]),
             2,
             Target::new_datastore(
                 "ds:operational".into(),
@@ -1783,7 +1753,7 @@ mod tests {
         let subscription_info3 = SubscriptionInfo::new(
             SocketAddr::from(([192, 168, 1, 100], 10000)),
             None,
-            SocketAddr::from(([192, 168, 1, 103], 830)),
+            IpAddr::from([192, 168, 1, 103]),
             2,
             Target::new_datastore(
                 "ds:operational".into(),
@@ -1866,7 +1836,7 @@ mod tests {
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::from(([192, 168, 1, 100], 10000)),
             None,
-            SocketAddr::from(([192, 168, 1, 102], 830)),
+            IpAddr::from([192, 168, 1, 102]),
             2,
             Target::new_datastore(
                 "ds:operational".into(),
@@ -1923,7 +1893,7 @@ mod tests {
         let subscription_info1 = SubscriptionInfo::new(
             SocketAddr::from(([192, 168, 1, 100], 10000)),
             None,
-            SocketAddr::from(([192, 168, 1, 101], 830)),
+            IpAddr::from([192, 168, 1, 101]),
             1,
             Target::new_datastore(
                 "ds:operational".into(),
@@ -1976,7 +1946,7 @@ mod tests {
         let subscription_info2 = SubscriptionInfo::new(
             SocketAddr::from(([192, 168, 1, 100], 10000)),
             None,
-            SocketAddr::from(([192, 168, 1, 102], 830)),
+            IpAddr::from([192, 168, 1, 102]),
             2,
             Target::new_datastore(
                 "ds:operational".into(),
@@ -2025,13 +1995,13 @@ mod tests {
 
         // Verify both subscription IDs can be retrieved
         let (sub1_info, sub1_ref) = cache
-            .get_by_subscription_id(subscription_info1.peer().ip(), subscription_info1.id())
+            .get_by_subscription_id(subscription_info1.peer(), subscription_info1.id())
             .unwrap();
         assert_eq!(sub1_info, subscription_info1);
         assert!(sub1_ref.is_some());
 
         let (sub2_info, sub2_ref) = cache
-            .get_by_subscription_id(subscription_info2.peer().ip(), subscription_info2.id())
+            .get_by_subscription_id(subscription_info2.peer(), subscription_info2.id())
             .unwrap();
         assert_eq!(sub2_info, subscription_info2);
         assert!(sub2_ref.is_some());
@@ -2043,57 +2013,13 @@ mod tests {
         assert!(subscriptions.contains(&subscription_info2));
     }
 
-    /// A device that reconnects from a different source port must still hit the
-    /// cache: [`SubscriptionInfo`] identity intentionally ignores the peer's
-    /// ephemeral port. See <https://github.com/NetGauze/NetGauze/issues/483>.
-    #[test]
-    fn test_subscription_info_identity_ignores_peer_port() {
-        let info = create_test_subscription_info("content-id-1");
-
-        // Same subscription, device reconnected from a different source port.
-        let mut reconnected = info.clone();
-        reconnected.peer = SocketAddr::new(info.peer.ip(), info.peer.port() + 1);
-
-        assert_eq!(
-            info, reconnected,
-            "subscriptions differing only by peer port must compare equal"
-        );
-
-        // `Hash` must agree with `Eq`, otherwise the map lookup still misses.
-        let hash = |x: &SubscriptionInfo| {
-            use std::hash::{Hash, Hasher};
-            let mut h = std::collections::hash_map::DefaultHasher::new();
-            x.hash(&mut h);
-            h.finish()
-        };
-        assert_eq!(
-            hash(&info),
-            hash(&reconnected),
-            "equal subscriptions must hash equally"
-        );
-
-        // The lookup the issue is about: cached under the old port, found under
-        // the new one.
-        let mut cache = FxHashMap::default();
-        cache.insert(info.clone(), "yang-library");
-        assert_eq!(
-            cache.get(&reconnected),
-            Some(&"yang-library"),
-            "cache lookup must hit after the peer reconnects from a new port"
-        );
-    }
-
-    /// The port is the *only* part of the peer that is ignored -- a different
-    /// device must never share a cache entry.
+    /// A different peer IP must never share a cache entry
     #[test]
     fn test_subscription_info_identity_still_distinguishes_peer_ip() {
         let info = create_test_subscription_info("content-id-1");
 
         let mut other_device = info.clone();
-        other_device.peer = SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 200)),
-            info.peer.port(),
-        );
+        other_device.peer = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 200));
         assert_ne!(
             info, other_device,
             "subscriptions from different peer IPs must not compare equal"

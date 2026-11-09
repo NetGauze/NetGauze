@@ -849,14 +849,14 @@ impl ValidationActor {
                     let subscription_info = SubscriptionInfo::new_empty(
                         collector,
                         interface.map(String::from),
-                        peer,
+                        peer.ip(),
                         subscription_id,
                     );
                     self.cache_cmd_tx
                         .send(CacheLookupCommand::LookupBySubscriptionId {
                             collector,
                             interface: interface.map(String::from),
-                            peer,
+                            peer: peer.ip(),
                             subscription_id,
                             tx: self.cache_tx.clone(),
                         })
@@ -883,19 +883,13 @@ impl ValidationActor {
         response: CacheResponse,
     ) -> Result<(), ValidationActorError> {
         let (cached_content_id, subscription_info, yang_lib_ref) = response.into();
-        let mut otl_tags = Vec::from([
-            opentelemetry::KeyValue::new(
-                "network.peer.address",
-                format!("{}", subscription_info.peer().ip()),
-            ),
-            opentelemetry::KeyValue::new(
-                "network.peer.port",
-                opentelemetry::Value::I64(subscription_info.peer().port().into()),
-            ),
-        ]);
+        let mut otl_tags = Vec::from([opentelemetry::KeyValue::new(
+            "network.peer.address",
+            format!("{}", subscription_info.peer()),
+        )]);
         Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut otl_tags);
         let peer_cache = if let Some(peer_cache) =
-            self.peer_cache.get_mut(&subscription_info.peer().ip())
+            self.peer_cache.get_mut(&subscription_info.peer())
         {
             peer_cache
         } else {
@@ -1018,7 +1012,7 @@ impl ValidationActor {
         Some(SubscriptionInfo::new(
             collector,
             interface,
-            peer,
+            peer.ip(),
             sub_started.id(),
             sub_started.target().clone(),
             sub_started.stop_time().cloned(),
@@ -1191,7 +1185,7 @@ mod tests {
         .expect("Failed to spawn validation actor");
 
         // Create a test peer address
-        let peer = subscription_info.peer();
+        let peer = SocketAddr::new(subscription_info.peer(), 12345);
         let payload = serde_json::json!(
             {
                 "ietf-yp-notification:envelope": {
@@ -1304,7 +1298,7 @@ mod tests {
         .expect("Failed to spawn validation actor");
 
         // Create a test peer address
-        let peer = subscription_info.peer();
+        let peer = SocketAddr::new(subscription_info.peer(), 12345);
         let payload = serde_json::json!(
             {
                 "ietf-yp-notification:envelope": {

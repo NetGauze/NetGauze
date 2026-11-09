@@ -37,7 +37,7 @@ use netgauze_netconf_proto::yanglib::{DatastoreName, PermissiveVersionChecker, Y
 use rand::RngExt;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tracing::{error, info, trace, warn};
@@ -66,7 +66,7 @@ pub trait YangLibraryFetcher {
         &self,
         collector: SocketAddr,
         interface: Option<Box<str>>,
-        peer: SocketAddr,
+        peer: IpAddr,
         subscription_id: SubscriptionId,
     ) -> impl Future<Output = JoinHandle<FetcherResult>> + Send;
 
@@ -74,7 +74,7 @@ pub trait YangLibraryFetcher {
         &self,
         collector: SocketAddr,
         interface: Option<Box<str>>,
-        peer: SocketAddr,
+        peer: IpAddr,
         subscription_id: SubscriptionId,
     ) -> impl Future<Output = FetcherResult> + Send;
 }
@@ -151,7 +151,7 @@ impl NetconfYangLibraryFetcher {
         let interface = subscription_info.interface();
         let peer = subscription_info.peer();
         let subscription_id = subscription_info.id();
-        let host = SocketAddr::new(peer.ip(), cfg.default_port);
+        let host = SocketAddr::new(peer, cfg.default_port);
         info!(
             host=%host,
             collector=%collector,
@@ -222,10 +222,10 @@ impl NetconfYangLibraryFetcher {
         cfg: &FetchConfig,
         collector: SocketAddr,
         interface: Option<Box<str>>,
-        peer: SocketAddr,
+        peer: IpAddr,
         subscription_id: SubscriptionId,
     ) -> FetcherResult {
-        let host = SocketAddr::new(peer.ip(), cfg.default_port);
+        let host = SocketAddr::new(peer, cfg.default_port);
         info!(
             host=%host,
             collector=%collector,
@@ -385,7 +385,7 @@ impl NetconfYangLibraryFetcher {
     /// attempt waits `base * 2^(attempt-1)` (capped at `retry.max_backoff`)
     /// with equal jitter before the next try.
     #[allow(clippy::result_large_err)]
-    async fn with_retry<F, Fut>(peer: SocketAddr, retry: RetryConfig, operation: F) -> FetcherResult
+    async fn with_retry<F, Fut>(peer: IpAddr, retry: RetryConfig, operation: F) -> FetcherResult
     where
         F: Fn() -> Fut,
         Fut: Future<Output = FetcherResult>,
@@ -438,7 +438,7 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
         &self,
         collector: SocketAddr,
         interface: Option<Box<str>>,
-        peer: SocketAddr,
+        peer: IpAddr,
         subscription_id: SubscriptionId,
     ) -> JoinHandle<FetcherResult> {
         let fetch_cfg = self.fetch_cfg.clone();
@@ -461,7 +461,7 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
         &self,
         collector: SocketAddr,
         interface: Option<Box<str>>,
-        peer: SocketAddr,
+        peer: IpAddr,
         subscription_id: SubscriptionId,
     ) -> FetcherResult {
         Self::with_retry(peer, self.retry_cfg, || {
@@ -559,7 +559,7 @@ pub(crate) mod tests {
             let subscription_info = self
                 .yang_libs
                 .keys()
-                .find(|x| x.id() == subscription_id && x.peer().ip() == peer.ip());
+                .find(|x| x.id() == subscription_id && x.peer() == peer);
             let subscription_info = if let Some(subscription_info) = subscription_info {
                 subscription_info.clone()
             } else {
@@ -611,7 +611,7 @@ pub(crate) mod tests {
             &self,
             collector: SocketAddr,
             interface: Option<Box<str>>,
-            peer: SocketAddr,
+            peer: IpAddr,
             subscription_id: SubscriptionId,
         ) -> JoinHandle<FetcherResult> {
             let subscription_info = SubscriptionInfo::new_empty(
@@ -628,7 +628,7 @@ pub(crate) mod tests {
             &self,
             collector: SocketAddr,
             interface: Option<Box<str>>,
-            peer: SocketAddr,
+            peer: IpAddr,
             subscription_id: SubscriptionId,
         ) -> FetcherResult {
             let subscription_info = SubscriptionInfo::new_empty(
@@ -656,8 +656,8 @@ mod retry_tests {
         SocketAddr::from(([127, 0, 0, 1], 10000))
     }
 
-    fn dummy_peer() -> SocketAddr {
-        "127.0.0.1:0".parse().unwrap()
+    fn dummy_peer() -> IpAddr {
+        IpAddr::from([127, 0, 0, 1])
     }
 
     #[allow(clippy::result_large_err)]

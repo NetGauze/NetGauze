@@ -849,7 +849,7 @@ async fn main() -> Result<()> {
     let subscription_info = SubscriptionInfo::new_empty(
         SocketAddr::new(IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)), 0),
         None,
-        SocketAddr::new(IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)), 0),
+        IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
         0,
     );
 
