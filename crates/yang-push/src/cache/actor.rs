@@ -831,10 +831,16 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                                         "failed to fetch yang library from device"
                                     );
                                     // remove the sender we just added since the
-                                    // fetch failed to
-                                    // start
-                                    entry.remove(entry.len() - 1);
+                                    // fetch failed to start, and tell the
+                                    // requester there is no schema so it does
+                                    // not keep buffering packets for a lookup
+                                    // that will never be answered.
+                                    let sender = entry.remove(entry.len() - 1);
+                                    if entry.is_empty() {
+                                        self.pending_requests.remove(&subscription_info);
+                                    }
                                     self.stats.device_fetch_failed.add(1, &otl_tags);
+                                    Self::send_yang_lib_ref(&subscription_info, None, sender).await;
                                     return;
                                 }
                             };
