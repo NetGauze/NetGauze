@@ -1,17 +1,17 @@
 <yang-library xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
   <module-set>
     <name>complete</name>
-    <!-- Main IETF telemetry message and the YANG push augmentation -->
+    <!-- Main IETF telemetry message and the YANG-Push augmentation -->
     <module>
       <name>ietf-telemetry-message</name>
-      <revision>2025-10-19</revision>
+      <revision>2026-10-25</revision>
       <namespace>urn:ietf:params:xml:ns:yang:ietf-telemetry-message</namespace>
       <feature>network-node-manifest</feature>
       <feature>data-collection-manifest</feature>
     </module>
     <module>
       <name>ietf-yang-push-telemetry-message</name>
-      <revision>2025-10-19</revision>
+      <revision>2026-10-25</revision>
       <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-push-telemetry-message</namespace>
     </module>
     <!-- Direct imports by ietf-telemetry-message -->
@@ -27,7 +27,7 @@
     </module>
     <module>
       <name>ietf-platform-manifest</name>
-      <revision>2025-02-21</revision>
+      <revision>2026-06-27</revision>
       <namespace>urn:ietf:params:xml:ns:yang:ietf-platform-manifest</namespace>
     </module>
     <module>

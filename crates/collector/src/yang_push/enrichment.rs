@@ -609,12 +609,12 @@ mod tests {
     fn test_manifest() -> Manifest {
         Manifest::new(
             Some("test-writer".into()),
-            Some("NetGauze".into()),
-            Some(3746),
-            Some("0.11.0 (f5b7083e)".into()),
-            Some("debug".into()),
-            Some("26.4.1".into()),
+            None,
+            None,
             Some("Darwin".into()),
+            Some("26.4.1".into()),
+            Some("Darwin Kernel Version 26.4.1".into()),
+            Some("arm64".into()),
         )
     }
 

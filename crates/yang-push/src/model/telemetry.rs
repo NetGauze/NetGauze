@@ -27,8 +27,9 @@
 //!   for including the module namespace.
 //!
 //! - **Manifest**: Common metadata structure for both network nodes and data
-//!   collection systems, including information such as name, vendor, software
-//!   version, etc.
+//!   collection systems, as the ietf-system `system` and
+//!   `system-state/platform` containers (hostname, contact, location, OS
+//!   name/release/version, machine)
 //!
 //! - **TelemetryMessageMetadata**: Metadata about the telemetry session between
 //!   collector and network node, including timestamps, protocol information,
@@ -150,51 +151,150 @@ pub enum EventType {
     Delete,
 }
 
-/// Generic Metadata Manifest
+/// Platform manifest of a network node or of the data collector: the
+/// `platform-ietf-system` grouping of ietf-platform-manifest, which mirrors
+/// ietf-system `system/{contact,hostname,location}` and
+/// `system-state/platform/{os-name,os-release,os-version,machine}`.
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Manifest {
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    system: Option<ManifestSystem>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    vendor: Option<String>,
+    system_state: Option<ManifestSystemState>,
+}
+
+/// `system` container of the platform manifest (ietf-system
+/// `/system/{contact,hostname,location}`)
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct ManifestSystem {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contact: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    vendor_pen: Option<u32>,
+    hostname: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    software_version: Option<String>,
+    location: Option<String>,
+}
+
+/// `system-state` container of the platform manifest
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct ManifestSystemState {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    platform: Option<ManifestPlatform>,
+}
+
+/// `system-state/platform` container of the platform manifest (ietf-system
+/// `/system-state/platform/{os-name,os-release,os-version,machine}`)
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct ManifestPlatform {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    os_name: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    software_flavor: Option<String>,
+    os_release: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     os_version: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    os_type: Option<String>,
+    machine: Option<String>,
 }
 
 impl Manifest {
-    pub const fn new(
-        name: Option<String>,
-        vendor: Option<String>,
-        vendor_pen: Option<u32>,
-        software_version: Option<String>,
-        software_flavor: Option<String>,
+    /// Build a manifest from the ietf-system leaves; containers with no leaf
+    /// set are omitted from the serialized message.
+    pub fn new(
+        hostname: Option<String>,
+        contact: Option<String>,
+        location: Option<String>,
+        os_name: Option<String>,
+        os_release: Option<String>,
         os_version: Option<String>,
-        os_type: Option<String>,
+        machine: Option<String>,
     ) -> Self {
+        let system = if hostname.is_none() && contact.is_none() && location.is_none() {
+            None
+        } else {
+            Some(ManifestSystem {
+                contact,
+                hostname,
+                location,
+            })
+        };
+        let system_state = if os_name.is_none()
+            && os_release.is_none()
+            && os_version.is_none()
+            && machine.is_none()
+        {
+            None
+        } else {
+            Some(ManifestSystemState {
+                platform: Some(ManifestPlatform {
+                    os_name,
+                    os_release,
+                    os_version,
+                    machine,
+                }),
+            })
+        };
         Self {
-            name,
-            vendor,
-            vendor_pen,
-            software_version,
-            software_flavor,
-            os_version,
-            os_type,
+            system,
+            system_state,
         }
+    }
+
+    pub const fn system(&self) -> Option<&ManifestSystem> {
+        self.system.as_ref()
+    }
+
+    pub const fn system_state(&self) -> Option<&ManifestSystemState> {
+        self.system_state.as_ref()
+    }
+
+    pub fn hostname(&self) -> Option<&str> {
+        self.system.as_ref().and_then(|s| s.hostname.as_deref())
+    }
+
+    pub fn platform(&self) -> Option<&ManifestPlatform> {
+        self.system_state.as_ref().and_then(|s| s.platform.as_ref())
+    }
+}
+
+impl ManifestSystem {
+    pub fn contact(&self) -> Option<&str> {
+        self.contact.as_deref()
+    }
+
+    pub fn hostname(&self) -> Option<&str> {
+        self.hostname.as_deref()
+    }
+
+    pub fn location(&self) -> Option<&str> {
+        self.location.as_deref()
+    }
+}
+
+impl ManifestPlatform {
+    pub fn os_name(&self) -> Option<&str> {
+        self.os_name.as_deref()
+    }
+
+    pub fn os_release(&self) -> Option<&str> {
+        self.os_release.as_deref()
+    }
+
+    pub fn os_version(&self) -> Option<&str> {
+        self.os_version.as_deref()
+    }
+
+    pub fn machine(&self) -> Option<&str> {
+        self.machine.as_deref()
     }
 }
 
@@ -612,15 +712,15 @@ mod tests {
     fn test_telemetry_message_serde() {
         let original_message = TelemetryMessageWrapper {
             message: TelemetryMessage {
-                network_node_manifest: Some(Manifest {
-                    name: Some("node_id".to_string()),
-                    vendor: Some("FRR".to_string()),
-                    vendor_pen: None,
-                    software_version: None,
-                    software_flavor: None,
-                    os_version: None,
-                    os_type: None,
-                }),
+                network_node_manifest: Some(Manifest::new(
+                    Some("node_id".to_string()),
+                    None,
+                    None,
+                    Some("FRR".to_string()),
+                    None,
+                    None,
+                    None,
+                )),
                 telemetry_message_metadata: TelemetryMessageMetadata {
                     node_export_timestamp: None,
                     collection_timestamp: Utc.timestamp_millis_opt(0).unwrap(),
@@ -660,15 +760,15 @@ mod tests {
                         yang_library_content_id: Some("random-content-id".into()),
                     }),
                 },
-                data_collection_manifest: Some(Manifest {
-                    name: Some("dev-collector".to_string()),
-                    vendor: Some("NetGauze".to_string()),
-                    vendor_pen: Some(12345),
-                    software_version: Some("1.0.0".to_string()),
-                    software_flavor: Some("release".to_string()),
-                    os_version: Some("8.10".to_string()),
-                    os_type: Some("Rocky Linux".to_string()),
-                }),
+                data_collection_manifest: Some(Manifest::new(
+                    Some("dev-collector".to_string()),
+                    Some("noc@example.com".to_string()),
+                    Some("Data Center 1".to_string()),
+                    Some("Rocky Linux".to_string()),
+                    Some("8.10".to_string()),
+                    Some("Linux 4.18.0-553.el8_10.x86_64".to_string()),
+                    Some("x86_64".to_string()),
+                )),
                 network_operator_metadata: Some(NetworkOperatorMetadata {
                     labels: vec![
                         Label {
@@ -697,7 +797,7 @@ mod tests {
         let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
 
         // Expected JSON string
-        let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"name":"node_id","vendor":"FRR"},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","notification-event":"log","sequence-number":1,"session-protocol":"yang-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module":[{"name":"example-module","revision":"2025-01-01","version":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"network-operator-metadata":{"labels":[{"name":"priority_level","number-value":"100"},{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
+        let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"system":{"hostname":"node_id"},"system-state":{"platform":{"os-name":"FRR"}}},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","notification-event":"log","sequence-number":1,"session-protocol":"yang-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module":[{"name":"example-module","revision":"2025-01-01","version":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"system":{"contact":"noc@example.com","hostname":"dev-collector","location":"Data Center 1"},"system-state":{"platform":{"os-name":"Rocky Linux","os-release":"8.10","os-version":"Linux 4.18.0-553.el8_10.x86_64","machine":"x86_64"}}},"network-operator-metadata":{"labels":[{"name":"priority_level","number-value":"100"},{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON
         // string

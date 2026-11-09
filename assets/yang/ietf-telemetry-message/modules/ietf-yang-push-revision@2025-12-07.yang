@@ -84,19 +84,12 @@ module ietf-yang-push-revision {
     described in BCP 14 (RFC 2119) (RFC 8174) when, and only when,
     they appear in all capitals, as shown here.";
 
-  revision 2025-08-29 {
+  revision 2025-12-07 {
     description
       "First revision";
     reference
       "RFC XXXX: Support of Versioning in YANG Notifications
       Subscription";
-  }
-
-  feature yang-push-revision-supported {
-    description
-      "This feature indicates the YANG Subscription Notifications
-      supports specifying the list of modules, revisions and
-      version in the YANG subscription.";
   }
 
   // Identities
@@ -113,7 +106,7 @@ module ietf-yang-push-revision {
     base sn:establish-subscription-error;
     base sn:modify-subscription-error;
     description
-      "Version not supported.  This failure can be due to
+      "Specific version not supported.  This failure can be due to 
       subscribing to a specific version not supported by the
       publisher.";
   }
@@ -122,14 +115,13 @@ module ietf-yang-push-revision {
     base sn:establish-subscription-error;
     base sn:modify-subscription-error;
     description
-      "The combination of revision and the version are
+      "The combination of revision and version are
       incompatible. This failure happens when the revision and the
       version are both specified in the RPC and the YANG
-      module supported by the publisher does not support one of the
-      revision or the version.";
+      module supported by the publisher does not support one of them.";
   }
 
-  grouping yang-push-module-version-config {
+  grouping yang-push-module-version-subs {
     description
       "This grouping combines the module name, the revision and
       version leaves. This grouping is to be used for
@@ -139,21 +131,30 @@ module ietf-yang-push-revision {
       description
         "This references the YANG module name.";
     }
-    leaf revision {
-      type rev:revision-date;
+    choice revision-version {
       description
-        "This references the YANG module revision to be sent in the
-        subscription.";
-    }
-    leaf version {
-      type ysver:version;
-      description
-        "This references the YANG module semantic version to be sent
+        "Specifies the revision or version of the YANG module sent
         in the subscription.";
-    }
+      case revision {
+        leaf revision {
+          type rev:revision-date;
+          description
+            "This references the YANG module revision to be sent in the
+            subscription.";
+        }
+      }
+      case version {
+        leaf version {
+          type ysver:version;
+          description
+            "This references the YANG module semantic version to be sent
+            in the subscription.";
+        }
+      }
+    }	
   }
 
-  grouping yang-push-module-version {
+  grouping yang-push-module-version-notif {
     description
       "This grouping combines the module name, the revision and
       version leaves. This grouping is to be used for
@@ -183,9 +184,9 @@ module ietf-yang-push-revision {
     }
   }
 
-  grouping yang-push-module-version-list {
+  grouping yang-push-module-version-notif-list {
     description
-      "This grouping defines a list of yang-push-module-version
+      "This grouping defines a list of yang-push-module-version-notif
       grouping.";
     list module-version {
       key "name";
@@ -193,7 +194,7 @@ module ietf-yang-push-revision {
       description
         "List of yang-push-module-version grouping. The revision is
         not configurable.";
-      uses ypr:yang-push-module-version;
+      uses ypr:yang-push-module-version-notif;
     }
     leaf yang-library-content-id {
       type leafref {
@@ -206,75 +207,72 @@ module ietf-yang-push-revision {
     }
   }
 
-  grouping yang-push-module-version-config-list {
+  grouping yang-push-module-version-subs-list {
     description
-      "This grouping defines a list of yang-push-module-version-config
+      "This grouping defines a list of yang-push-module-version-subs
       grouping.";
-    list module-version-config {
+    list module-version-subs {
       key "name";
       description
-        "List of yang-push-module-version-config grouping. The
+        "List of yang-push-module-version-subs grouping. The
         revision is configurable.";
-      uses ypr:yang-push-module-version-config;
+      uses ypr:yang-push-module-version-subs;
     }
   }
 
   // Subscription parameters
   augment "/sn:establish-subscription/sn:input" {
-    if-feature "yang-push-revision-supported";
     description
       "Augment the establish-subscription RPC from the
       ietf-subscribed-notifications YANG module with the
-      yang-push-module-version-config-list grouping.";
-    uses ypr:yang-push-module-version-config-list;
+      yang-push-module-version-subs-list grouping.";
+    uses ypr:yang-push-module-version-subs-list;
   }
   augment "/sn:modify-subscription/sn:input" {
-    if-feature "yang-push-revision-supported";
     description
       "Augment the modify-subscription RPC from the
       ietf-subscribed-notifications YANG module with the
-      yang-push-module-version-config-list grouping.";
-    uses ypr:yang-push-module-version-config-list;
+      yang-push-module-version-subs-list grouping.";
+    uses ypr:yang-push-module-version-subs-list;
   }
 
   // Subscription notifications
   augment "/sn:subscription-started" {
-    if-feature "yang-push-revision-supported";
     description
       "Augment the subscription-started notification from the
       ietf-subscribed-notifications YANG module with the
-      yang-push-module-version-list grouping.";
-    uses ypr:yang-push-module-version-list;
+      yang-push-module-version-notif-list grouping.";
+    uses ypr:yang-push-module-version-notif-list;
   }
   augment "/sn:subscription-modified" {
-    if-feature "yang-push-revision-supported";
     description
       "Augment the subscription-modified notification from the
       ietf-subscribed-notifications YANG module with the
-      yang-push-module-version-list grouping.";
-    uses ypr:yang-push-module-version-list;
+      yang-push-module-version-notif-list grouping.";
+    uses ypr:yang-push-module-version-notif-list;
   }
 
   // Subscription container
   augment "/sn:subscriptions/sn:subscription" {
-    if-feature "yang-push-revision-supported";
     description
       "Augment the subscriptions RPC container from the
       ietf-subscribed-notifications YANG module with the
-      yang-push-module-version-config-list grouping.";
-    uses ypr:yang-push-module-version-config-list;
+      yang-push-module-version-subs-list grouping.";
+    uses ypr:yang-push-module-version-subs-list;
   }
 
-  // Event capabilities
+  // Subscription capabilities
   augment "/sysc:system-capabilities/notc:subscription-capabilities" {
     description
       "Add system level capabilities";
     leaf yang-push-module-revision-supported {
       type boolean;
+      default true;
       description
         "Specifies whether the publisher supports exporting
         revision and version in YANG-Push subscription state change
-	      notifications.";
+        notifications. If set to true, publisher supports. If set to
+        false, publisher does not support.";
       reference
         "RFC XXXX: Support of Versioning in YANG Notifications
         Subscription";

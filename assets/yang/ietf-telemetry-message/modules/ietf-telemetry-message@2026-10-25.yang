@@ -38,7 +38,7 @@ module ietf-telemetry-message {
      data collection to transform Network Telemetry messages towards
      external systems such as Message Brokers.
 
-     Copyright (c) 2025 IETF Trust and the persons identified as
+     Copyright (c) 2026 IETF Trust and the persons identified as
        authors of the code.  All rights reserved.
 
      Redistribution and use in source and binary forms, with or without
@@ -50,7 +50,7 @@ module ietf-telemetry-message {
      This version of this YANG module is part of RFC XXXX; see the RFC
      itself for full legal notices.";
 
-  revision 2025-10-19 {
+  revision 2026-10-25 {
     description
       "Initial revision.";
     reference
@@ -138,7 +138,7 @@ module ietf-telemetry-message {
       description
         "Contains the Data Manifest about the network node that
          exported Network Telemetry data.";
-      uses p-mf:platform-details;
+      uses p-mf:platform-ietf-system;
     }
     container telemetry-message-metadata {
       description
@@ -216,7 +216,7 @@ module ietf-telemetry-message {
       description
         "Contains the Data Manifest of the data collector which
          collected the Network Telemetry data.";
-      uses p-mf:platform-details;
+      uses p-mf:platform-ietf-system;
     }
     container network-operator-metadata {
       description
