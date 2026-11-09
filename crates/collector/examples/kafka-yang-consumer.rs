@@ -108,6 +108,12 @@ struct Args {
     /// interrupted/terminated
     #[arg(short = 'f', long = "follow")]
     follow: bool,
+
+    /// Validate the content of anydata nodes (the YANG-Push notification inside
+    /// the telemetry message `payload`) against the schema instead of accepting
+    /// any JSON there (same as the collector's `anydata_strict_validation`)
+    #[arg(short = 'A', long = "anydata-strict")]
+    anydata_strict: bool,
 }
 
 // ============================================================================
@@ -782,6 +788,10 @@ fn log_configuration(
         info!("  Limit: {} messages per partition", limit);
     }
     info!("  Follow: {}", if args.follow { "yes" } else { "no" });
+    info!(
+        "  Anydata strict validation: {}",
+        if args.anydata_strict { "yes" } else { "no" }
+    );
 
     info!("Schema Registry:");
     info!("  URL: {}", args.schema_registry_url);
@@ -986,11 +996,15 @@ async fn main() -> Result<()> {
                                         validation_stats.no_tm_schema += 1;
                                     } else {
                                         // Validate message payload
-                                        let validation_result =yang5::data::DataTree::parse_string(
+                                        let mut parser_flags = DataParserFlags::STRICT;
+                                        if args.anydata_strict {
+                                            parser_flags |= DataParserFlags::ANYDATA_STRICT;
+                                        }
+                                        let validation_result = yang5::data::DataTree::parse_string(
                                                 yang_ctx,
                                                 payload,
                                                 DataFormat::JSON,
-                                                DataParserFlags::STRICT,
+                                                parser_flags,
                                                 DataValidationFlags::PRESENT,
                                         );
 

@@ -30,6 +30,8 @@
 //! let (join_handle, handle) = ValidationActorHandle::new(
 //!     1000,  // max packets cached per peer
 //!     100,   // max packets cached per subscription
+//!     Duration::from_secs(60), // pending schema lookup timeout
+//!     true,  // validate anydata content (datastore-contents) strictly
 //!     rx,    // incoming UDP-Notif packets
 //!     tx,    // validated packets output
 //!     cache_cmd_tx,  // cache lookup commands
@@ -349,6 +351,11 @@ struct ValidationActor {
     max_cached_packets_per_peer: usize,
     max_cached_packets_per_subscription: usize,
     pending_lookup_timeout: Duration,
+    /// Validate the content of `anydata` nodes (the `datastore-contents` of a
+    /// push-update, the `datastore-changes` of a push-change-update) against
+    /// the subscription's YANG schemas instead of accepting any JSON there
+    /// (`yang5::data::DataParserFlags::ANYDATA_STRICT`).
+    anydata_strict: bool,
     peer_cache: FxHashMap<IpAddr, CachedPeerSubscriptions>,
     cmd_rx: mpsc::Receiver<ValidationActorCommand>,
     rx: async_channel::Receiver<Arc<UdpNotifRequest>>,
@@ -706,6 +713,7 @@ impl ValidationActor {
                 &notification_type,
                 yang_ctx,
                 is_legacy,
+                self.anydata_strict,
             );
             // logging of error is handled in the [Self::validate_message]
             if validation_result.is_err() {
@@ -764,6 +772,7 @@ impl ValidationActor {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn validate_message(
         packet: &UdpNotifPacket,
         peer: SocketAddr,
@@ -772,18 +781,23 @@ impl ValidationActor {
         notification_type: &String,
         yang_ctx: &yang5::context::Context,
         is_legacy: bool,
+        anydata_strict: bool,
     ) -> Result<(), yang5::Error> {
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
         Self::extend_peer_targs_with_subscription_info(subscription_info, &mut peer_tags);
         let message_id = packet.message_id();
         let publisher_id = packet.publisher_id();
+        let mut parser_flags = DataParserFlags::STRICT;
+        if anydata_strict {
+            parser_flags |= DataParserFlags::ANYDATA_STRICT;
+        }
 
         if !is_legacy {
             let validation_result = yang5::data::DataTree::parse_string(
                 yang_ctx,
                 packet.payload(),
                 DataFormat::JSON,
-                DataParserFlags::STRICT,
+                parser_flags,
                 DataValidationFlags::PRESENT,
             );
             if let Err(err) = validation_result {
@@ -822,7 +836,7 @@ impl ValidationActor {
                 yang_ctx,
                 packet.payload(),
                 DataFormat::JSON,
-                DataParserFlags::STRICT,
+                parser_flags,
                 DataOperation::NotificationYang,
             );
             if let Err(err) = validation_result {
@@ -1265,6 +1279,7 @@ impl ValidationActorHandle {
         max_cached_packets_per_peer: usize,
         max_cached_packets_per_subscription: usize,
         pending_lookup_timeout: Duration,
+        anydata_strict: bool,
         rx: async_channel::Receiver<Arc<UdpNotifRequest>>,
         tx: async_channel::Sender<(Option<ContentId>, SubscriptionInfo, UdpNotifPacketDecoded)>,
         cache_cmd_tx: async_channel::Sender<CacheLookupCommand>,
@@ -1286,6 +1301,7 @@ impl ValidationActorHandle {
             max_cached_packets_per_peer,
             max_cached_packets_per_subscription,
             pending_lookup_timeout,
+            anydata_strict,
             peer_cache: FxHashMap::default(),
             cmd_rx,
             rx,
@@ -1341,6 +1357,7 @@ mod tests {
             1000,
             100,
             DEFAULT_PENDING_LOOKUP_TIMEOUT,
+            false,
             udp_notif_rx,
             validated_tx,
             caching_handle.request_tx(),
@@ -1455,6 +1472,7 @@ mod tests {
             1000,
             100,
             DEFAULT_PENDING_LOOKUP_TIMEOUT,
+            false,
             udp_notif_rx,
             validated_tx,
             caching_handle.request_tx(),
@@ -1562,6 +1580,7 @@ mod tests {
             1000,
             100,
             DEFAULT_PENDING_LOOKUP_TIMEOUT,
+            false,
             udp_notif_rx,
             validated_tx,
             caching_handle.request_tx(),
@@ -1692,5 +1711,191 @@ mod tests {
         handle.shutdown().await.unwrap();
         caching_handle.shutdown().await.unwrap();
         caching_join_handle.await.unwrap().unwrap();
+    }
+
+    /// Build a SubscriptionStarted + push-update pair for the anydata tests.
+    /// `interface` is the JSON object placed in `datastore-contents` ->
+    /// `ietf-interfaces:interfaces/interface[0]`.
+    fn anydata_test_payloads(
+        interface: serde_json::Value,
+    ) -> (serde_json::Value, serde_json::Value) {
+        let started = serde_json::json!(
+            {
+                "ietf-yp-notification:envelope": {
+                    "event-time": "2025-09-23T14:12:16.024Z",
+                    "hostname": "ipf-zbl1327-r-daisy-48",
+                    "sequence-number": 0,
+                    "contents": {
+                        "ietf-subscribed-notifications:subscription-started": {
+                            "id": 1,
+                            "ietf-yang-push:datastore": "ietf-datastores:operational",
+                            "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces",
+                            "transport": "ietf-udp-notif-transport:udp-notif",
+                            "encoding": "encode-json",
+                            "purpose": "test subscription",
+                            "ietf-distributed-notif:message-publisher-id": [16843789],
+                            "ietf-yang-push-revision:module-version": [
+                                {"name": "ietf-interfaces", "revision": "2018-02-20"}
+                            ],
+                            "ietf-yang-push-revision:yang-library-content-id": "test-content-id-1",
+                            "ietf-yang-push:periodic": {"period": 6000}
+                        }
+                    }
+                }
+            }
+        );
+        let push_update = serde_json::json!(
+            {
+                "ietf-yp-notification:envelope": {
+                    "event-time": "2025-09-23T14:12:17.024Z",
+                    "hostname": "ipf-zbl1327-r-daisy-48",
+                    "sequence-number": 1,
+                    "contents": {
+                        "ietf-yang-push:push-update": {
+                            "id": 1,
+                            "datastore-contents": {
+                                "ietf-interfaces:interfaces": {
+                                    "interface": [interface]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        );
+        (started, push_update)
+    }
+
+    /// Run the validation actor with the given `anydata_strict` setting over a
+    /// SubscriptionStarted followed by one push-update and return the
+    /// notification types that were forwarded (a packet that fails validation
+    /// is dropped, so it does not show up).
+    async fn run_anydata_case(anydata_strict: bool, interface: serde_json::Value) -> Vec<String> {
+        let (caching_join_handle, caching_handle, subscription_info, _fetcher_count) =
+            setup_actor_with_empty_cache();
+        let (udp_notif_tx, udp_notif_rx) = async_channel::bounded(100);
+        let (validated_tx, validated_rx) = async_channel::bounded(100);
+        let (_join_handle, handle) = ValidationActorHandle::new(
+            100,
+            1000,
+            100,
+            DEFAULT_PENDING_LOOKUP_TIMEOUT,
+            anydata_strict,
+            udp_notif_rx,
+            validated_tx,
+            caching_handle.request_tx(),
+            either::Right(ValidationStats::new(opentelemetry::global::meter(
+                "test_meter",
+            ))),
+        )
+        .expect("Failed to spawn validation actor");
+
+        let peer = SocketAddr::new(subscription_info.peer(), 12345);
+        let collector = SocketAddr::from(([127, 0, 0, 1], 10000));
+        let (started, push_update) = anydata_test_payloads(interface);
+        let mk = |message_id: u32, payload: &serde_json::Value| {
+            Arc::new(UdpNotifRequest::new(
+                collector,
+                None,
+                peer,
+                UdpNotifPacket::new(
+                    MediaType::YangDataJson,
+                    10,
+                    message_id,
+                    HashMap::new(),
+                    Bytes::from(serde_json::to_vec(payload).unwrap()),
+                ),
+            ))
+        };
+        udp_notif_tx.send(mk(1, &started)).await.unwrap();
+        // wait for the SubscriptionStarted to come out before sending the data
+        // packet, so its validation uses the resolved schema and the outcome
+        // is not confused with the pending-lookup buffering
+        let first = tokio::time::timeout(Duration::from_secs(2), validated_rx.recv())
+            .await
+            .expect("timeout waiting for SubscriptionStarted")
+            .unwrap();
+        let mut types = vec![
+            first
+                .2
+                .notification_type()
+                .map(|x| x.to_string())
+                .unwrap_or_default(),
+        ];
+        udp_notif_tx.send(mk(2, &push_update)).await.unwrap();
+        if let Ok(Ok((_, _, decoded))) =
+            tokio::time::timeout(Duration::from_millis(500), validated_rx.recv()).await
+        {
+            types.push(
+                decoded
+                    .notification_type()
+                    .map(|x| x.to_string())
+                    .unwrap_or_default(),
+            );
+        }
+        handle
+            .shutdown()
+            .await
+            .expect("Failed to shutdown validation actor");
+        caching_handle
+            .shutdown()
+            .await
+            .expect("Failed to shutdown caching actor");
+        caching_join_handle
+            .await
+            .expect("Failed to join caching actor")
+            .expect("caching actor error");
+        types
+    }
+
+    /// With `anydata_strict` the `datastore-contents` of a push-update is
+    /// validated against the subscription's schemas: an unknown node inside the
+    /// interface list entry must be rejected (packet dropped).
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_validation_actor_anydata_strict_rejects_unknown_node() {
+        let types = run_anydata_case(
+            true,
+            serde_json::json!({"name": "eth0", "type": "iana-if-type:ethernetCsmacd", "no-such-leaf": 1}),
+        )
+        .await;
+        assert_eq!(types, vec!["SubscriptionStarted".to_string()]);
+    }
+
+    /// With `anydata_strict` valid `datastore-contents` still pass.
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_validation_actor_anydata_strict_accepts_valid_content() {
+        let types = run_anydata_case(
+            true,
+            serde_json::json!({"name": "eth0", "type": "iana-if-type:ethernetCsmacd"}),
+        )
+        .await;
+        assert_eq!(
+            types,
+            vec![
+                "SubscriptionStarted".to_string(),
+                "YangPushUpdate".to_string()
+            ]
+        );
+    }
+
+    /// Without `anydata_strict` only the envelope is validated: the same
+    /// unknown node inside `datastore-contents` is accepted.
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_validation_actor_anydata_not_strict_accepts_unknown_node() {
+        let types = run_anydata_case(
+            false,
+            serde_json::json!({"name": "eth0", "type": "iana-if-type:ethernetCsmacd", "no-such-leaf": 1}),
+        )
+        .await;
+        assert_eq!(
+            types,
+            vec![
+                "SubscriptionStarted".to_string(),
+                "YangPushUpdate".to_string()
+            ]
+        );
     }
 }

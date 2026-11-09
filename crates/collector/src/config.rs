@@ -74,6 +74,11 @@ pub(crate) const fn default_pending_lookup_timeout() -> Duration {
     netgauze_yang_push::validation::DEFAULT_PENDING_LOOKUP_TIMEOUT
 }
 
+/// The content of `anydata` nodes is validated by default.
+pub(crate) const fn default_anydata_strict_validation() -> bool {
+    true
+}
+
 pub(crate) const fn default_netconf_port() -> u16 {
     830
 }
@@ -242,6 +247,14 @@ pub struct UdpNotifConfig {
     #[serde(default = "default_pending_lookup_timeout")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     pub pending_lookup_timeout: Duration,
+
+    /// Validate the content of `anydata` nodes (`datastore-contents` of a
+    /// push-update, `datastore-changes` of a push-change-update) against the
+    /// subscription's YANG schemas. When `false` only the notification envelope
+    /// is validated and any JSON is accepted inside the `anydata` nodes.
+    /// Default: `true`.
+    #[serde(default = "default_anydata_strict_validation")]
+    pub anydata_strict_validation: bool,
 
     pub netconf: NetconfConfig,
 
