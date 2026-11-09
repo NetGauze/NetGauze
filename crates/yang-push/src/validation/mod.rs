@@ -50,10 +50,14 @@
 //! 2. **Decode**: Extract subscription ID and notification type
 //! 3. **Bootstrap**: `SubscriptionStarted` notifications trigger YANG library
 //!    lookups via the cache actor
-//! 4. **Cache or Validate**:
-//!    - If YANG schema available: Validate and forward
-//!    - If schema pending: Cache packet until schema arrives
-//!    - If schema unavailable: Forward unvalidated with empty subscription info
+//! 4. **Cache or Validate** (driven by the per-subscription SchemaState):
+//!    - `Resolved` with a loaded context: Validate and forward
+//!    - `Pending` (lookup in flight): Buffer *every* packet of the
+//!      subscription, including data packets that arrive right after the
+//!      `SubscriptionStarted`, so nothing bypasses validation or is forwarded
+//!      out of order
+//!    - `Unavailable` (cache answered with no schema, or the lookup timed out
+//!      after `pending_lookup_timeout`): Forward unvalidated
 //! 5. **Forward**: Send validated/unvalidated packets downstream
 //!
 //! ### Two-Level Caching
@@ -129,21 +133,80 @@ use netgauze_udp_notif_service::{OTL_UDP_NOTIF_PUBLISHER_ID_KEY, UdpNotifRequest
 use rustc_hash::FxHashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tracing::{debug, info, trace, warn};
 use yang5::data::{DataFormat, DataOperation, DataParserFlags, DataValidationFlags};
 
+/// Default upper bound on how long packets are buffered while a schema lookup
+/// is in flight before the subscription is marked SchemaState::Unavailable
+/// and the buffered packets are forwarded unvalidated.
+pub const DEFAULT_PENDING_LOOKUP_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// How often the actor scans for pending lookups that exceeded the timeout.
+const PENDING_LOOKUP_SCAN_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Where a subscription is in the schema-resolution lifecycle.
+///
+/// Modelling this explicitly (rather than with `Option<ContentId>`) is what
+/// prevents packets from being forwarded unvalidated while the cache lookup
+/// for their subscription is still outstanding.
+#[derive(Debug)]
+enum SchemaState {
+    /// A lookup was sent to the cache actor and no answer has been received
+    /// yet. All packets for this subscription are buffered until the answer
+    /// arrives (or the pending timeout expires).
+    Pending { since: Instant },
+    /// The cache actor answered with a YANG library reference. `yang_ctx` is
+    /// `None` only if loading the schemas into libyang failed, in which case
+    /// packets are forwarded unvalidated.
+    Resolved {
+        content_id: ContentId,
+        yang_ctx: Option<yang5::context::Context>,
+    },
+    /// The cache actor answered that no schemas are available for this
+    /// subscription (or the lookup timed out). Packets are forwarded
+    /// unvalidated.
+    Unavailable,
+}
+
 #[derive(Debug)]
 struct CachedSubscription {
-    cached_content_id: Option<ContentId>,
     subscription_info: SubscriptionInfo,
-    yang_ctx: Option<yang5::context::Context>,
+    state: SchemaState,
     cached_packets: Vec<Arc<UdpNotifRequest>>,
+}
+
+impl CachedSubscription {
+    fn pending(subscription_info: SubscriptionInfo) -> Self {
+        Self {
+            subscription_info,
+            state: SchemaState::Pending {
+                since: Instant::now(),
+            },
+            cached_packets: Vec::new(),
+        }
+    }
+
+    const fn is_pending(&self) -> bool {
+        matches!(self.state, SchemaState::Pending { .. })
+    }
 }
 
 #[derive(Debug, Default)]
 struct CachedPeerSubscriptions {
     subscriptions: FxHashMap<SubscriptionId, CachedSubscription>,
+}
+
+/// Outcome of looking a packet's subscription up in the local cache.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LookupStatus {
+    /// No (matching) entry: a lookup must be sent to the cache actor.
+    Missing,
+    /// Entry exists and its lookup is still in flight.
+    Pending,
+    /// Entry exists and the cache actor already answered.
+    Settled,
 }
 
 #[derive(Debug, Clone)]
@@ -156,6 +219,7 @@ pub struct ValidationStats {
     pub cached_packets: opentelemetry::metrics::Gauge<u64>,
     pub cache_drop: opentelemetry::metrics::Counter<u64>,
     pub cache_drain: opentelemetry::metrics::Counter<u64>,
+    pub cache_lookup_timeout: opentelemetry::metrics::Counter<u64>,
     pub cache_yang_ctx_created: opentelemetry::metrics::Counter<u64>,
     pub cache_yang_ctx_invalid: opentelemetry::metrics::Counter<u64>,
     pub cache_yang_ctx_empty: opentelemetry::metrics::Counter<u64>,
@@ -202,6 +266,10 @@ impl ValidationStats {
             .u64_counter("netgauze.collector.yang_push.validation.cache.drain")
             .with_description("Number of Yang Push messages popped out of the cache and send is going to the validation step")
             .build();
+        let cache_lookup_timeout = meter
+            .u64_counter("netgauze.collector.yang_push.validation.cache.lookup.timeout")
+            .with_description("Number of subscriptions whose schema lookup did not get an answer from the cache actor within the pending timeout; their buffered packets are forwarded unvalidated")
+            .build();
         let cache_yang_ctx_created = meter
             .u64_counter("netgauze.collector.yang_push.validation.cache.yang.ctx.created")
             .with_description("Number of libyang validation context that are successfully created")
@@ -247,6 +315,7 @@ impl ValidationStats {
             cached_packets,
             cache_drop,
             cache_drain,
+            cache_lookup_timeout,
             cache_yang_ctx_created,
             cache_yang_ctx_invalid,
             cache_yang_ctx_empty,
@@ -279,6 +348,7 @@ enum ValidationActorCommand {
 struct ValidationActor {
     max_cached_packets_per_peer: usize,
     max_cached_packets_per_subscription: usize,
+    pending_lookup_timeout: Duration,
     peer_cache: FxHashMap<IpAddr, CachedPeerSubscriptions>,
     cmd_rx: mpsc::Receiver<ValidationActorCommand>,
     rx: async_channel::Receiver<Arc<UdpNotifRequest>>,
@@ -294,8 +364,15 @@ impl ValidationActor {
     /// cache.
     ///
     /// If it is different, remove the existing one from the cache to allow a
-    /// new request to the caching actor.
-    fn check_subscription_new(&mut self, peer: SocketAddr, subscription_info: &SubscriptionInfo) {
+    /// new request to the caching actor. Packets that were buffered under the
+    /// old entry are returned so the caller can carry them over into the new
+    /// entry instead of silently dropping them.
+    fn check_subscription_new(
+        &mut self,
+        peer: SocketAddr,
+        subscription_info: &SubscriptionInfo,
+    ) -> Vec<Arc<UdpNotifRequest>> {
+        let mut displaced = Vec::new();
         if let Some(cached_peer_subscriptions) = self.peer_cache.get_mut(&peer.ip()) {
             let is_different = cached_peer_subscriptions
                 .subscriptions
@@ -310,30 +387,38 @@ impl ValidationActor {
                     target=%subscription_info.target(),
                     "Subscription changed, removing from cache to allow a new fetch schemas request"
                 );
-                cached_peer_subscriptions
+                if let Some(old) = cached_peer_subscriptions
                     .subscriptions
-                    .remove(&subscription_info.id());
+                    .remove(&subscription_info.id())
+                {
+                    displaced = old.cached_packets;
+                }
             }
             // clear peer if there are no subscriptions left
             if cached_peer_subscriptions.subscriptions.is_empty() {
                 self.peer_cache.remove(&peer.ip());
             }
         }
+        displaced
     }
 
     /// Get the subscription info from the cache or from the SubscriptionStarted
-    /// notification, and the cached content id if it's found in the cache.
+    /// notification, together with the state of its schema lookup.
     ///
     /// If the notification is a SubscriptionStarted, create a new
     /// SubscriptionInfo and return it. If the notification is not a
     /// SubscriptionStarted, look up the subscription info in the cache.
+    ///
+    /// For a SubscriptionStarted that differs from the cached entry, the old
+    /// entry is removed and any packets buffered under it are returned as the
+    /// third element so they can be re-queued under the new entry.
     fn get_subscription_info(
         &mut self,
         peer: SocketAddr,
         collector: SocketAddr,
         interface: Option<String>,
         decoded: &UdpNotifPacketDecoded,
-    ) -> Option<(SubscriptionInfo, Option<Option<String>>)> {
+    ) -> Option<(SubscriptionInfo, LookupStatus, Vec<Arc<UdpNotifRequest>>)> {
         let message_id = decoded.message_id();
         let publisher_id = decoded.publisher_id();
         let notif_contents = if let Some(notif) = decoded.payload().notification_contents() {
@@ -348,6 +433,7 @@ impl ValidationActor {
             return None;
         };
 
+        let mut displaced = Vec::new();
         let subscription_info = if let NotificationVariant::SubscriptionStarted(
             subscription_started,
         )
@@ -374,7 +460,7 @@ impl ValidationActor {
                 );
                 return None;
             };
-            self.check_subscription_new(peer, &subscription_info);
+            displaced = self.check_subscription_new(peer, &subscription_info);
             Some(subscription_info)
         } else {
             self.peer_cache.get(&peer.ip()).and_then(
@@ -386,22 +472,25 @@ impl ValidationActor {
                 },
             )
         };
-        if let Some(subscription_info) = subscription_info {
-            let cached_content_id = self
-                .peer_cache
-                .get(&peer.ip())
-                .and_then(|cached_peer_subscriptions: &CachedPeerSubscriptions| {
-                    cached_peer_subscriptions
-                        .subscriptions
-                        .get(&notif_contents.subscription_id())
-                })
-                .filter(|x| x.subscription_info == subscription_info)
-                .map(|x| x.cached_content_id.clone());
-
-            Some((subscription_info, cached_content_id))
-        } else {
-            None
-        }
+        let subscription_info = subscription_info?;
+        let status = self
+            .peer_cache
+            .get(&peer.ip())
+            .and_then(|cached_peer_subscriptions: &CachedPeerSubscriptions| {
+                cached_peer_subscriptions
+                    .subscriptions
+                    .get(&notif_contents.subscription_id())
+            })
+            .filter(|x| x.subscription_info == subscription_info)
+            .map(|x| {
+                if x.is_pending() {
+                    LookupStatus::Pending
+                } else {
+                    LookupStatus::Settled
+                }
+            })
+            .unwrap_or(LookupStatus::Missing);
+        Some((subscription_info, status, displaced))
     }
 
     fn cache_packet(
@@ -421,16 +510,10 @@ impl ValidationActor {
             .values()
             .map(|x| x.cached_packets.len())
             .sum::<usize>();
-        let subscription_cache =
-            peer_cache
-                .subscriptions
-                .entry(subscription_id)
-                .or_insert(CachedSubscription {
-                    cached_content_id: None,
-                    subscription_info: subscription_info.clone(),
-                    yang_ctx: None,
-                    cached_packets: Vec::new(),
-                });
+        let subscription_cache = peer_cache
+            .subscriptions
+            .entry(subscription_id)
+            .or_insert_with(|| CachedSubscription::pending(subscription_info.clone()));
         if subscription_cache.cached_packets.len() > self.max_cached_packets_per_subscription {
             // drop the new packet, since the cache is full
             warn!(
@@ -601,21 +684,20 @@ impl ValidationActor {
             return Ok(());
         };
         Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut peer_tags);
-        let peer_cache = self.peer_cache.entry(peer.ip()).or_default();
-        let subscription_cache = peer_cache
-            .subscriptions
-            .entry(subscription_info.id())
-            .or_insert(CachedSubscription {
-                cached_content_id: None,
-                subscription_info: subscription_info.clone(),
-                yang_ctx: None,
-                cached_packets: Vec::new(),
+        // `extract_subscription_info` only hands back a subscription whose
+        // lookup has settled; anything still pending was buffered there.
+        let schema = self
+            .peer_cache
+            .get(&peer.ip())
+            .and_then(|x| x.subscriptions.get(&subscription_info.id()))
+            .and_then(|x| match &x.state {
+                SchemaState::Resolved {
+                    content_id,
+                    yang_ctx: Some(yang_ctx),
+                } if !subscription_info.is_empty() => Some((content_id.clone(), yang_ctx)),
+                _ => None,
             });
-        let cached_content_id = if let Some(cached_content_id) =
-            subscription_cache.cached_content_id.clone()
-            && let Some(yang_ctx) = subscription_cache.yang_ctx.as_ref()
-            && !subscription_info.is_empty()
-        {
+        let cached_content_id = if let Some((cached_content_id, yang_ctx)) = schema {
             let validation_result = Self::validate_message(
                 packet,
                 peer,
@@ -789,11 +871,26 @@ impl ValidationActor {
             .unwrap_or("UNKNOWN".to_string());
 
         match self.get_subscription_info(peer, collector, interface.map(String::from), decoded) {
-            Some((subscription_info, cached_content_id)) => {
+            Some((subscription_info, LookupStatus::Settled, _)) => Ok(Some(subscription_info)),
+            Some((subscription_info, LookupStatus::Pending, _)) => {
+                // A lookup for this subscription is already in flight: hold the
+                // packet so it is validated (and forwarded in order) once the
+                // cache actor answers, instead of letting it bypass validation.
+                trace!(
+                    peer=%peer,
+                    message_id,
+                    publisher_id,
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    subscription_target=%subscription_info.target(),
+                    notification_type,
+                    "Schema lookup in flight for subscription, buffering packet until the cache answers"
+                );
+                self.cache_packet(subscription_info, message);
+                Ok(None)
+            }
+            Some((subscription_info, LookupStatus::Missing, displaced)) => {
                 Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut peer_tags);
-                if cached_content_id.is_some() {
-                    return Ok(Some(subscription_info));
-                }
                 debug!(
                     peer=%peer,
                     message_id,
@@ -826,6 +923,11 @@ impl ValidationActor {
                         );
                         ValidationActorError::CacheLookupSendError
                     })?;
+                // Packets that were buffered under the previous version of
+                // this subscription arrived earlier, so they go first.
+                for old in displaced {
+                    self.cache_packet(subscription_info.clone(), old);
+                }
                 self.cache_packet(subscription_info.clone(), message);
                 Ok(None)
             }
@@ -921,7 +1023,7 @@ impl ValidationActor {
 
         // Update subscription info in the cache
         subscription_cache.subscription_info = subscription_info.clone();
-        if let Some(yang_lib_ref) = yang_lib_ref {
+        if let (Some(yang_lib_ref), Some(content_id)) = (yang_lib_ref, cached_content_id.clone()) {
             let search_dir = yang_lib_ref.search_dir();
             let yang_ctx_result = yang5::context::Context::new_from_yang_library_file(
                 &yang_lib_ref.yang_library_path(),
@@ -948,12 +1050,13 @@ impl ValidationActor {
                     None
                 }
             };
-            subscription_cache.cached_content_id = cached_content_id.clone();
-            subscription_cache.yang_ctx = yang_ctx;
+            subscription_cache.state = SchemaState::Resolved {
+                content_id,
+                yang_ctx,
+            };
         } else {
             self.stats.cache_yang_ctx_empty.add(1, &otl_tags);
-            subscription_cache.cached_content_id = None;
-            subscription_cache.yang_ctx = None;
+            subscription_cache.state = SchemaState::Unavailable;
         }
         let cached_packets = std::mem::take(&mut subscription_cache.cached_packets);
         for message in cached_packets {
@@ -1028,8 +1131,60 @@ impl ValidationActor {
         ))
     }
 
+    /// Flip subscriptions whose schema lookup has been pending for longer than
+    /// `pending_lookup_timeout` to [SchemaState::Unavailable] and release
+    /// their buffered packets unvalidated.
+    ///
+    /// The cache actor answers every lookup in normal operation (hit, miss, or
+    /// fetch failure), so this is a safety net that bounds how long packets
+    /// can be held if an answer never arrives.
+    async fn expire_pending_lookups(&mut self) -> Result<(), ValidationActorError> {
+        let now = Instant::now();
+        let mut expired: Vec<(SubscriptionInfo, Vec<Arc<UdpNotifRequest>>)> = Vec::new();
+        for peer_cache in self.peer_cache.values_mut() {
+            for subscription_cache in peer_cache.subscriptions.values_mut() {
+                if let SchemaState::Pending { since } = subscription_cache.state
+                    && now.duration_since(since) >= self.pending_lookup_timeout
+                {
+                    subscription_cache.state = SchemaState::Unavailable;
+                    expired.push((
+                        subscription_cache.subscription_info.clone(),
+                        std::mem::take(&mut subscription_cache.cached_packets),
+                    ));
+                }
+            }
+        }
+        for (subscription_info, cached_packets) in expired {
+            let mut otl_tags = Vec::from([opentelemetry::KeyValue::new(
+                "network.peer.address",
+                format!("{}", subscription_info.peer()),
+            )]);
+            Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut otl_tags);
+            self.stats.cache_lookup_timeout.add(1, &otl_tags);
+            warn!(
+                peer=%subscription_info.peer(),
+                subscription_id=subscription_info.id(),
+                router_content_id=subscription_info.content_id(),
+                target=%subscription_info.target(),
+                buffered_packets=cached_packets.len(),
+                timeout=?self.pending_lookup_timeout,
+                "Schema lookup for subscription did not complete within the pending timeout, forwarding buffered packets unvalidated"
+            );
+            for message in cached_packets {
+                let peer = message.peer_address();
+                let mut peer_tags = Self::peer_tags_from_packet(peer, message.packet());
+                Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut peer_tags);
+                self.stats.cache_drain.add(1, &peer_tags);
+                self.process_udp_notif_msg(message).await?;
+            }
+        }
+        Ok(())
+    }
+
     async fn run(mut self) -> Result<String, ValidationActorError> {
         info!("Starting Yang-Push validation actor");
+        let mut expiry_tick = tokio::time::interval(PENDING_LOOKUP_SCAN_INTERVAL);
+        expiry_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             tokio::select! {
                 biased;
@@ -1078,6 +1233,13 @@ impl ValidationActor {
                         }
                     }
                 }
+                _ = expiry_tick.tick() => {
+                    if let Err(err) = self.expire_pending_lookups().await {
+                        let err_msg = "Yang Push validation actor failed to release packets of a timed-out schema lookup, shutting down";
+                        warn!(error=%err, err_msg);
+                        return Ok(err_msg.to_string());
+                    }
+                }
             }
         }
     }
@@ -1097,10 +1259,12 @@ pub struct ValidationActorHandle {
 }
 
 impl ValidationActorHandle {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         buffer_size: usize,
         max_cached_packets_per_peer: usize,
         max_cached_packets_per_subscription: usize,
+        pending_lookup_timeout: Duration,
         rx: async_channel::Receiver<Arc<UdpNotifRequest>>,
         tx: async_channel::Sender<(Option<ContentId>, SubscriptionInfo, UdpNotifPacketDecoded)>,
         cache_cmd_tx: async_channel::Sender<CacheLookupCommand>,
@@ -1121,6 +1285,7 @@ impl ValidationActorHandle {
         let actor = ValidationActor {
             max_cached_packets_per_peer,
             max_cached_packets_per_subscription,
+            pending_lookup_timeout,
             peer_cache: FxHashMap::default(),
             cmd_rx,
             rx,
@@ -1175,6 +1340,7 @@ mod tests {
             100,
             1000,
             100,
+            DEFAULT_PENDING_LOOKUP_TIMEOUT,
             udp_notif_rx,
             validated_tx,
             caching_handle.request_tx(),
@@ -1288,6 +1454,7 @@ mod tests {
             100,
             1000,
             100,
+            DEFAULT_PENDING_LOOKUP_TIMEOUT,
             udp_notif_rx,
             validated_tx,
             caching_handle.request_tx(),
@@ -1372,6 +1539,156 @@ mod tests {
         }
 
         // Shutdown actor
+        handle.shutdown().await.unwrap();
+        caching_handle.shutdown().await.unwrap();
+        caching_join_handle.await.unwrap().unwrap();
+    }
+
+    /// Regression test: a data packet that arrives while the schema lookup
+    /// triggered by its `SubscriptionStarted` is still in flight must be
+    /// buffered and validated once the schemas are available, not forwarded
+    /// unvalidated (and out of order) with an empty content id.
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_validation_actor_buffers_data_packets_while_lookup_pending() {
+        let (caching_join_handle, caching_handle, subscription_info, fetcher_count) =
+            setup_actor_with_empty_cache();
+
+        let (udp_notif_tx, udp_notif_rx) = async_channel::bounded(100);
+        let (validated_tx, validated_rx) = async_channel::bounded(100);
+
+        let (_join_handle, handle) = ValidationActorHandle::new(
+            100,
+            1000,
+            100,
+            DEFAULT_PENDING_LOOKUP_TIMEOUT,
+            udp_notif_rx,
+            validated_tx,
+            caching_handle.request_tx(),
+            either::Right(ValidationStats::new(opentelemetry::global::meter(
+                "test_meter",
+            ))),
+        )
+        .expect("Failed to spawn validation actor");
+
+        let peer = SocketAddr::new(subscription_info.peer(), 12345);
+        let collector = SocketAddr::from(([127, 0, 0, 1], 10000));
+        let started = serde_json::json!(
+            {
+                "ietf-yp-notification:envelope": {
+                    "event-time": "2025-09-23T14:12:16.024Z",
+                    "hostname": "ipf-zbl1327-r-daisy-48",
+                    "sequence-number": 0,
+                    "contents": {
+                        "ietf-subscribed-notifications:subscription-started": {
+                            "id": 1,
+                            "ietf-yang-push:datastore": "ietf-datastores:operational",
+                            "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces",
+                            "transport": "ietf-udp-notif-transport:udp-notif",
+                            "encoding": "encode-json",
+                            "purpose": "test subscription",
+                            "ietf-distributed-notif:message-publisher-id": [16843789],
+                            "ietf-yang-push-revision:module-version": [
+                                {"name": "ietf-interfaces", "revision": "2018-02-20"}
+                            ],
+                            "ietf-yang-push-revision:yang-library-content-id": "test-content-id-1",
+                            "ietf-yang-push:periodic": {"period": 6000}
+                        }
+                    }
+                }
+            }
+        );
+        let push_update = serde_json::json!(
+            {
+                "ietf-yp-notification:envelope": {
+                    "event-time": "2025-09-23T14:12:17.024Z",
+                    "hostname": "ipf-zbl1327-r-daisy-48",
+                    "sequence-number": 1,
+                    "contents": {
+                        "ietf-yang-push:push-update": {
+                            "id": 1,
+                            "datastore-contents": {
+                                "ietf-interfaces:interfaces": {
+                                    "interface": [{"name": "eth0"}]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        );
+        let mk = |message_id: u32, payload: &serde_json::Value| {
+            Arc::new(UdpNotifRequest::new(
+                collector,
+                None,
+                peer,
+                UdpNotifPacket::new(
+                    MediaType::YangDataJson,
+                    10,
+                    message_id,
+                    HashMap::new(),
+                    Bytes::from(serde_json::to_vec(payload).unwrap()),
+                ),
+            ))
+        };
+
+        // Queue the SubscriptionStarted and a data packet back to back, so the
+        // data packet is processed before the cache actor can answer the
+        // lookup triggered by the SubscriptionStarted.
+        udp_notif_tx.send(mk(1, &started)).await.unwrap();
+        udp_notif_tx.send(mk(2, &push_update)).await.unwrap();
+
+        let mut received = Vec::new();
+        for _ in 0..2 {
+            let item = tokio::time::timeout(Duration::from_secs(2), validated_rx.recv())
+                .await
+                .expect("timeout waiting for forwarded packet")
+                .unwrap();
+            received.push(item);
+        }
+        // Nothing else must come out: the data packet is forwarded once.
+        assert!(
+            tokio::time::timeout(Duration::from_millis(200), validated_rx.recv())
+                .await
+                .is_err(),
+            "unexpected extra packet forwarded"
+        );
+
+        let types: Vec<String> = received
+            .iter()
+            .map(|(_, _, decoded)| {
+                decoded
+                    .notification_type()
+                    .map(|x| x.to_string())
+                    .unwrap_or_default()
+            })
+            .collect();
+        assert_eq!(
+            types,
+            vec![
+                "SubscriptionStarted".to_string(),
+                "YangPushUpdate".to_string()
+            ],
+            "packets must be forwarded in arrival order"
+        );
+        for (content_id, sub_info, decoded) in &received {
+            assert!(
+                content_id.is_some(),
+                "packet {} was forwarded without a cached content id (bypassed validation)",
+                decoded.message_id()
+            );
+            assert!(!sub_info.is_empty());
+        }
+        // The lookup was sent exactly once, and the data packet did not
+        // trigger a second one.
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 1);
+        }
+
         handle.shutdown().await.unwrap();
         caching_handle.shutdown().await.unwrap();
         caching_join_handle.await.unwrap().unwrap();

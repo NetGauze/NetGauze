@@ -70,6 +70,10 @@ pub(crate) const fn default_max_cached_packets_per_subscription() -> usize {
     100
 }
 
+pub(crate) const fn default_pending_lookup_timeout() -> Duration {
+    netgauze_yang_push::validation::DEFAULT_PENDING_LOOKUP_TIMEOUT
+}
+
 pub(crate) const fn default_netconf_port() -> u16 {
     830
 }
@@ -230,6 +234,14 @@ pub struct UdpNotifConfig {
 
     #[serde(default = "default_max_cached_packets_per_subscription")]
     pub max_cached_packets_per_subscription: usize,
+
+    /// Maximum time (milliseconds) packets of a subscription are buffered
+    /// while its YANG schema lookup is in flight. After this, the buffered
+    /// packets are forwarded unvalidated and the subscription is treated as
+    /// having no schemas until a new `subscription-started` is received.
+    #[serde(default = "default_pending_lookup_timeout")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    pub pending_lookup_timeout: Duration,
 
     pub netconf: NetconfConfig,
 
