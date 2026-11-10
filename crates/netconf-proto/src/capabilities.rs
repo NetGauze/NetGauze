@@ -133,6 +133,7 @@ impl FromStr for Capability {
                         "https" => UrlScheme::Https,
                         "ftp" => UrlScheme::Ftp,
                         "sftp" => UrlScheme::Sftp,
+                        "ftps" => UrlScheme::Ftps,
                         "file" => UrlScheme::File,
                         "scp" => UrlScheme::Scp,
                         _ => {
@@ -438,6 +439,9 @@ pub enum UrlScheme {
 
     #[strum(serialize = "sftp")]
     Sftp,
+
+    #[strum(serialize = "ftps")]
+    Ftps,
 
     #[strum(serialize = "file")]
     File,
