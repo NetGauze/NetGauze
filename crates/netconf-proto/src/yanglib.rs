@@ -1752,6 +1752,35 @@ fn serialize_yang_lib_location<T: io::Write>(
     Ok(())
 }
 
+/// Version of the `content-id` algorithm, hashed first so a change to the
+/// algorithm never produces ids that collide with the previous one
+const CONTENT_ID_VERSION: &[u8] = b"netgauze-content-id/v2";
+
+/// Kind of each item fed into the `content-id` hash
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+enum ContentIdTag {
+    Version = 0,
+    ModuleDigest = 1,
+    Implemented = 2,
+    ImportOnly = 3,
+    Submodule = 4,
+    SubmoduleDigest = 5,
+    Revision = 6,
+    Namespace = 7,
+    Feature = 8,
+    Deviation = 9,
+    AugmentedBy = 10,
+    Schema = 11,
+}
+
+/// Feed `data` into `hasher` prefixed with its kind and length
+fn hash_field(hasher: &mut sha2::Sha256, tag: ContentIdTag, data: &[u8]) {
+    hasher.update([tag as u8]);
+    hasher.update((data.len() as u64).to_le_bytes());
+    hasher.update(data);
+}
+
 /// Helper struct for building a `ModuleSet` with backward compatibility checks.
 /// Only the latest version of each module is allowed in the set.
 /// User can update the version of a module by adding a new module with the same
@@ -1760,6 +1789,7 @@ fn serialize_yang_lib_location<T: io::Write>(
 ///
 /// The module Builder records the latest version of each schema in a HashMap
 /// with as module name and value as the raw schema string.
+
 #[derive(Debug)]
 pub struct ModuleSetBuilder {
     module_set: ModuleSet,
@@ -2094,31 +2124,12 @@ impl ModuleSetBuilder {
     }
 
     /// Produce a YANG library that contains only one module set
+    ///
+    /// The `content-id` is a canonical fingerprint of the module set, see
+    /// Self::content_id.
     pub fn build_yang_lib(self) -> (YangLibrary, HashMap<Box<str>, Box<str>>) {
         let default_name: Box<str> = "ALL".into();
-        let mut content_id = sha2::Sha256::new();
-        for module in self.module_set.modules().values() {
-            for feature in module.features() {
-                content_id.update(feature.as_ref());
-            }
-            for submodule in module.submodules() {
-                content_id.update(self.yang_schemas.get(submodule.name()).unwrap().as_ref());
-            }
-            content_id.update(self.yang_schemas.get(module.name()).unwrap().as_ref());
-        }
-        for import_only_versions in self.module_set.import_only_modules().values() {
-            for module in import_only_versions.values() {
-                for (_, submodule) in module.submodules() {
-                    content_id.update(self.yang_schemas.get(submodule.name()).unwrap().as_ref());
-                }
-                content_id.update(self.yang_schemas.get(module.name()).unwrap().as_ref());
-            }
-        }
-        let content_id = content_id.finalize();
-        let content_id = content_id
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>();
+        let content_id = self.content_id();
         let yang_lib_schema = Schema::new(
             default_name.clone(),
             Box::new([self.module_set.name().into()]),
@@ -2135,6 +2146,126 @@ impl ModuleSetBuilder {
         (yang_lib, self.yang_schemas)
     }
 
+    /// Compute the `content-id` of the module set.
+    ///
+    /// Every module (implemented or import-only) gets its own digest over its
+    /// kind, name, revision, namespace, sorted features, deviations and
+    /// augmented-by lists, the digests of its submodules and its schema
+    /// text. The `content-id` is the digest of [`CONTENT_ID_VERSION`]
+    /// followed by the sorted module digests.
+    ///
+    /// The result does not depend on the order modules, features or
+    /// submodules were added (the dependency traversal order), and every
+    /// item is tagged and length-prefixed, so two different module sets
+    /// cannot produce the same input to the hash, e.g. moving a module from
+    /// implemented to import-only changes the `content-id`.
+    fn content_id(&self) -> String {
+        let mut module_digests: Vec<[u8; 32]> = Vec::new();
+        for module in self.module_set.modules().values() {
+            let mut submodules: Vec<_> = module
+                .submodules()
+                .iter()
+                .map(|submodule| self.submodule_digest(submodule))
+                .collect();
+            submodules.sort_unstable();
+            module_digests.push(self.module_digest(
+                ContentIdTag::Implemented,
+                module.name(),
+                module.revision(),
+                module.namespace(),
+                &[
+                    (ContentIdTag::Feature, module.features()),
+                    (ContentIdTag::Deviation, module.deviations()),
+                    (ContentIdTag::AugmentedBy, module.augmented_by()),
+                ],
+                &submodules,
+            ));
+        }
+        for import_only_versions in self.module_set.import_only_modules().values() {
+            for module in import_only_versions.values() {
+                let mut submodules: Vec<_> = module
+                    .submodules()
+                    .values()
+                    .map(|submodule| self.submodule_digest(submodule))
+                    .collect();
+                submodules.sort_unstable();
+                module_digests.push(self.module_digest(
+                    ContentIdTag::ImportOnly,
+                    module.name(),
+                    module.revision(),
+                    module.namespace(),
+                    &[],
+                    &submodules,
+                ));
+            }
+        }
+        module_digests.sort_unstable();
+
+        let mut hasher = sha2::Sha256::new();
+        hash_field(&mut hasher, ContentIdTag::Version, CONTENT_ID_VERSION);
+        for digest in &module_digests {
+            hash_field(&mut hasher, ContentIdTag::ModuleDigest, digest);
+        }
+        hasher
+            .finalize()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>()
+    }
+
+    fn module_digest(
+        &self,
+        kind: ContentIdTag,
+        name: &str,
+        revision: Option<&str>,
+        namespace: &str,
+        lists: &[(ContentIdTag, &[Box<str>])],
+        submodule_digests: &[[u8; 32]],
+    ) -> [u8; 32] {
+        let mut hasher = sha2::Sha256::new();
+        hash_field(&mut hasher, kind, name.as_bytes());
+        if let Some(revision) = revision {
+            hash_field(&mut hasher, ContentIdTag::Revision, revision.as_bytes());
+        }
+        hash_field(&mut hasher, ContentIdTag::Namespace, namespace.as_bytes());
+        for (tag, items) in lists {
+            let mut items: Vec<&str> = items.iter().map(|item| item.as_ref()).collect();
+            items.sort_unstable();
+            for item in items {
+                hash_field(&mut hasher, *tag, item.as_bytes());
+            }
+        }
+        for digest in submodule_digests {
+            hash_field(&mut hasher, ContentIdTag::SubmoduleDigest, digest);
+        }
+        hash_field(&mut hasher, ContentIdTag::Schema, self.schema_text(name));
+        hasher.finalize().into()
+    }
+
+    fn submodule_digest(&self, submodule: &Submodule) -> [u8; 32] {
+        let mut hasher = sha2::Sha256::new();
+        hash_field(
+            &mut hasher,
+            ContentIdTag::Submodule,
+            submodule.name().as_bytes(),
+        );
+        if let Some(revision) = submodule.revision() {
+            hash_field(&mut hasher, ContentIdTag::Revision, revision.as_bytes());
+        }
+        hash_field(
+            &mut hasher,
+            ContentIdTag::Schema,
+            self.schema_text(submodule.name()),
+        );
+        hasher.finalize().into()
+    }
+
+    fn schema_text(&self, name: &str) -> &[u8] {
+        self.yang_schemas
+            .get(name)
+            .map(|schema| schema.as_bytes())
+            .unwrap_or_default()
+    }
     pub fn extend_from_yang_lib<C: BackwardCompatibilityChecker>(
         &mut self,
         yang_lib: YangLibrary,
@@ -2823,6 +2954,221 @@ mod tests {
                 )
                 .map(|x| x.name()),
             None
+        );
+    }
+
+    fn content_id_module(
+        name: &str,
+        features: &[&str],
+        deviations: &[&str],
+        augmented_by: &[&str],
+        submodules: &[&str],
+    ) -> Module {
+        Module::new(
+            name.into(),
+            Some("2020-01-01".into()),
+            format!("urn:example:{name}").into(),
+            features.iter().map(|f| (*f).into()).collect(),
+            deviations.iter().map(|d| (*d).into()).collect(),
+            submodules
+                .iter()
+                .map(|s| Submodule::new((*s).into(), Some("2020-01-01".into()), Box::new([])))
+                .collect(),
+            augmented_by.iter().map(|a| (*a).into()).collect(),
+            Box::new([]),
+        )
+    }
+
+    fn content_id_import_only(name: &str, submodules: &[&str]) -> ImportOnlyModule {
+        ImportOnlyModule::new(
+            name.into(),
+            Some("2020-01-01".into()),
+            format!("urn:example:{name}").into(),
+            Box::new([]),
+            submodules
+                .iter()
+                .map(|s| {
+                    (
+                        (*s).into(),
+                        Submodule::new((*s).into(), Some("2020-01-01".into()), Box::new([])),
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    fn content_id_add_module(builder: &mut ModuleSetBuilder, module: Module) {
+        let name = module.name().to_string();
+        let submodules = module.submodules().to_vec();
+        builder
+            .add_module(
+                module,
+                format!("{name}-schema").into(),
+                &PermissiveVersionChecker,
+            )
+            .unwrap();
+        for submodule in submodules {
+            let schema = format!("{}-schema", submodule.name()).into();
+            builder
+                .add_submodule_for_module(&name, submodule, schema, &PermissiveVersionChecker)
+                .unwrap();
+        }
+    }
+
+    fn content_id_add_import_only(builder: &mut ModuleSetBuilder, module: ImportOnlyModule) {
+        let name = module.name().to_string();
+        let submodules: Vec<_> = module.submodules().values().cloned().collect();
+        builder
+            .add_import_only_module(
+                module,
+                format!("{name}-schema").into(),
+                &PermissiveVersionChecker,
+            )
+            .unwrap();
+        for submodule in submodules {
+            let schema = format!("{}-schema", submodule.name()).into();
+            builder
+                .add_submodule_for_import_only_module(
+                    &name,
+                    submodule,
+                    schema,
+                    &PermissiveVersionChecker,
+                )
+                .unwrap();
+        }
+    }
+
+    fn content_id_of(builder: ModuleSetBuilder) -> Box<str> {
+        let (yang_lib, _) = builder.build_yang_lib();
+        yang_lib.content_id().into()
+    }
+
+    /// Semantically identical module sets must get the same content-id
+    /// whatever order modules, features, deviations and submodules were
+    /// added in (the dependency traversal order).
+    #[test]
+    fn test_content_id_is_insertion_order_independent() {
+        let mut builder1 = ModuleSetBuilder::new("ALL".into());
+        content_id_add_module(
+            &mut builder1,
+            content_id_module(
+                "a",
+                &["f1", "f2"],
+                &["a-dev1", "a-dev2"],
+                &["x", "y"],
+                &["a-sub1", "a-sub2"],
+            ),
+        );
+        content_id_add_module(&mut builder1, content_id_module("b", &[], &[], &[], &[]));
+        content_id_add_import_only(&mut builder1, content_id_import_only("types1", &[]));
+        content_id_add_import_only(
+            &mut builder1,
+            content_id_import_only("types2", &["t-sub1", "t-sub2"]),
+        );
+
+        let mut builder2 = ModuleSetBuilder::new("ALL".into());
+        content_id_add_import_only(
+            &mut builder2,
+            content_id_import_only("types2", &["t-sub2", "t-sub1"]),
+        );
+        content_id_add_import_only(&mut builder2, content_id_import_only("types1", &[]));
+        content_id_add_module(&mut builder2, content_id_module("b", &[], &[], &[], &[]));
+        content_id_add_module(
+            &mut builder2,
+            content_id_module(
+                "a",
+                &["f2", "f1"],
+                &["a-dev2", "a-dev1"],
+                &["y", "x"],
+                &["a-sub2", "a-sub1"],
+            ),
+        );
+
+        assert_eq!(content_id_of(builder1), content_id_of(builder2));
+    }
+
+    /// The same module implemented or import-only is a different library
+    /// (only implemented modules contribute data nodes and identities to
+    /// validation).
+    #[test]
+    fn test_content_id_distinguishes_implemented_from_import_only() {
+        let mut builder1 = ModuleSetBuilder::new("ALL".into());
+        content_id_add_module(&mut builder1, content_id_module("a", &[], &[], &[], &[]));
+        content_id_add_module(&mut builder1, content_id_module("b", &[], &[], &[], &[]));
+
+        let mut builder2 = ModuleSetBuilder::new("ALL".into());
+        content_id_add_module(&mut builder2, content_id_module("a", &[], &[], &[], &[]));
+        content_id_add_import_only(&mut builder2, content_id_import_only("b", &[]));
+
+        assert_ne!(content_id_of(builder1), content_id_of(builder2));
+    }
+
+    /// A feature and a submodule schema with the same text must not produce
+    /// the same hash input.
+    #[test]
+    fn test_content_id_distinguishes_feature_from_submodule() {
+        let mut builder1 = ModuleSetBuilder::new("ALL".into());
+        content_id_add_module(
+            &mut builder1,
+            content_id_module("m", &["s-schema"], &[], &[], &[]),
+        );
+
+        let mut builder2 = ModuleSetBuilder::new("ALL".into());
+        content_id_add_module(&mut builder2, content_id_module("m", &[], &[], &[], &["s"]));
+
+        assert_ne!(content_id_of(builder1), content_id_of(builder2));
+    }
+
+    /// The YANG library metadata is part of the content-id, not only the
+    /// schema texts: features, deviations and augmented-by, and to which
+    /// module they belong.
+    #[test]
+    fn test_content_id_covers_library_metadata() {
+        let build = |a: Module, b: Module| {
+            let mut builder = ModuleSetBuilder::new("ALL".into());
+            content_id_add_module(&mut builder, a);
+            content_id_add_module(&mut builder, b);
+            content_id_of(builder)
+        };
+        let plain = build(
+            content_id_module("a", &[], &[], &[], &[]),
+            content_id_module("b", &[], &[], &[], &[]),
+        );
+        let feature_on_a = build(
+            content_id_module("a", &["f"], &[], &[], &[]),
+            content_id_module("b", &[], &[], &[], &[]),
+        );
+        let feature_on_b = build(
+            content_id_module("a", &[], &[], &[], &[]),
+            content_id_module("b", &["f"], &[], &[], &[]),
+        );
+        let deviation = build(
+            content_id_module("a", &[], &["b"], &[], &[]),
+            content_id_module("b", &[], &[], &[], &[]),
+        );
+        let augmented_by = build(
+            content_id_module("a", &[], &[], &["b"], &[]),
+            content_id_module("b", &[], &[], &[], &[]),
+        );
+        let ids = [plain, feature_on_a, feature_on_b, deviation, augmented_by];
+        let unique: HashSet<_> = ids.iter().collect();
+        assert_eq!(unique.len(), ids.len(), "{ids:?}");
+    }
+
+    /// Pin the algorithm: an accidental change to the content-id computation
+    /// must be noticed (and come with a new `CONTENT_ID_VERSION`), as existing
+    /// caches and schema registrations are keyed by it.
+    #[test]
+    fn test_content_id_is_stable() {
+        let mut builder = ModuleSetBuilder::new("ALL".into());
+        content_id_add_module(
+            &mut builder,
+            content_id_module("a", &["f"], &["d"], &["b"], &["a-sub"]),
+        );
+        content_id_add_import_only(&mut builder, content_id_import_only("types", &["t-sub"]));
+        assert_eq!(
+            content_id_of(builder).as_ref(),
+            "3d320c42aaa14b50c07023a593c0b05c89f95039cbf3d88447d79567c2e8f159"
         );
     }
 }
