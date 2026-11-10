@@ -449,6 +449,7 @@ pub struct SubscriptionStartedModified {
 
     #[serde(rename = "ietf-yang-push-revision:module-version")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "YangPushModuleVersion::serialize_as_received")]
     module_version: Option<Box<[YangPushModuleVersion]>>,
 
     #[serde(rename = "ietf-yang-push-revision:yang-library-content-id")]
@@ -1025,11 +1026,11 @@ mod tests {
                 excluded_change: Some(Box::new([ChangeType::Create, ChangeType::Replace])),
             }),
             module_version: Some(
-                vec![YangPushModuleVersion {
-                    name: "example-module".into(),
-                    revision: Some("2025-04-25".into()),
-                    version: None,
-                }]
+                vec![YangPushModuleVersion::new(
+                    "example-module".into(),
+                    Some("2025-04-25".into()),
+                    None,
+                )]
                 .into(),
             ),
             yang_library_content_id: Some("content-id".into()),
@@ -1129,11 +1130,11 @@ mod tests {
                 excluded_change: Some(Box::new([ChangeType::Create, ChangeType::Replace])),
             }),
             module_version: Some(
-                vec![YangPushModuleVersion {
-                    name: "example-module".into(),
-                    revision: Some("2025-04-25".into()),
-                    version: None,
-                }]
+                vec![YangPushModuleVersion::new(
+                    "example-module".into(),
+                    Some("2025-04-25".into()),
+                    None,
+                )]
                 .into(),
             ),
             yang_library_content_id: Some("content-id".into()),
@@ -1600,11 +1601,11 @@ mod tests {
                         .with_timezone(&Utc),
                 ),
             }),
-            module_version: Some(Box::new([YangPushModuleVersion {
-                name: "example-module".into(),
-                revision: Some("2025-04-25".into()),
-                version: None,
-            }])),
+            module_version: Some(Box::new([YangPushModuleVersion::new(
+                "example-module".into(),
+                Some("2025-04-25".into()),
+                None,
+            )])),
             yang_library_content_id: Some("content-id".into()),
         };
 
@@ -1631,11 +1632,11 @@ mod tests {
                 ),
             }),
             module_version: Some(
-                vec![YangPushModuleVersion {
-                    name: "example-module".into(),
-                    revision: Some("2025-04-25".into()),
-                    version: None,
-                }]
+                vec![YangPushModuleVersion::new(
+                    "example-module".into(),
+                    Some("2025-04-25".into()),
+                    None,
+                )]
                 .into(),
             ),
             yang_library_content_id: Some("content-id".into()),

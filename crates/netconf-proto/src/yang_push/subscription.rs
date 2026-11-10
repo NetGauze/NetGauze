@@ -43,7 +43,9 @@ use crate::yanglib::DatastoreName;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use quick_xml::events::{BytesText, Event};
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize, Serializer};
+use std::hash::{Hash, Hasher};
 use std::io;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -91,6 +93,7 @@ pub struct Subscription {
 
     #[serde(rename = "ietf-yang-push-revision:module-version")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "YangPushModuleVersion::serialize_as_received")]
     pub module_version: Option<Box<[YangPushModuleVersion]>>,
 
     #[serde(rename = "ietf-yang-push-revision:yang-library-content-id")]
@@ -962,6 +965,47 @@ impl<'a> XmlDeserialize<'a, DatastoreSelectionFilterObjects> for DatastoreSelect
     }
 }
 
+/// Leaf names of a `module-version` list entry.
+///
+/// draft-ietf-netconf-yang-notifications-versioning renamed the leaves of the
+/// `module-version` list in revision 09. Publishers implementing an older
+/// revision still send the previous names, and the `ietf-yang-push-revision`
+/// module they announce only defines those.
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ModuleVersionLeafNames {
+    /// `name`, `revision` and `version`
+    /// (draft-ietf-netconf-yang-notifications-versioning >= 9)
+    #[default]
+    Current,
+
+    /// `module-name`, `revision` and `revision-label`
+    /// (draft-ietf-netconf-yang-notifications-versioning < 9)
+    Legacy,
+}
+
+impl ModuleVersionLeafNames {
+    /// Name of the leaf carrying the module name.
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::Current => "name",
+            Self::Legacy => "module-name",
+        }
+    }
+
+    /// Name of the leaf carrying the module revision date.
+    pub const fn revision(&self) -> &'static str {
+        "revision"
+    }
+
+    /// Name of the leaf carrying the module version label.
+    pub const fn version(&self) -> &'static str {
+        match self {
+            Self::Current => "version",
+            Self::Legacy => "revision-label",
+        }
+    }
+}
+
 /// Module Versioning (draft-ietf-netconf-yang-notifications-versioning)
 ///
 /// The `YangPushModuleVersion` structure provides information about YANG
@@ -969,22 +1013,92 @@ impl<'a> XmlDeserialize<'a, DatastoreSelectionFilterObjects> for DatastoreSelect
 /// - `name`: Module name
 /// - `revision`: Module revision date (e.g., "2025-04-25")
 /// - `version`: Semantic version label
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "kebab-case")]
+/// - `leaf_names`: Leaf names the publisher used for the entry
+///
+/// The legacy leaf names `module-name` and `revision-label`
+/// (draft-ietf-netconf-yang-notifications-versioning < 9) are accepted when
+/// deserializing and recorded in `leaf_names`.
+///
+/// `leaf_names` only describes how the entry was encoded. Two entries naming
+/// the same module, revision and version are equal and hash the same whatever
+/// leaf names they were received with.
+///
+/// The derived [`Serialize`] always writes the current leaf names, which is
+/// what models reusing this type outside of `ietf-yang-push-revision` expect.
+/// Use [`YangPushModuleVersion::serialize_as_received`] where the entry is
+/// encoded again against the publisher's own `ietf-yang-push-revision` module.
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", try_from = "YangPushModuleVersionRepr")]
 pub struct YangPushModuleVersion {
-    /// Alias 'module-name' still supported
-    /// (draft-ietf-netconf-yang-notifications-versioning < 9)
-    #[serde(alias = "module-name")]
     pub name: Box<str>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revision: Option<Box<str>>,
 
-    /// Alias 'revision-label' still supported
-    /// (draft-ietf-netconf-yang-notifications-versioning < 9)
-    #[serde(alias = "revision-label")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<Box<str>>,
+
+    #[serde(skip)]
+    pub leaf_names: ModuleVersionLeafNames,
+}
+
+/// JSON representation accepted for [`YangPushModuleVersion`], with both the
+/// current and the legacy leaf names.
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct YangPushModuleVersionRepr {
+    name: Option<Box<str>>,
+    module_name: Option<Box<str>>,
+    revision: Option<Box<str>>,
+    version: Option<Box<str>>,
+    revision_label: Option<Box<str>>,
+}
+
+impl TryFrom<YangPushModuleVersionRepr> for YangPushModuleVersion {
+    type Error = &'static str;
+
+    fn try_from(repr: YangPushModuleVersionRepr) -> Result<Self, Self::Error> {
+        let mut leaf_names = ModuleVersionLeafNames::Current;
+        let name = match (repr.name, repr.module_name) {
+            (Some(name), None) => name,
+            (None, Some(name)) => {
+                leaf_names = ModuleVersionLeafNames::Legacy;
+                name
+            }
+            (None, None) => return Err("missing field `name`"),
+            (Some(_), Some(_)) => return Err("duplicate field `name`"),
+        };
+        let version = match (repr.version, repr.revision_label) {
+            (version, None) => version,
+            (None, version) => {
+                leaf_names = ModuleVersionLeafNames::Legacy;
+                version
+            }
+            (Some(_), Some(_)) => return Err("duplicate field `version`"),
+        };
+        Ok(Self {
+            name,
+            revision: repr.revision,
+            version,
+            leaf_names,
+        })
+    }
+}
+
+impl PartialEq for YangPushModuleVersion {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.revision == other.revision && self.version == other.version
+    }
+}
+
+impl Eq for YangPushModuleVersion {}
+
+impl Hash for YangPushModuleVersion {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.revision.hash(state);
+        self.version.hash(state);
+    }
 }
 
 impl YangPushModuleVersion {
@@ -997,8 +1111,16 @@ impl YangPushModuleVersion {
             name,
             revision,
             version,
+            leaf_names: ModuleVersionLeafNames::Current,
         }
     }
+
+    /// Sets the leaf names used when the entry is serialized as received.
+    pub const fn with_leaf_names(mut self, leaf_names: ModuleVersionLeafNames) -> Self {
+        self.leaf_names = leaf_names;
+        self
+    }
+
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
@@ -1008,6 +1130,49 @@ impl YangPushModuleVersion {
     }
     pub fn version(&self) -> Option<&str> {
         self.version.as_deref()
+    }
+
+    pub const fn leaf_names(&self) -> ModuleVersionLeafNames {
+        self.leaf_names
+    }
+
+    /// Serializes a `module-version` list with the leaf names each entry was
+    /// received with, for use with `#[serde(serialize_with = "...")]`.
+    ///
+    /// A notification that is decoded and encoded again is validated against
+    /// the `ietf-yang-push-revision` module of its publisher, which defines
+    /// either the current or the legacy leaf names but not both.
+    pub fn serialize_as_received<S: Serializer>(
+        module_versions: &Option<Box<[Self]>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match module_versions {
+            Some(module_versions) => serializer.collect_seq(module_versions.iter().map(AsReceived)),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
+/// Serializes a [`YangPushModuleVersion`] with its own
+/// [`ModuleVersionLeafNames`].
+struct AsReceived<'a>(&'a YangPushModuleVersion);
+
+impl Serialize for AsReceived<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let Self(module_version) = self;
+        let leaf_names = module_version.leaf_names;
+        let len = 1
+            + usize::from(module_version.revision.is_some())
+            + usize::from(module_version.version.is_some());
+        let mut state = serializer.serialize_struct("YangPushModuleVersion", len)?;
+        state.serialize_field(leaf_names.name(), &module_version.name)?;
+        if let Some(revision) = &module_version.revision {
+            state.serialize_field(leaf_names.revision(), revision)?;
+        }
+        if let Some(version) = &module_version.version {
+            state.serialize_field(leaf_names.version(), version)?;
+        }
+        state.end()
     }
 }
 
@@ -1025,20 +1190,22 @@ impl XmlSerialize for YangPushModuleVersion {
         let module_version_start =
             writer.create_ns_element(YANG_PUSH_REVISION, "module-version")?;
         writer.write_event(Event::Start(module_version_start.clone()))?;
-        let name_start = writer.create_ns_element(YANG_PUSH_REVISION, "name")?;
+        let name_start = writer.create_ns_element(YANG_PUSH_REVISION, self.leaf_names.name())?;
 
         writer.write_event(Event::Start(name_start.clone()))?;
         writer.write_event(Event::Text(BytesText::new(self.name.as_ref())))?;
         writer.write_event(Event::End(name_start.to_end()))?;
 
         if let Some(revision) = &self.revision {
-            let revision_start = writer.create_ns_element(YANG_PUSH_REVISION, "revision")?;
+            let revision_start =
+                writer.create_ns_element(YANG_PUSH_REVISION, self.leaf_names.revision())?;
             writer.write_event(Event::Start(revision_start.clone()))?;
             writer.write_event(Event::Text(BytesText::new(revision.as_ref())))?;
             writer.write_event(Event::End(revision_start.to_end()))?;
         }
         if let Some(version) = &self.version {
-            let version_start = writer.create_ns_element(YANG_PUSH_REVISION, "version")?;
+            let version_start =
+                writer.create_ns_element(YANG_PUSH_REVISION, self.leaf_names.version())?;
             writer.write_event(Event::Start(version_start.clone()))?;
             writer.write_event(Event::Text(BytesText::new(version.as_ref())))?;
             writer.write_event(Event::End(version_start.to_end()))?;
@@ -1060,19 +1227,26 @@ impl XmlDeserialize<'_, YangPushModuleVersion> for YangPushModuleVersion {
         let mut version: Option<Box<str>> = None;
 
         parser.skip_text()?;
-        parser.open(Some(YANG_PUSH_REVISION), "name")?;
+        // The key leaf tells which revision of the module the entry follows
+        let legacy = ModuleVersionLeafNames::Legacy;
+        let leaf_names = if parser.is_tag(Some(YANG_PUSH_REVISION), legacy.name()) {
+            legacy
+        } else {
+            ModuleVersionLeafNames::Current
+        };
+        parser.open(Some(YANG_PUSH_REVISION), leaf_names.name())?;
         let name = parser.tag_string()?.trim().into();
         parser.close()?;
 
         parser.skip_text()?;
-        if parser.is_tag(Some(YANG_PUSH_REVISION), "revision") {
-            parser.open(Some(YANG_PUSH_REVISION), "revision")?;
+        if parser.is_tag(Some(YANG_PUSH_REVISION), leaf_names.revision()) {
+            parser.open(Some(YANG_PUSH_REVISION), leaf_names.revision())?;
             revision = Some(parser.tag_string()?.trim().into());
             parser.close()?;
         }
         parser.skip_text()?;
-        if parser.is_tag(Some(YANG_PUSH_REVISION), "version") {
-            parser.open(Some(YANG_PUSH_REVISION), "version")?;
+        if parser.is_tag(Some(YANG_PUSH_REVISION), leaf_names.version()) {
+            parser.open(Some(YANG_PUSH_REVISION), leaf_names.version())?;
             version = Some(parser.tag_string()?.trim().into());
             parser.close()?;
         }
@@ -1086,6 +1260,7 @@ impl XmlDeserialize<'_, YangPushModuleVersion> for YangPushModuleVersion {
             name,
             revision,
             version,
+            leaf_names,
         })
     }
 }

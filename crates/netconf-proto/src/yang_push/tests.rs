@@ -768,18 +768,104 @@ fn test_yang_push_module_version_json_serde() {
         "version": "2.0.0",
     });
 
-    let modeled = YangPushModuleVersion {
-        name: "ietf-interfaces".into(),
-        revision: Some("2014-05-08".into()),
-        version: Some("2.0.0".into()),
-    };
+    let modeled = YangPushModuleVersion::new(
+        "ietf-interfaces".into(),
+        Some("2014-05-08".into()),
+        Some("2.0.0".into()),
+    );
 
     let serialized = serde_json::to_value(&modeled).unwrap();
     assert_eq!(serialized, json_value);
 
-    let deserialized: YangPushModuleVersion = serde_json::from_value(json_legacy).unwrap();
+    // Both encodings name the same module version
+    let deserialized: YangPushModuleVersion = serde_json::from_value(json_legacy.clone()).unwrap();
     assert_eq!(deserialized, modeled);
+    assert_eq!(deserialized.leaf_names(), ModuleVersionLeafNames::Legacy);
+    // and the legacy one is normalized unless serialized as received
+    assert_eq!(serde_json::to_value(&deserialized).unwrap(), json_value);
 
     let deserialized: YangPushModuleVersion = serde_json::from_value(json_value).unwrap();
     assert_eq!(deserialized, modeled);
+    assert_eq!(deserialized.leaf_names(), ModuleVersionLeafNames::Current);
+
+    for invalid in [
+        serde_json::json!({"revision": "2014-05-08"}),
+        serde_json::json!({"name": "ietf-interfaces", "module-name": "ietf-interfaces"}),
+        serde_json::json!({"name": "ietf-interfaces", "version": "2.0.0", "revision-label": "2.0.0"}),
+    ] {
+        assert!(serde_json::from_value::<YangPushModuleVersion>(invalid).is_err());
+    }
+}
+
+#[test]
+fn test_yang_push_module_version_json_as_received() {
+    #[derive(serde::Serialize, serde::Deserialize)]
+    struct ModuleVersions {
+        #[serde(serialize_with = "YangPushModuleVersion::serialize_as_received")]
+        module_version: Option<Box<[YangPushModuleVersion]>>,
+    }
+
+    let json_value = serde_json::json!({
+        "module_version": [
+            {"module-name": "ietf-interfaces", "revision": "2014-05-08", "revision-label": "2.0.0"},
+            {"module-name": "ietf-ip"},
+            {"name": "ietf-hardware", "revision": "2018-03-13", "version": "1.0.0"},
+            {"name": "ietf-system"},
+        ]
+    });
+
+    let deserialized: ModuleVersions = serde_json::from_value(json_value.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&deserialized).unwrap(), json_value);
+
+    let constructed = ModuleVersions {
+        module_version: Some(Box::new([YangPushModuleVersion::new(
+            "ietf-ip".into(),
+            None,
+            Some("3.0.0".into()),
+        )
+        .with_leaf_names(ModuleVersionLeafNames::Legacy)])),
+    };
+    assert_eq!(
+        serde_json::to_value(&constructed).unwrap(),
+        serde_json::json!({"module_version": [{"module-name": "ietf-ip", "revision-label": "3.0.0"}]})
+    );
+}
+
+#[test]
+fn test_yang_push_module_version_xml_legacy_leaf_names() -> Result<(), ParsingError> {
+    let input = r#"<module-version xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push-revision">
+          <module-name>ietf-interfaces</module-name>
+          <revision>2014-05-08</revision>
+          <revision-label>2.0.0</revision-label>
+        </module-version>"#;
+    let expected = YangPushModuleVersion::new(
+        "ietf-interfaces".into(),
+        Some("2014-05-08".into()),
+        Some("2.0.0".into()),
+    )
+    .with_leaf_names(ModuleVersionLeafNames::Legacy);
+
+    let mut reader = quick_xml::NsReader::from_str(input);
+    reader.config_mut().trim_text(false);
+    let mut parser = XmlParser::new(reader)?;
+    let parsed = YangPushModuleVersion::xml_deserialize(&mut parser)?;
+    assert_eq!(parsed, expected);
+    assert_eq!(parsed.leaf_names(), ModuleVersionLeafNames::Legacy);
+
+    let writer = quick_xml::writer::Writer::new(std::io::Cursor::new(Vec::new()));
+    let mut writer = XmlWriter::new(writer);
+    parsed.xml_serialize(&mut writer)?;
+    let serialized = String::from_utf8(writer.into_inner().into_inner()).unwrap();
+    assert_eq!(
+        serialized,
+        concat!(
+            r#"<module-version xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-push-revision">"#,
+            "<module-name>ietf-interfaces</module-name>",
+            "<revision>2014-05-08</revision>",
+            "<revision-label>2.0.0</revision-label>",
+            "</module-version>"
+        )
+    );
+
+    test_xml_value(input, expected)
 }
