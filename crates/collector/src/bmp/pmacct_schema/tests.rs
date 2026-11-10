@@ -84,13 +84,15 @@ fn test_pmacct_route_monitoring_serialization() {
 
     // Avro encode
     let schema = msg.get_avro_schema();
-    let mut writer = Writer::new(&schema, Vec::new());
+    let mut writer = Writer::new(&schema, Vec::new()).expect("Failed to create writer");
 
     let avro_val = msg
         .clone()
         .get_avro_value()
         .expect("Failed to convert to avro value");
-    writer.append(avro_val).expect("Failed to append to writer");
+    writer
+        .append_value(avro_val)
+        .expect("Failed to append to writer");
 
     let encoded = writer.into_inner().expect("Failed to get inner buffer");
 
@@ -164,8 +166,10 @@ fn test_pmacct_peer_up_avro_union_encode_decode() {
     }
 
     // Avro encode
-    let mut writer = Writer::new(&schema, Vec::new());
-    writer.append(avro_val).expect("Failed to append to writer");
+    let mut writer = Writer::new(&schema, Vec::new()).expect("Failed to create writer");
+    writer
+        .append_value(avro_val)
+        .expect("Failed to append to writer");
     let encoded = writer.into_inner().expect("Failed to get inner buffer");
 
     // Avro decode
@@ -253,14 +257,16 @@ fn test_convert_route_monitoring_loc_rib_ipv6_mpls_vpn() {
 
     // Avro encode
     let schema = PmacctBmpMessage::get_schema();
-    let mut writer = Writer::new(&schema, Vec::new());
+    let mut writer = Writer::new(&schema, Vec::new()).expect("Failed to create writer");
 
     for msg in &msgs {
         let avro_val = msg
             .clone()
             .get_avro_value()
             .expect("Failed to convert to avro value");
-        writer.append(avro_val).expect("Failed to append to writer");
+        writer
+            .append_value(avro_val)
+            .expect("Failed to append to writer");
     }
 
     let encoded = writer.into_inner().expect("Failed to get inner buffer");
@@ -389,14 +395,16 @@ fn test_convert_statistics_report_global_instance_peer() {
 
     // Avro encode/decode test for all statistics report messages
     let schema = PmacctBmpMessage::get_schema();
-    let mut writer = Writer::new(&schema, Vec::new());
+    let mut writer = Writer::new(&schema, Vec::new()).expect("Failed to create writer");
 
     for msg in &msgs {
         let avro_val = msg
             .clone()
             .get_avro_value()
             .expect("Failed to convert to avro value");
-        writer.append(avro_val).expect("Failed to append to writer");
+        writer
+            .append_value(avro_val)
+            .expect("Failed to append to writer");
     }
 
     let encoded = writer.into_inner().expect("Failed to get inner buffer");

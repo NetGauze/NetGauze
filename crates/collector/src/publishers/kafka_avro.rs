@@ -166,7 +166,7 @@ impl KafkaAvroPublisherStats {
     }
 }
 
-pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, C: AvroConverter<T, E>> {
+pub struct KafkaAvroPublisherActor<T, E: std::error::Error, C: AvroConverter<T, E>> {
     cmd_rx: mpsc::Receiver<KafkaAvroPublisherActorCommand>,
 
     /// Configured kafka options
@@ -179,7 +179,7 @@ pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, C: AvroConverter
     producer: ThreadedProducer<LoggingProducerContext>,
 
     /// Encoding to avro
-    avro_encoder: AvroEncoder<'a>,
+    avro_encoder: AvroEncoder,
 
     msg_recv: async_channel::Receiver<T>,
 
@@ -189,7 +189,7 @@ pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, C: AvroConverter
     pub _phantom: PhantomData<(T, E)>,
 }
 
-impl<T, E, C> KafkaAvroPublisherActor<'_, T, E, C>
+impl<T, E, C> KafkaAvroPublisherActor<T, E, C>
 where
     E: std::error::Error,
     C: AvroConverter<T, E>,
