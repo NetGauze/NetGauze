@@ -183,7 +183,7 @@ impl PmacctBmpMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, AvroSchema, PartialEq, Clone)]
-#[avro(name = "bmp_msglog_rm")]
+#[serde(rename = "bmp_msglog_rm")]
 pub struct PmacctRouteMonitoringMessage {
     log_type: LogType,
     seq: u32,
@@ -229,7 +229,7 @@ pub struct PmacctRouteMonitoringMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, AvroSchema, PartialEq, Clone)]
-#[avro(name = "bmp_stats")]
+#[serde(rename = "bmp_stats")]
 pub struct PmacctStatisticsReportMessage {
     seq: u32,
     timestamp: String,
@@ -263,7 +263,7 @@ pub struct PmacctStatisticsReportMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, AvroSchema, PartialEq, Clone)]
-#[avro(name = "bmp_peer_down")]
+#[serde(rename = "bmp_peer_down")]
 pub struct PmacctPeerDownNotificationMessage {
     seq: u32,
     timestamp: String,
@@ -295,7 +295,7 @@ pub struct PmacctPeerDownNotificationMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, AvroSchema, PartialEq, Clone)]
-#[avro(name = "bmp_peer_up")]
+#[serde(rename = "bmp_peer_up")]
 pub struct PmacctPeerUpNotificationMessage {
     seq: u32,
     timestamp: String,
@@ -331,7 +331,7 @@ pub struct PmacctPeerUpNotificationMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, AvroSchema, PartialEq, Clone)]
-#[avro(name = "bmp_init")]
+#[serde(rename = "bmp_init")]
 pub struct PmacctInitiationMessage {
     seq: u32,
     timestamp: String,
@@ -351,7 +351,7 @@ pub struct PmacctInitiationMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, AvroSchema, PartialEq, Clone)]
-#[avro(name = "bmp_term")]
+#[serde(rename = "bmp_term")]
 pub struct PmacctTerminationMessage {
     seq: u32,
     timestamp: String,
@@ -1909,7 +1909,7 @@ impl PmacctBmpMessage {
     }
 }
 
-/// Implements [`apache_avro::schema::derive::AvroSchemaComponent`] as a bare
+/// Implements [`apache_avro::AvroSchemaComponent`] as a bare
 /// Avro `string` for enums that serialize through their `Display` form.
 ///
 /// `apache_avro`'s own `AvroSchema` derive would emit a *named* Avro `enum`
@@ -1918,15 +1918,19 @@ impl PmacctBmpMessage {
 macro_rules! impl_avro_string_schema {
     ($($ty:ty),+ $(,)?) => {
         $(
-            impl apache_avro::schema::derive::AvroSchemaComponent for $ty {
+            impl apache_avro::AvroSchemaComponent for $ty {
                 fn get_schema_in_ctxt(
-                    _named_schemas: &mut std::collections::HashMap<
-                        apache_avro::schema::Name,
-                        apache_avro::Schema,
-                    >,
-                    _enclosing_namespace: &apache_avro::schema::Namespace,
+                    _named_schemas: &mut std::collections::HashSet<apache_avro::schema::Name>,
+                    _enclosing_namespace: apache_avro::schema::NamespaceRef<'_>,
                 ) -> apache_avro::Schema {
                     apache_avro::Schema::String
+                }
+
+                fn get_record_fields_in_ctxt(
+                    _named_schemas: &mut std::collections::HashSet<apache_avro::schema::Name>,
+                    _enclosing_namespace: apache_avro::schema::NamespaceRef<'_>,
+                ) -> Option<Vec<apache_avro::schema::RecordField>> {
+                    None
                 }
             }
         )+
