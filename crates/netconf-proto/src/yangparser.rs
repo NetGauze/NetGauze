@@ -92,110 +92,92 @@ impl<'a> YangParser<'a> {
     }
 
     /// Parse module metadata (name, namespace, prefix, revision)
+    ///
+    /// Only the header of the module is read: the `module`/`submodule`
+    /// statement and its direct substatements up to the first body statement.
+    /// Any other statement is skipped as a whole, so keywords nested in it
+    /// (e.g. `argument revision;` inside an `extension`, or the `prefix` of an
+    /// `import`) are never mistaken for module-level ones.
     fn parse_metadata(&mut self) -> Result<YangModuleMetadata, String> {
-        let mut module_name = None;
         let mut namespace = None;
         let mut prefix = None;
-        let mut revision = None;
+        let mut revision: Option<String> = None;
         let mut is_submodule_of = None;
 
-        while !self.is_eof() {
+        self.skip_whitespace_and_comments();
+        let module_name = if self.match_keyword("module") {
             self.skip_whitespace_and_comments();
+            self.read_string_or_identifier()
+                .ok_or("Expected module name")?
+        } else if self.match_keyword("submodule") {
+            self.skip_whitespace_and_comments();
+            self.read_string_or_identifier()
+                .ok_or("Expected submodule name")?
+        } else {
+            return Err("Module/submodule name not found".to_string());
+        };
+        self.skip_whitespace_and_comments();
+        self.expect_char('{')?;
 
-            if self.is_eof() {
+        loop {
+            self.skip_whitespace_and_comments();
+            if self.is_eof() || self.peek_char() == Some('}') {
                 break;
             }
-
-            if self.match_keyword("module") {
-                self.skip_whitespace_and_comments();
-                module_name = Some(
-                    self.read_string_or_identifier()
-                        .ok_or("Expected module name")?,
-                );
-                self.skip_whitespace_and_comments();
-                self.expect_char('{')?;
-            } else if self.match_keyword("submodule") {
-                self.skip_whitespace_and_comments();
-                module_name = Some(
-                    self.read_string_or_identifier()
-                        .ok_or("Expected submodule name")?,
-                );
-                self.skip_whitespace_and_comments();
-                self.expect_char('{')?;
-            } else if self.match_keyword("belongs-to") {
-                // Only in submodules
-                self.skip_whitespace_and_comments();
-                is_submodule_of = Some(
-                    self.read_string_or_identifier()
-                        .ok_or("Expected parent module name")?,
-                );
-                // Skip the rest of belongs-to statement (prefix declaration)
-                self.skip_statement();
-            } else if self.match_keyword("namespace") {
-                self.skip_whitespace_and_comments();
-                namespace = Some(
-                    self.read_string_or_identifier()
-                        .ok_or("Expected namespace value")?,
-                );
-                self.skip_whitespace_and_comments();
-                self.expect_char(';')?;
-            } else if self.match_keyword("prefix") {
-                // Only capture the first module-level prefix
-                if prefix.is_none() {
-                    self.skip_whitespace_and_comments();
+            let Some(keyword) = self.read_identifier() else {
+                return Err(format!(
+                    "Expected a statement keyword at position: {}",
+                    self.position
+                ));
+            };
+            self.skip_whitespace_and_comments();
+            match keyword.as_str() {
+                "namespace" => {
+                    namespace = Some(
+                        self.read_string_or_identifier()
+                            .ok_or("Expected namespace value")?,
+                    );
+                    self.expect_char(';')?;
+                }
+                "prefix" => {
                     prefix = Some(
                         self.read_string_or_identifier()
                             .ok_or("Expected prefix value")?,
                     );
-                    self.skip_whitespace_and_comments();
-                    self.expect_char(';')?;
-                } else {
-                    // Skip prefix statements inside import blocks
-                    self.skip_statement();
-                }
-            } else if self.match_keyword("yang-version") {
-                self.skip_whitespace_and_comments();
-                self.read_string_or_identifier();
-                self.skip_whitespace_and_comments();
-                self.expect_char(';')?;
-            } else if self.match_keyword("revision") {
-                self.skip_whitespace_and_comments();
-                let rev = self
-                    .read_string_or_identifier()
-                    .ok_or("Expected revision date")?;
-                // Only keep the first (latest) revision
-                if revision.is_none() {
-                    revision = Some(rev);
-                }
-                // Skip the revision body
-                self.skip_whitespace_and_comments();
-                if self.peek_char() == Some('{') {
-                    self.skip_statement();
-                } else {
                     self.expect_char(';')?;
                 }
-            } else if self.match_keyword("container")
-                || self.match_keyword("list")
-                || self.match_keyword("leaf")
-                || self.match_keyword("grouping")
-                || self.match_keyword("typedef")
-                || self.match_keyword("identity")
-                || self.match_keyword("augment")
-                || self.match_keyword("rpc")
-                || self.match_keyword("notification")
-            {
-                // Once we hit data definition statements, we can stop
-                break;
-            } else {
-                // Skip other statements
-                self.skip_one_token();
+                "belongs-to" => {
+                    is_submodule_of = Some(
+                        self.read_string_or_identifier()
+                            .ok_or("Expected parent module name")?,
+                    );
+                    // the rest is the parent's prefix declaration
+                    self.skip_statement();
+                }
+                "revision" => {
+                    let rev = self
+                        .read_string_or_identifier()
+                        .ok_or("Expected revision date")?;
+                    // RFC 7950 only recommends listing the newest revision
+                    // first; keep the latest date whatever the order
+                    // (YYYY-MM-DD compares chronologically as a string)
+                    if revision.as_ref().is_none_or(|latest| rev > *latest) {
+                        revision = Some(rev);
+                    }
+                    self.skip_statement();
+                }
+                // the header ends at the first body statement
+                "extension" | "feature" | "identity" | "typedef" | "grouping" | "container"
+                | "leaf" | "leaf-list" | "list" | "choice" | "anydata" | "anyxml" | "uses"
+                | "augment" | "rpc" | "action" | "notification" | "deviation" => break,
+                // yang-version, import, include, organization, contact,
+                // description, reference, extension instances, ...
+                _ => self.skip_statement(),
             }
         }
 
-        let name = module_name.ok_or("Module/submodule name not found")?;
-
         Ok(YangModuleMetadata {
-            name,
+            name: module_name,
             namespace,
             prefix,
             revision,
@@ -1275,5 +1257,112 @@ mod tests {
             }],
         };
         assert_eq!(deps, expected_deps);
+    }
+
+    /// Keywords nested in other statements are not module-level statements:
+    /// 6WIND's vrouter-extensions declares `extension ... { argument revision;
+    /// }` which used to fail with "Expected revision date".
+    #[test]
+    fn test_metadata_ignores_nested_revision_keyword() {
+        let yang = r#"
+module vrouter-extensions {
+  namespace "urn:6wind:vrouter/extensions";
+  prefix vrouter-extensions;
+
+  organization
+    "6WIND";
+  description
+    "6WIND vRouter extensions.";
+
+  revision 2020-02-10 {
+    description
+      "Add extension nc-cli-sort-by.";
+    reference
+      "";
+  }
+  revision 2019-01-14 {
+    description
+      "Initial version.";
+  }
+
+  extension status-deprecated-revision {
+    argument revision;
+    description
+      "Describes in which module revision a given node has been deprecated.";
+  }
+  container settings {
+    leaf revision {
+      type string;
+    }
+  }
+}
+"#;
+        let metadata = extract_yang_metadata(yang).unwrap();
+        assert_eq!(metadata.name, "vrouter-extensions");
+        assert_eq!(metadata.revision.as_deref(), Some("2020-02-10"));
+        assert_eq!(
+            metadata.namespace.as_deref(),
+            Some("urn:6wind:vrouter/extensions")
+        );
+        assert_eq!(metadata.prefix.as_deref(), Some("vrouter-extensions"));
+        assert_eq!(metadata.is_submodule_of, None);
+    }
+
+    /// RFC 7950 only recommends listing the newest revision first; some vendor
+    /// modules list them oldest-first.
+    #[test]
+    fn test_metadata_keeps_latest_revision_when_listed_oldest_first() {
+        let yang = r#"
+module example-deviations {
+  yang-version 1.1;
+  namespace "urn:example:deviations";
+  prefix ex-dev;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  revision 2018-01-01 {
+    description "Initial revision.";
+  }
+  revision 2021-06-30;
+  revision 2020-03-15 {
+    description "Fix.";
+  }
+
+  deviation /if:interfaces/if:interface/if:description {
+    deviate not-supported;
+  }
+}
+"#;
+        let metadata = extract_yang_metadata(yang).unwrap();
+        assert_eq!(metadata.revision.as_deref(), Some("2021-06-30"));
+        assert_eq!(metadata.prefix.as_deref(), Some("ex-dev"));
+    }
+
+    /// A submodule has no prefix of its own: the prefixes of `belongs-to` and
+    /// `import` belong to those statements.
+    #[test]
+    fn test_submodule_metadata_does_not_take_nested_prefixes() {
+        let yang = r#"
+submodule example-sub {
+  yang-version 1.1;
+  belongs-to example {
+    prefix ex;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  revision 2024-01-01;
+  typedef port {
+    type inet:port-number;
+  }
+}
+"#;
+        let metadata = extract_yang_metadata(yang).unwrap();
+        assert_eq!(metadata.name, "example-sub");
+        assert_eq!(metadata.is_submodule_of.as_deref(), Some("example"));
+        assert_eq!(metadata.revision.as_deref(), Some("2024-01-01"));
+        assert_eq!(metadata.prefix, None);
     }
 }
