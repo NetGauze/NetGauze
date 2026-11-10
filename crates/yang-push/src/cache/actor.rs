@@ -394,6 +394,19 @@ pub struct CacheResponse {
 }
 
 impl CacheResponse {
+    #[cfg(test)]
+    pub(crate) const fn new(
+        cached_content_id: Option<ContentId>,
+        subscription_info: SubscriptionInfo,
+        yang_lib_ref: Option<Arc<YangLibraryReference>>,
+    ) -> Self {
+        Self {
+            cached_content_id,
+            subscription_info,
+            yang_lib_ref,
+        }
+    }
+
     pub const fn cached_content_id(&self) -> Option<&ContentId> {
         self.cached_content_id.as_ref()
     }
@@ -1310,7 +1323,10 @@ pub(crate) mod tests {
         )
     }
 
-    fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+    pub(crate) fn copy_dir_all(
+        src: impl AsRef<Path>,
+        dst: impl AsRef<Path>,
+    ) -> std::io::Result<()> {
         std::fs::create_dir_all(&dst)?;
         for entry in std::fs::read_dir(src)? {
             let entry = entry?;

@@ -54,8 +54,8 @@
 //!    lookups via the cache actor
 //! 4. **Cache or Validate** (driven by the per-subscription SchemaState):
 //!    - `Resolved` with a loaded context: Validate and forward
-//!    - `Pending` (lookup in flight): Buffer *every* packet of the
-//!      subscription, including data packets that arrive right after the
+//!    - `Pending` (lookup or context build in flight): Buffer *every* packet of
+//!      the subscription, including data packets that arrive right after the
 //!      `SubscriptionStarted`, so nothing bypasses validation or is forwarded
 //!      out of order
 //!    - `Unavailable` (cache answered with no schema, or the lookup timed out
@@ -73,12 +73,22 @@
 //!
 //! - **Subscription Level**: Per-subscription state including:
 //!   - `SubscriptionInfo`: Metadata from `SubscriptionStarted`
-//!   - `yang5::Context`: Loaded YANG schemas for validation
+//!   - `yang5::Context`: Loaded YANG schemas for validation, shared with the
+//!     other subscriptions of the same content-id
 //!   - Buffered packets waiting for schema retrieval
 //!   - Enforces `max_cached_packets_per_subscription` limit
 //!
 //! Packets arriving before schemas are loaded are cached and reprocessed
 //! when the cache actor responds with YANG library references.
+//!
+//! ### Shared YANG Contexts
+//!
+//! A libyang context is built once per content-id, on the blocking thread pool
+//! so the async runtime (and the UDP listener on it) keeps running, and shared
+//! by every subscription whose schemas resolve to that content-id. A
+//! subscription answered while its content-id is still being built waits for
+//! that build. The context is freed with the last subscription using it; a
+//! content-id whose schemas libyang cannot load is not retried.
 //!
 //! ### Cache Limits
 //!
@@ -134,7 +144,8 @@ use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
 use netgauze_udp_notif_service::{OTL_UDP_NOTIF_PUBLISHER_ID_KEY, UdpNotifRequest};
 use rustc_hash::FxHashMap;
 use std::net::{IpAddr, SocketAddr};
-use std::sync::Arc;
+use std::path::PathBuf;
+use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tracing::{debug, info, trace, warn};
@@ -156,15 +167,17 @@ const PENDING_LOOKUP_SCAN_INTERVAL: Duration = Duration::from_secs(1);
 #[derive(Debug)]
 enum SchemaState {
     /// A lookup was sent to the cache actor and no answer has been received
-    /// yet. All packets for this subscription are buffered until the answer
-    /// arrives (or the pending timeout expires).
+    /// yet, or the answer arrived and the libyang context for its content-id
+    /// is still being built. All packets for this subscription are buffered
+    /// until the context is ready (or the pending timeout expires).
     Pending { since: Instant },
     /// The cache actor answered with a YANG library reference. `yang_ctx` is
-    /// `None` only if loading the schemas into libyang failed, in which case
-    /// packets are forwarded unvalidated.
+    /// shared by all subscriptions with the same content-id. It is `None` only
+    /// if loading the schemas into libyang failed, in which case packets are
+    /// forwarded unvalidated.
     Resolved {
         content_id: ContentId,
-        yang_ctx: Option<yang5::context::Context>,
+        yang_ctx: Option<Arc<yang5::context::Context>>,
     },
     /// The cache actor answered that no schemas are available for this
     /// subscription (or the lookup timed out). Packets are forwarded
@@ -223,6 +236,7 @@ pub struct ValidationStats {
     pub cache_drain: opentelemetry::metrics::Counter<u64>,
     pub cache_lookup_timeout: opentelemetry::metrics::Counter<u64>,
     pub cache_yang_ctx_created: opentelemetry::metrics::Counter<u64>,
+    pub cache_yang_ctx_reused: opentelemetry::metrics::Counter<u64>,
     pub cache_yang_ctx_invalid: opentelemetry::metrics::Counter<u64>,
     pub cache_yang_ctx_empty: opentelemetry::metrics::Counter<u64>,
     pub validation_success: opentelemetry::metrics::Counter<u64>,
@@ -276,6 +290,12 @@ impl ValidationStats {
             .u64_counter("netgauze.collector.yang_push.validation.cache.yang.ctx.created")
             .with_description("Number of libyang validation context that are successfully created")
             .build();
+        let cache_yang_ctx_reused = meter
+            .u64_counter("netgauze.collector.yang_push.validation.cache.yang.ctx.reused")
+            .with_description(
+                "Number of subscriptions that reused the libyang validation context of another subscription with the same content-id",
+            )
+            .build();
         let cache_yang_ctx_invalid = meter
             .u64_counter("netgauze.collector.yang_push.validation.cache.yang.ctx.invalid")
             .with_description(
@@ -319,6 +339,7 @@ impl ValidationStats {
             cache_drain,
             cache_lookup_timeout,
             cache_yang_ctx_created,
+            cache_yang_ctx_reused,
             cache_yang_ctx_invalid,
             cache_yang_ctx_empty,
             validation_success,
@@ -347,17 +368,27 @@ enum ValidationActorCommand {
     Shutdown,
 }
 
-/// Run CPU-heavy, blocking work without stalling the async runtime: on the
-/// multi-thread runtime the worker hands its queued tasks to other workers for
-/// the duration (`block_in_place`); on a current-thread runtime (tests) the
-/// closure is simply called.
-fn run_blocking<T>(f: impl FnOnce() -> T) -> T {
-    match tokio::runtime::Handle::try_current() {
-        Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
-            tokio::task::block_in_place(f)
-        }
-        _ => f(),
-    }
+/// The libyang context of one content-id, shared by every subscription whose
+/// schemas resolve to that content-id.
+#[derive(Debug)]
+enum YangContextEntry {
+    /// The context is being built on the blocking thread pool; these
+    /// subscriptions are waiting for it (their packets are buffered).
+    Building { waiters: Vec<SubscriptionInfo> },
+    /// The context is held by the subscriptions using it and is freed with the
+    /// last of them.
+    Ready(Weak<yang5::context::Context>),
+    /// libyang could not load the schemas; not retried for this content-id.
+    Failed,
+}
+
+/// Result of building a libyang context on the blocking thread pool.
+#[derive(Debug)]
+struct YangContextBuilt {
+    content_id: ContentId,
+    yang_library_path: PathBuf,
+    search_dir: PathBuf,
+    result: Result<yang5::context::Context, String>,
 }
 
 struct ValidationActor {
@@ -370,6 +401,9 @@ struct ValidationActor {
     /// (`yang5::data::DataParserFlags::ANYDATA_STRICT`).
     anydata_strict: bool,
     peer_cache: FxHashMap<IpAddr, CachedPeerSubscriptions>,
+    yang_contexts: FxHashMap<ContentId, YangContextEntry>,
+    yang_ctx_built_tx: mpsc::UnboundedSender<YangContextBuilt>,
+    yang_ctx_built_rx: mpsc::UnboundedReceiver<YangContextBuilt>,
     cmd_rx: mpsc::Receiver<ValidationActorCommand>,
     rx: async_channel::Receiver<Arc<UdpNotifRequest>>,
     tx: async_channel::Sender<(Option<ContentId>, SubscriptionInfo, UdpNotifPacketDecoded)>,
@@ -1050,54 +1084,172 @@ impl ValidationActor {
 
         // Update subscription info in the cache
         subscription_cache.subscription_info = subscription_info.clone();
-        if let (Some(yang_lib_ref), Some(content_id)) = (yang_lib_ref, cached_content_id.clone()) {
-            let search_dir = yang_lib_ref.search_dir();
-            // Building a libyang context for a device library (hundreds of
-            // modules) takes seconds of CPU. Doing that inline would stall the
-            // tokio worker, and with it the UDP listener that shares the
-            // runtime: the kernel socket buffer then overflows and packets are
-            // lost (observed with 44 subscriptions announced in one second).
-            let yang_ctx_result = run_blocking(|| {
-                yang5::context::Context::new_from_yang_library_file(
-                    &yang_lib_ref.yang_library_path(),
-                    DataFormat::XML,
-                    &search_dir.as_path(),
-                    yang5::context::ContextFlags::empty(),
-                )
-            });
-            let yang_ctx = match yang_ctx_result {
-                Ok(yang_ctx) => {
-                    self.stats.cache_yang_ctx_created.add(1, &otl_tags);
-                    Some(yang_ctx)
-                }
-                Err(err) => {
-                    self.stats.cache_yang_ctx_invalid.add(1, &otl_tags);
-                    warn!(
-                        peer=%subscription_info.peer(),
-                        subscription_id=subscription_info.id(),
-                        router_content_id=subscription_info.content_id(),
-                        cached_content_id=yang_lib_ref.content_id(),
-                        yang_library_path=%yang_lib_ref.yang_library_path().display(),
-                        search_dir=%search_dir.display(),
-                        error=%err,
-                        "Failed to create YANG context, disabling YANG validation for this subscription");
-                    None
-                }
-            };
+        let (Some(yang_lib_ref), Some(content_id)) = (yang_lib_ref, cached_content_id) else {
+            self.stats.cache_yang_ctx_empty.add(1, &otl_tags);
+            subscription_cache.state = SchemaState::Unavailable;
+            return self.drain_cached_packets(&subscription_info).await;
+        };
+
+        // Subscriptions resolving to the same content-id share one context
+        let shared = match self.yang_contexts.get_mut(&content_id) {
+            Some(YangContextEntry::Ready(yang_ctx)) => yang_ctx.upgrade().map(Some),
+            Some(YangContextEntry::Failed) => Some(None),
+            Some(YangContextEntry::Building { waiters }) => {
+                trace!(
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    cached_content_id=content_id,
+                    "YANG context for this content-id is being built, waiting for it"
+                );
+                waiters.push(subscription_info);
+                return Ok(());
+            }
+            None => None,
+        };
+        if let Some(yang_ctx) = shared {
+            if yang_ctx.is_some() {
+                self.stats.cache_yang_ctx_reused.add(1, &otl_tags);
+            } else {
+                self.stats.cache_yang_ctx_invalid.add(1, &otl_tags);
+            }
             subscription_cache.state = SchemaState::Resolved {
                 content_id,
                 yang_ctx,
             };
-        } else {
-            self.stats.cache_yang_ctx_empty.add(1, &otl_tags);
-            subscription_cache.state = SchemaState::Unavailable;
+            return self.drain_cached_packets(&subscription_info).await;
         }
+
+        // Building a libyang context for a device library (hundreds of modules)
+        // takes seconds of CPU. Doing that on the actor's task would stall the
+        // tokio worker, and with it the UDP listener that shares the runtime:
+        // the kernel socket buffer then overflows and packets are lost
+        // (observed with 44 subscriptions announced in one second). Build it on
+        // the blocking thread pool; the subscription stays pending, buffering
+        // its packets, until the result comes back.
+        self.yang_contexts.insert(
+            content_id.clone(),
+            YangContextEntry::Building {
+                waiters: vec![subscription_info],
+            },
+        );
+        let yang_library_path = yang_lib_ref.yang_library_path().to_path_buf();
+        let search_dir = yang_lib_ref.search_dir();
+        let built_tx = self.yang_ctx_built_tx.clone();
+        tokio::task::spawn_blocking(move || {
+            let result = yang5::context::Context::new_from_yang_library_file(
+                &yang_library_path.as_path(),
+                DataFormat::XML,
+                &search_dir.as_path(),
+                yang5::context::ContextFlags::empty(),
+            )
+            .map_err(|err| err.to_string());
+            // the actor is gone if the receiver is closed, nothing to report to
+            let _ = built_tx.send(YangContextBuilt {
+                content_id,
+                yang_library_path,
+                search_dir,
+                result,
+            });
+        });
+        Ok(())
+    }
+
+    /// Hand the context built for a content-id to every subscription waiting
+    /// for it, and process their buffered packets.
+    async fn process_yang_context_built(
+        &mut self,
+        built: YangContextBuilt,
+    ) -> Result<(), ValidationActorError> {
+        let YangContextBuilt {
+            content_id,
+            yang_library_path,
+            search_dir,
+            result,
+        } = built;
+        let waiters = match self.yang_contexts.remove(&content_id) {
+            Some(YangContextEntry::Building { waiters }) => waiters,
+            _ => Vec::new(),
+        };
+        let yang_ctx = match result {
+            Ok(yang_ctx) => {
+                let yang_ctx = Arc::new(yang_ctx);
+                self.yang_contexts.insert(
+                    content_id.clone(),
+                    YangContextEntry::Ready(Arc::downgrade(&yang_ctx)),
+                );
+                Some(yang_ctx)
+            }
+            Err(err) => {
+                warn!(
+                    cached_content_id=content_id,
+                    yang_library_path=%yang_library_path.display(),
+                    search_dir=%search_dir.display(),
+                    subscriptions=waiters.len(),
+                    error=%err,
+                    "Failed to create YANG context, disabling YANG validation for the subscriptions using this content-id");
+                self.yang_contexts
+                    .insert(content_id.clone(), YangContextEntry::Failed);
+                None
+            }
+        };
+        for (index, subscription_info) in waiters.into_iter().enumerate() {
+            let mut otl_tags = Vec::from([opentelemetry::KeyValue::new(
+                "network.peer.address",
+                format!("{}", subscription_info.peer()),
+            )]);
+            Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut otl_tags);
+            let subscription_cache = match self
+                .peer_cache
+                .get_mut(&subscription_info.peer())
+                .and_then(|peer_cache| peer_cache.subscriptions.get_mut(&subscription_info.id()))
+            {
+                // skip subscriptions that were replaced by a newer
+                // SubscriptionStarted while the context was being built
+                Some(subscription_cache)
+                    if subscription_cache.subscription_info == subscription_info =>
+                {
+                    subscription_cache
+                }
+                _ => continue,
+            };
+            match (&yang_ctx, index) {
+                (Some(_), 0) => self.stats.cache_yang_ctx_created.add(1, &otl_tags),
+                (Some(_), _) => self.stats.cache_yang_ctx_reused.add(1, &otl_tags),
+                (None, _) => self.stats.cache_yang_ctx_invalid.add(1, &otl_tags),
+            }
+            subscription_cache.state = SchemaState::Resolved {
+                content_id: content_id.clone(),
+                yang_ctx: yang_ctx.clone(),
+            };
+            self.drain_cached_packets(&subscription_info).await?;
+        }
+        Ok(())
+    }
+
+    /// Process the packets buffered for a subscription whose schema lookup has
+    /// settled.
+    async fn drain_cached_packets(
+        &mut self,
+        subscription_info: &SubscriptionInfo,
+    ) -> Result<(), ValidationActorError> {
+        let Some(subscription_cache) = self
+            .peer_cache
+            .get_mut(&subscription_info.peer())
+            .and_then(|peer_cache| peer_cache.subscriptions.get_mut(&subscription_info.id()))
+        else {
+            return Ok(());
+        };
+        let cached_content_id = match &subscription_cache.state {
+            SchemaState::Resolved { content_id, .. } => Some(content_id.clone()),
+            _ => None,
+        };
         let cached_packets = std::mem::take(&mut subscription_cache.cached_packets);
         for message in cached_packets {
             let peer = message.peer_address();
             let packet = message.packet();
             let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
-            Self::extend_peer_targs_with_subscription_info(&subscription_info, &mut peer_tags);
+            Self::extend_peer_targs_with_subscription_info(subscription_info, &mut peer_tags);
             self.stats.cache_drain.add(1, &peer_tags);
             trace!(
                 peer=%peer,
@@ -1267,6 +1419,13 @@ impl ValidationActor {
                         }
                     }
                 }
+                Some(built) = self.yang_ctx_built_rx.recv() => {
+                    if let Err(err) = self.process_yang_context_built(built).await {
+                        let err_msg = "Yang Push validation actor failed to process buffered packets after building a YANG context, shutting down";
+                        warn!(error=%err, err_msg);
+                        return Ok(err_msg.to_string());
+                    }
+                }
                 _ = expiry_tick.tick() => {
                     if let Err(err) = self.expire_pending_lookups().await {
                         let err_msg = "Yang Push validation actor failed to release packets of a timed-out schema lookup, shutting down";
@@ -1317,12 +1476,16 @@ impl ValidationActorHandle {
             either::Either::Left(meter) => ValidationStats::new(meter),
             either::Either::Right(stats) => stats,
         };
+        let (yang_ctx_built_tx, yang_ctx_built_rx) = mpsc::unbounded_channel();
         let actor = ValidationActor {
             max_cached_packets_per_peer,
             max_cached_packets_per_subscription,
             pending_lookup_timeout,
             anydata_strict,
             peer_cache: FxHashMap::default(),
+            yang_contexts: FxHashMap::default(),
+            yang_ctx_built_tx,
+            yang_ctx_built_rx,
             cmd_rx,
             rx,
             tx,
@@ -1348,6 +1511,7 @@ impl ValidationActorHandle {
 mod tests {
     use super::*;
     use crate::cache::actor::tests::setup_actor_with_empty_cache;
+    use crate::cache::storage::YangLibraryReference;
     use bytes::Bytes;
     use netgauze_udp_notif_pkt::raw::MediaType;
     use std::collections::HashMap;
@@ -1917,5 +2081,215 @@ mod tests {
                 "YangPushUpdate".to_string()
             ]
         );
+    }
+
+    /// A validation actor that is driven directly by the test (not spawned),
+    /// so its shared YANG context map can be inspected.
+    fn context_test_actor() -> ValidationActor {
+        let (_cmd_tx, cmd_rx) = mpsc::channel(1);
+        let (_udp_notif_tx, rx) = async_channel::bounded(1);
+        let (tx, _validated_rx) = async_channel::bounded(100);
+        let (cache_cmd_tx, _cache_cmd_rx) = async_channel::bounded(1);
+        let (cache_tx, cache_rx) = async_channel::bounded(1);
+        let (yang_ctx_built_tx, yang_ctx_built_rx) = mpsc::unbounded_channel();
+        ValidationActor {
+            max_cached_packets_per_peer: 1000,
+            max_cached_packets_per_subscription: 100,
+            pending_lookup_timeout: DEFAULT_PENDING_LOOKUP_TIMEOUT,
+            anydata_strict: false,
+            peer_cache: FxHashMap::default(),
+            yang_contexts: FxHashMap::default(),
+            yang_ctx_built_tx,
+            yang_ctx_built_rx,
+            cmd_rx,
+            rx,
+            tx,
+            cache_cmd_tx,
+            cache_tx,
+            cache_rx,
+            stats: ValidationStats::new(opentelemetry::global::meter("test_meter")),
+        }
+    }
+
+    /// The ietf-interfaces test library copied into `dir`, optionally without
+    /// its module files so that libyang fails to load it.
+    fn context_test_yang_lib_ref(
+        dir: &std::path::Path,
+        with_modules: bool,
+    ) -> (Arc<YangLibraryReference>, SubscriptionInfo) {
+        let path = dir.join("ietf-interfaces-lib");
+        crate::cache::actor::tests::copy_dir_all("../../assets/yang/ietf-interfaces", &path)
+            .unwrap();
+        if !with_modules {
+            std::fs::remove_dir_all(path.join("modules")).unwrap();
+            std::fs::create_dir(path.join("modules")).unwrap();
+        }
+        let yang_lib_ref = YangLibraryReference::load_from_disk(path.join("yang-lib.xml"), path)
+            .expect("Failed to load yang library reference from disk");
+        let subscription_info = yang_lib_ref.subscriptions_info().unwrap()[0].clone();
+        (Arc::new(yang_lib_ref), subscription_info)
+    }
+
+    fn with_subscription_id(subscription_info: &SubscriptionInfo, id: u32) -> SubscriptionInfo {
+        let mut subscription_info = subscription_info.clone();
+        subscription_info.id = id;
+        subscription_info
+    }
+
+    /// Register a pending lookup for the subscription and answer it with the
+    /// given YANG library reference, as the cache actor would.
+    async fn answer_lookup(
+        actor: &mut ValidationActor,
+        subscription_info: &SubscriptionInfo,
+        yang_lib_ref: &Arc<YangLibraryReference>,
+    ) {
+        actor
+            .peer_cache
+            .entry(subscription_info.peer())
+            .or_default()
+            .subscriptions
+            .insert(
+                subscription_info.id(),
+                CachedSubscription::pending(subscription_info.clone()),
+            );
+        actor
+            .process_cache_response(CacheResponse::new(
+                Some(yang_lib_ref.content_id().clone()),
+                subscription_info.clone(),
+                Some(Arc::clone(yang_lib_ref)),
+            ))
+            .await
+            .unwrap();
+    }
+
+    /// Finish the context build that is in flight.
+    async fn finish_build(actor: &mut ValidationActor) {
+        let built = tokio::time::timeout(Duration::from_secs(10), actor.yang_ctx_built_rx.recv())
+            .await
+            .expect("timeout waiting for the YANG context build")
+            .expect("build channel closed");
+        actor.process_yang_context_built(built).await.unwrap();
+    }
+
+    fn state_of<'a>(
+        actor: &'a ValidationActor,
+        subscription_info: &SubscriptionInfo,
+    ) -> &'a SchemaState {
+        &actor.peer_cache[&subscription_info.peer()].subscriptions[&subscription_info.id()].state
+    }
+
+    fn resolved_ctx(
+        actor: &ValidationActor,
+        subscription_info: &SubscriptionInfo,
+    ) -> Option<Arc<yang5::context::Context>> {
+        match state_of(actor, subscription_info) {
+            SchemaState::Resolved { yang_ctx, .. } => yang_ctx.clone(),
+            other => panic!(
+                "subscription {} not resolved: {other:?}",
+                subscription_info.id()
+            ),
+        }
+    }
+
+    /// Subscriptions with the same content-id share one libyang context: a
+    /// second subscription answered while the context is being built waits
+    /// for that build, a third one answered afterwards reuses the context, and
+    /// the context is freed with the last subscription using it.
+    #[tokio::test]
+    async fn test_yang_context_shared_by_subscriptions_with_same_content_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let (yang_lib_ref, sub1) = context_test_yang_lib_ref(dir.path(), true);
+        let content_id = yang_lib_ref.content_id().clone();
+        let sub2 = with_subscription_id(&sub1, 2);
+        let sub3 = with_subscription_id(&sub1, 3);
+        let mut actor = context_test_actor();
+
+        answer_lookup(&mut actor, &sub1, &yang_lib_ref).await;
+        answer_lookup(&mut actor, &sub2, &yang_lib_ref).await;
+        // one build in flight, both subscriptions wait for it
+        match &actor.yang_contexts[&content_id] {
+            YangContextEntry::Building { waiters } => assert_eq!(waiters.len(), 2),
+            other => panic!("expected a build in flight, got {other:?}"),
+        }
+        assert!(matches!(
+            state_of(&actor, &sub1),
+            SchemaState::Pending { .. }
+        ));
+        assert!(matches!(
+            state_of(&actor, &sub2),
+            SchemaState::Pending { .. }
+        ));
+
+        finish_build(&mut actor).await;
+        let ctx1 = resolved_ctx(&actor, &sub1).expect("context built");
+        let ctx2 = resolved_ctx(&actor, &sub2).expect("context built");
+        assert!(Arc::ptr_eq(&ctx1, &ctx2));
+
+        // a later subscription is resolved right away with the same context
+        answer_lookup(&mut actor, &sub3, &yang_lib_ref).await;
+        let ctx3 = resolved_ctx(&actor, &sub3).expect("context reused");
+        assert!(Arc::ptr_eq(&ctx1, &ctx3));
+        drop((ctx1, ctx2, ctx3));
+
+        // freed with the last subscription: a new one builds it again
+        actor.peer_cache.clear();
+        answer_lookup(&mut actor, &sub1, &yang_lib_ref).await;
+        assert!(matches!(
+            actor.yang_contexts[&content_id],
+            YangContextEntry::Building { .. }
+        ));
+        finish_build(&mut actor).await;
+        assert!(resolved_ctx(&actor, &sub1).is_some());
+    }
+
+    /// A library libyang cannot load is not rebuilt for every subscription
+    /// using its content-id.
+    #[tokio::test]
+    async fn test_yang_context_failure_is_not_retried() {
+        let dir = tempfile::tempdir().unwrap();
+        let (yang_lib_ref, sub1) = context_test_yang_lib_ref(dir.path(), false);
+        let content_id = yang_lib_ref.content_id().clone();
+        let sub2 = with_subscription_id(&sub1, 2);
+        let mut actor = context_test_actor();
+
+        answer_lookup(&mut actor, &sub1, &yang_lib_ref).await;
+        finish_build(&mut actor).await;
+        assert!(resolved_ctx(&actor, &sub1).is_none());
+        assert!(matches!(
+            actor.yang_contexts[&content_id],
+            YangContextEntry::Failed
+        ));
+
+        answer_lookup(&mut actor, &sub2, &yang_lib_ref).await;
+        assert!(resolved_ctx(&actor, &sub2).is_none());
+        assert!(matches!(
+            actor.yang_contexts[&content_id],
+            YangContextEntry::Failed
+        ));
+    }
+
+    /// A subscription replaced by a newer SubscriptionStarted while its
+    /// context was being built is left to its own (new) lookup.
+    #[tokio::test]
+    async fn test_yang_context_build_skips_replaced_subscription() {
+        let dir = tempfile::tempdir().unwrap();
+        let (yang_lib_ref, sub1) = context_test_yang_lib_ref(dir.path(), true);
+        let mut actor = context_test_actor();
+
+        answer_lookup(&mut actor, &sub1, &yang_lib_ref).await;
+        let mut replaced = sub1.clone();
+        replaced.content_id = "another-router-content-id".to_string();
+        actor
+            .peer_cache
+            .get_mut(&sub1.peer())
+            .unwrap()
+            .subscriptions
+            .insert(sub1.id(), CachedSubscription::pending(replaced.clone()));
+
+        finish_build(&mut actor).await;
+        assert!(matches!(
+            state_of(&actor, &replaced),
+            SchemaState::Pending { .. }
+        ));
     }
 }
