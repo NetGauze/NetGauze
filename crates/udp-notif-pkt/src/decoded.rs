@@ -260,6 +260,18 @@ mod tests {
         assert_eq!(decoded.publisher_id(), 1234);
         assert_eq!(decoded.message_id(), 5678);
 
+        // The module-version list is encoded again with the leaf names of the
+        // publisher: its ietf-yang-push-revision module has no `name` leaf
+        let encoded = serde_json::to_value(decoded.payload()).unwrap();
+        assert_eq!(
+            encoded.pointer(
+                "/ietf-yp-notification:envelope/contents/ietf-subscribed-notifications:subscription-started/ietf-yang-push-revision:module-version"
+            ),
+            Some(&json!([
+                { "module-name": "openconfig-interfaces", "revision": "2025-06-10" }
+            ]))
+        );
+
         // Create the expected NotificationEnvelope
         let sub_started = SubscriptionStartedModified::new(
             30,
