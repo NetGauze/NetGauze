@@ -89,6 +89,18 @@ pub trait Worker: Sized + 'static {
         stats: Arc<Self::Stats>,
     ) -> Result<Self, Self::Error>;
 
+    /// The slot's liveness beat, if the worker keeps one: the time of
+    /// its last sign of progress, in [crate::mono_ms_now] milliseconds,
+    /// stamped by the worker as it runs. The supervisor reads it to
+    /// notice a worker that is alive but wedged (a thread it cannot
+    /// interrupt, blocked where it should never block) and fails the
+    /// slot; see `SupervisorOptions::stall_timeout`. A worker must
+    /// stamp it more often than that timeout even when idle. Default:
+    /// no beat, so no stall watch.
+    fn heartbeat(_stats: &Self::Stats) -> Option<&std::sync::atomic::AtomicU64> {
+        None
+    }
+
     /// Runs until the command channel closes or a fatal error occurs.
     /// Deliberately `impl Future` without a `Send` bound — this future is
     /// driven by a `current_thread` runtime and never migrates.
