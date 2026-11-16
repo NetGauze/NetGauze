@@ -38,12 +38,20 @@ pub struct SupervisorOptions {
     pub mailbox: usize,
     pub affinity: Arc<dyn AffinityStrategy>,
     pub policy: RestartPolicy,
+    /// Longest a worker's [Worker::heartbeat] may go without a beat
+    /// before the worker is taken as stalled. A stalled worker's thread
+    /// cannot be interrupted or replaced (it still owns its sockets), so
+    /// the slot fails outright, with no restart: under the default
+    /// `min_live_workers` that ends supervision. `None` disables the
+    /// watch; so does a worker that keeps no heartbeat.
+    pub stall_timeout: Option<Duration>,
     /// Instance name to be used in logs and telemetry
     pub name: Box<str>,
 }
 
 impl SupervisorOptions {
     pub const DEFAULT_MAILBOX: usize = 64;
+    pub const DEFAULT_STALL_TIMEOUT: Duration = Duration::from_secs(30);
 
     pub fn new(cores: CoreAssignment, name: &str) -> Self {
         Self {
@@ -51,8 +59,16 @@ impl SupervisorOptions {
             mailbox: Self::DEFAULT_MAILBOX,
             affinity: Arc::new(NoAffinity),
             policy: RestartPolicy::default(),
+            stall_timeout: Some(Self::DEFAULT_STALL_TIMEOUT),
             name: Box::from(name),
         }
+    }
+
+    /// See [Self::stall_timeout]. It must exceed the longest the worker
+    /// legitimately goes between beats.
+    pub fn with_stall_timeout(mut self, stall_timeout: Option<Duration>) -> Self {
+        self.stall_timeout = stall_timeout;
+        self
     }
 
     pub fn with_mailbox(mut self, mailbox: usize) -> Self {
@@ -80,7 +96,8 @@ pub struct SlotExitInfo {
     /// Wall-clock stamp (Unix epoch ms) of when the supervisor processed
     /// the exit.
     pub at_unix_ms: u64,
-    /// Restarts consumed in the slot's current window at stamp time.
+    /// Restarts the slot has used, without a healthy run in between, at
+    /// stamp time.
     pub restarts: usize,
 }
 
@@ -90,6 +107,9 @@ pub enum SlotExitKind {
     Clean,
     Error,
     Panic,
+    /// The worker's heartbeat stopped: its thread is still there,
+    /// wedged, and the slot is failed without it having exited.
+    Stalled,
 }
 
 #[derive(Debug)]
@@ -124,52 +144,79 @@ struct WorkerThread<Cmd> {
 /// because it must survive respawns (a fresh `WorkerThread` replaces the
 /// old one; the restart budget must not reset with it).
 struct SlotState {
+    /// Restarts used since the slot last ran healthily.
     restarts: usize,
-    window_start: Instant,
-    /// Restart budget exhausted: the slot is left dead ("give up loudly"),
-    /// `route()` to it returns `WorkerGone`.
+    /// When the current incarnation was spawned.
+    spawned_at: Instant,
+    /// Restart budget exhausted, or the worker stalled: the slot is left
+    /// dead ("give up loudly"), `route()` to it returns `WorkerGone`.
     failed: bool,
     /// Exited via `ExitReason::Clean`; deliberately not respawned.
     done: bool,
 }
 
-/// Respawn budget for crashed workers: up to `max_restarts` restarts
-/// within any `window`, pacing each respawn by `backoff`; past the budget
-/// the slot is given up loudly ([AdminHandle::failed_slots]).
+/// Respawn budget for crashed workers: a slot may be restarted
+/// `max_restarts` times in a row, each respawn paced by `backoff`. A
+/// restart stops counting against the slot once an incarnation has run
+/// for `window` without exiting: that is a healthy run, and the count
+/// starts over. So `window` is not a rate limit that a slow enough
+/// failure slips under: a worker that fails every time it is started,
+/// however long each attempt takes to fail, uses up the budget, unless
+/// an attempt outlives `window`.
 ///
-/// `#[non_exhaustive]` + [`RestartPolicy::new`], so future knobs (e.g.,
+/// Past the budget the slot is given up loudly
+/// ([AdminHandle::failed_slots]), and once fewer than `min_live_workers`
+/// slots are live, supervision ends with
+/// [SuperviseExit::BelowMinimumWorkers] so the embedder shuts the whole
+/// service down and a redundant site takes the traffic. Live means
+/// running: neither failed nor done. A worker that returned cleanly
+/// without being asked to (its input ended) does no work either, so it
+/// is not live. Unless configured, the minimum is EVERY slot: one lost
+/// slot ends supervision, so a service never limps on degraded.
+///
+/// `#[non_exhaustive]` + [RestartPolicy::new], so future knobs (e.g.,
 /// respawn-on-clean for connection-oriented protocols, jittered backoff)
 /// are additive rather than breaking.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct RestartPolicy {
-    max_restarts: usize, // within `window`, before giving up loudly
+    /// Max restarts in a row, before giving up loudly
+    max_restarts: usize,
+    /// How long an incarnation must run for the count to start over.
     window: Duration,
     backoff: Duration,
-    min_live_workers: usize,
+    /// `None`: every slot, resolved against the worker count at start.
+    min_live_workers: Option<usize>,
 }
 
 impl RestartPolicy {
+    const DEFAULT_MAX_RESTARTS: usize = 3;
+    const DEFAULT_WINDOW: Duration = Duration::from_secs(300);
+    const DEFAULT_BACKOFF: Duration = Duration::from_millis(100);
+
     pub const fn new(max_restarts: usize, window: Duration, backoff: Duration) -> Self {
         Self {
             max_restarts,
             window,
             backoff,
-            min_live_workers: 0,
+            min_live_workers: None,
         }
     }
 
+    /// Live workers under which supervision ends; see the type docs.
+    /// Default: every slot. `0` keeps supervising with every slot
+    /// failed, for an embedder that handles [AdminHandle::failed_slots]
+    /// itself.
     pub const fn with_min_live_workers(mut self, min_live_workers: usize) -> Self {
-        self.min_live_workers = min_live_workers;
+        self.min_live_workers = Some(min_live_workers);
         self
     }
 
-    /// The budget must be REACHABLE: each respawn takes at least
-    /// `backoff`, so a crash loop can only exhaust `max_restarts` inside
-    /// `window` when `backoff * (max_restarts + 1) <= window`. Otherwise,
-    /// the rolling window resets the count before it can ever exceed the
-    /// budget and "give up loudly" is dead code which can cause an eternal
-    /// crash loop that [AdminHandle::failed_slots] never reports.
+    /// A zero `window` would make every run a healthy one, so the
+    /// budget could never be used up; a zero `backoff` allows an
+    /// un-paced crash loop. Nothing else can make the budget
+    /// unreachable: the count only starts over after a run of `window`,
+    /// whatever `backoff` is.
     pub fn validate(&self) -> Result<(), RestartPolicyError> {
         if self.window.is_zero() {
             return Err(RestartPolicyError::ZeroWindow);
@@ -177,24 +224,17 @@ impl RestartPolicy {
         if self.backoff.is_zero() {
             return Err(RestartPolicyError::ZeroBackoff);
         }
-        let budget_time = self
-            .backoff
-            .saturating_mul(u32::try_from(self.max_restarts).unwrap_or(u32::MAX));
-        if budget_time > self.window {
-            return Err(RestartPolicyError::UnreachableBudget {
-                backoff: self.backoff,
-                max_restarts: self.max_restarts,
-                window: self.window,
-            });
-        }
         Ok(())
     }
 }
 
 impl Default for RestartPolicy {
-    /// 3 restarts per 60s window, 100ms backoff.
     fn default() -> Self {
-        Self::new(3, Duration::from_secs(60), Duration::from_millis(100))
+        Self::new(
+            Self::DEFAULT_MAX_RESTARTS,
+            Self::DEFAULT_WINDOW,
+            Self::DEFAULT_BACKOFF,
+        )
     }
 }
 
@@ -209,9 +249,20 @@ pub enum SuperviseExit {
     /// The shutdown signal fired (or its sender dropped): normal
     /// teardown, proceed to `shutdown()`.
     ShutdownRequested,
-    /// Live workers (neither failed nor cleanly done) dropped below
-    /// `RestartPolicy::min_live_workers`.
+    /// Live workers (slots that neither failed nor finished) dropped
+    /// below `RestartPolicy::min_live_workers`.
     BelowMinimumWorkers { live: usize, minimum: usize },
+}
+
+/// [CollectionSupervisor::run] ended because too few workers were left:
+/// the service has shut itself down and the process should exit
+/// non-zero.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("supervisor '{name}': {live} live workers, fewer than the minimum of {minimum}")]
+pub struct PoolLost {
+    pub name: Box<str>,
+    pub live: usize,
+    pub minimum: usize,
 }
 
 /// Error in routing commands from the Supervisor to the worker threads
@@ -415,14 +466,6 @@ pub enum RestartPolicyError {
     ZeroWindow,
     #[error("restart policy backoff must be > 0 (zero backoff allows an un-paced crash loop)")]
     ZeroBackoff,
-    #[error(
-        "restart budget is unreachable: backoff ({backoff:?}) x max_restarts ({max_restarts}) exceeds window ({window:?}); a crash loop would roll the window forever and never trip the budget"
-    )]
-    UnreachableBudget {
-        backoff: Duration,
-        max_restarts: usize,
-        window: Duration,
-    },
 }
 
 /// Why [`CollectionSupervisor::start`] refused to start.
@@ -435,6 +478,8 @@ pub enum StartError {
     ZeroMailbox,
     #[error("min_live_workers ({minimum}) exceeds the worker count ({workers})")]
     MinLiveExceedsWorkers { minimum: usize, workers: usize },
+    #[error("stall timeout must be > 0 when set")]
+    ZeroStallTimeout,
     #[error("invalid restart policy: {0}")]
     Policy(#[from] RestartPolicyError),
     #[error("failed to spawn worker thread: {0}")]
@@ -442,9 +487,9 @@ pub enum StartError {
 }
 
 pub struct CollectionSupervisor<W: Worker> {
-    // Fixed-size, same reasoning as CoreAssignment: one slot per core,
-    // never added to or removed from. `supervise()` replaces a slot in
-    // place on respawn.
+    /// Fixed-size, same reasoning as [CoreAssignment]: one slot per core,
+    /// never added to or removed from. `supervise()` replaces a slot in
+    /// place on respawn.
     workers: Box<[WorkerThread<W::Command>]>,
 
     slots: Box<[SlotState]>,
@@ -464,6 +509,10 @@ pub struct CollectionSupervisor<W: Worker> {
     /// per-worker command channel capacity
     mailbox: usize,
     policy: RestartPolicy,
+    /// `policy.min_live_workers`, resolved against the slot count.
+    min_live: usize,
+    /// See [SupervisorOptions::stall_timeout].
+    stall_timeout: Option<Duration>,
     exit_rx: mpsc::Receiver<WorkerExit>,
     /// kept so it can be cloned into each spawn_pinned call
     exit_tx: mpsc::Sender<WorkerExit>,
@@ -481,21 +530,29 @@ impl<W: Worker> CollectionSupervisor<W> {
             mailbox,
             affinity,
             policy,
+            stall_timeout,
             name,
         } = options;
         if cores.is_empty() {
             return Err(StartError::EmptyCoreAssignment);
         }
         policy.validate()?;
+        if stall_timeout.is_some_and(|stall| stall.is_zero()) {
+            return Err(StartError::ZeroStallTimeout);
+        }
         if mailbox == 0 {
             return Err(StartError::ZeroMailbox);
         }
-        if policy.min_live_workers > cores.len() {
-            return Err(StartError::MinLiveExceedsWorkers {
-                minimum: policy.min_live_workers,
-                workers: cores.len(),
-            });
-        }
+        let min_live = match policy.min_live_workers {
+            Some(minimum) if minimum > cores.len() => {
+                return Err(StartError::MinLiveExceedsWorkers {
+                    minimum,
+                    workers: cores.len(),
+                });
+            }
+            Some(minimum) => minimum,
+            None => cores.len(),
+        };
         let stats: Box<[Arc<W::Stats>]> = (0..cores.len())
             .map(|i| W::build_stats(WorkerIndex::new(i), &config, &meter))
             .collect();
@@ -505,13 +562,19 @@ impl<W: Worker> CollectionSupervisor<W> {
 
         let workers: io::Result<Vec<WorkerThread<W::Command>>> = cores
             .iter()
-            .map(|(worker_index, core_id)| {
+            .zip(stats.iter())
+            .map(|((worker_index, core_id), stats)| {
+                // The stall watch counts from the spawn, not from
+                // whenever the thread gets to its first beat.
+                if let Some(beat) = W::heartbeat(stats) {
+                    beat.store(crate::mono_ms_now(), Ordering::Relaxed);
+                }
                 Self::spawn_pinned(
                     worker_index,
                     core_id,
                     meter.clone(),
                     config.clone(),
-                    Arc::clone(&stats[worker_index.get()]),
+                    Arc::clone(stats),
                     mailbox,
                     Arc::clone(&affinity),
                     exit_tx.clone(),
@@ -541,7 +604,7 @@ impl<W: Worker> CollectionSupervisor<W> {
         let slots: Box<[SlotState]> = (0..cores.len())
             .map(|_| SlotState {
                 restarts: 0,
-                window_start: now,
+                spawned_at: now,
                 failed: false,
                 done: false,
             })
@@ -557,6 +620,8 @@ impl<W: Worker> CollectionSupervisor<W> {
             affinity,
             mailbox,
             policy,
+            min_live,
+            stall_timeout,
             exit_rx,
             exit_tx,
             meter,
@@ -571,6 +636,12 @@ impl<W: Worker> CollectionSupervisor<W> {
     /// this supervisor mutably
     pub fn admin_handle(&self) -> AdminHandle<W::Command> {
         self.admin.clone()
+    }
+
+    /// Every slot's stats: the `Arc` from `build_stats`, kept across the
+    /// slot's respawns.
+    pub fn stats(&self) -> &[Arc<W::Stats>] {
+        &self.stats
     }
 
     /// name to be used in logs and OTEL telemetry
@@ -594,6 +665,19 @@ impl<W: Worker> CollectionSupervisor<W> {
 
     /// The supervision loop.
     pub async fn supervise(&mut self, shutdown: &mut watch::Receiver<bool>) -> SuperviseExit {
+        // A shutdown already requested never shows up as a CHANGE on a
+        // receiver that has seen it.
+        if *shutdown.borrow() {
+            return SuperviseExit::ShutdownRequested;
+        }
+        // Often enough that a stall is noticed within a quarter of the
+        // timeout past it.
+        let mut stall_watch = self.stall_timeout.map(|stall| {
+            let period = (stall / 4).clamp(Duration::from_millis(10), Duration::from_secs(1));
+            let mut watch = tokio::time::interval(period);
+            watch.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            watch
+        });
         loop {
             tokio::select! {
                 biased;
@@ -605,6 +689,9 @@ impl<W: Worker> CollectionSupervisor<W> {
                         return SuperviseExit::ShutdownRequested;
                     }
                 }
+                // Exits ahead of the stall watch: a worker whose exit is
+                // already waiting here has not stalled, however long the
+                // exits before it took to handle.
                 exit = self.exit_rx.recv() => {
                     match exit {
                         None => return SuperviseExit::ShutdownRequested,
@@ -621,12 +708,19 @@ impl<W: Worker> CollectionSupervisor<W> {
                         }
                     }
                 }
+                () = next_watch(&mut stall_watch), if stall_watch.is_some() => {
+                    if self.fail_stalled()
+                        && let Some(below) = self.check_min_live()
+                    {
+                        return below;
+                    }
+                }
             }
         }
     }
 
     fn check_min_live(&self) -> Option<SuperviseExit> {
-        let minimum = self.policy.min_live_workers;
+        let minimum = self.min_live;
         if minimum == 0 {
             return None;
         }
@@ -641,6 +735,76 @@ impl<W: Worker> CollectionSupervisor<W> {
             return Some(SuperviseExit::BelowMinimumWorkers { live, minimum });
         }
         None
+    }
+
+    /// Supervises until shutdown is requested or the pool is lost, then
+    /// tears down with `deadline` either way. `Err` when the pool was
+    /// lost: the embedder's whole job is then to exit non-zero, so that
+    /// whatever watches the process (and the redundant site behind it)
+    /// takes over. The one call an embedder needs; [Self::supervise] and
+    /// [Self::shutdown] are for those that do something in between.
+    pub async fn run(
+        mut self,
+        shutdown: &mut watch::Receiver<bool>,
+        deadline: Duration,
+    ) -> Result<(), PoolLost> {
+        let exit = self.supervise(shutdown).await;
+        let name = Box::from(self.name());
+        self.shutdown(deadline).await;
+        match exit {
+            SuperviseExit::ShutdownRequested => Ok(()),
+            SuperviseExit::BelowMinimumWorkers { live, minimum } => Err(PoolLost {
+                name,
+                live,
+                minimum,
+            }),
+        }
+    }
+
+    /// Fails every live slot whose heartbeat is older than the stall
+    /// timeout. The wedged thread cannot be interrupted, and it still
+    /// owns whatever it bound, so a replacement beside it would share
+    /// its traffic with a worker that handles none: the slot is failed
+    /// for good instead, and the minimum-live check decides the rest.
+    /// Returns whether any slot was failed.
+    fn fail_stalled(&mut self) -> bool {
+        let Some(stall) = self.stall_timeout else {
+            return false;
+        };
+        let stall_ms = u64::try_from(stall.as_millis()).unwrap_or(u64::MAX);
+        let now = crate::mono_ms_now();
+        let mut any = false;
+        for (idx, (slot, stats)) in self.slots.iter_mut().zip(self.stats.iter()).enumerate() {
+            if slot.failed || slot.done {
+                continue;
+            }
+            let Some(beat) = W::heartbeat(stats) else {
+                continue;
+            };
+            let silent_ms = now.saturating_sub(beat.load(Ordering::Relaxed));
+            if silent_ms <= stall_ms {
+                continue;
+            }
+            slot.failed = true;
+            if let Some(failed) = self.admin.failed.get(idx) {
+                failed.store(true, Ordering::Relaxed);
+            }
+            self.admin.record_exit(
+                idx,
+                SlotExitKind::Stalled,
+                format!("no heartbeat for {silent_ms} ms"),
+                slot.restarts,
+            );
+            error!(
+                supervisor = self.admin.name(),
+                worker_index = idx,
+                silent_ms,
+                stall_timeout_ms = stall_ms,
+                "worker stalled: its heartbeat stopped; giving up on this slot"
+            );
+            any = true;
+        }
+        any
     }
 
     /// Graceful teardown
@@ -658,7 +822,9 @@ impl<W: Worker> CollectionSupervisor<W> {
             mut exit_rx,
             ..
         } = self;
-        // Log-only bookkeeping
+        // The slots that still have a worker to report: a failed slot
+        // has none, or has one wedged for good (a stall), whose exit
+        // would be waited on for the whole deadline for nothing.
         let expected = slots.iter().filter(|s| !s.failed && !s.done).count();
 
         // AdminHandle clones hold sender clones that would keep every
@@ -683,9 +849,20 @@ impl<W: Worker> CollectionSupervisor<W> {
         // future is dropped, and a count owned by it would be lost.
         let clean = std::sync::atomic::AtomicUsize::new(0);
         let drain = async {
-            while let Some(exit) = exit_rx.recv().await {
+            let mut pending = expected;
+            while pending > 0 {
+                let Some(exit) = exit_rx.recv().await else {
+                    break;
+                };
                 let idx = exit.worker_index.get();
                 let restarts = slots.get(idx).map_or(0, |s| s.restarts);
+                if slots.get(idx).is_some_and(|s| s.failed) {
+                    // A thread given up on that came back after all:
+                    // not one of the exits awaited, and its record
+                    // already says why the slot failed.
+                    continue;
+                }
+                pending = pending.saturating_sub(1);
                 match exit.reason {
                     ExitReason::Clean => {
                         clean.fetch_add(1, Ordering::Relaxed);
@@ -753,6 +930,16 @@ impl<W: Worker> CollectionSupervisor<W> {
         let worker_index = exit.worker_index;
         let idx = worker_index.get();
         let restarts_now = self.slots.get(idx).map_or(0, |s| s.restarts);
+        if self.slots.get(idx).is_some_and(|s| s.failed) {
+            // The thread of a slot failed as stalled exited after all.
+            // The slot stays failed, and its record keeps saying why.
+            info!(
+                supervisor = self.name(),
+                worker_index = idx,
+                "worker of a failed slot exited; the slot stays failed"
+            );
+            return false;
+        }
         match exit.reason {
             ExitReason::Clean => {
                 info!(
@@ -764,7 +951,9 @@ impl<W: Worker> CollectionSupervisor<W> {
                     .record_exit(idx, SlotExitKind::Clean, String::new(), restarts_now);
                 if let Some(slot) = self.slots.get_mut(idx) {
                     slot.done = true;
-                    self.admin.done[idx].store(true, Ordering::Relaxed);
+                }
+                if let Some(done) = self.admin.done.get(idx) {
+                    done.store(true, Ordering::Relaxed);
                 }
                 false
             }
@@ -807,23 +996,31 @@ impl<W: Worker> CollectionSupervisor<W> {
         if slot.failed {
             return false;
         }
-        if slot.window_start.elapsed() > self.policy.window {
+        // A run of `window` is a healthy one: the count starts over.
+        if slot.spawned_at.elapsed() >= self.policy.window {
             slot.restarts = 0;
-            slot.window_start = Instant::now();
         }
-        slot.restarts += 1;
+        slot.restarts = slot.restarts.saturating_add(1);
         if slot.restarts > self.policy.max_restarts {
             slot.failed = true;
-            self.admin.failed[idx].store(true, Ordering::Relaxed);
+            if let Some(failed) = self.admin.failed.get(idx) {
+                failed.store(true, Ordering::Relaxed);
+            }
             error!(
                 supervisor,
                 worker_index = idx,
                 restarts = slot.restarts,
-                window_secs = self.policy.window.as_secs(),
+                healthy_run_secs = self.policy.window.as_secs(),
                 "restart budget exhausted; giving up on this slot"
             );
             return false;
         }
+        if *shutdown.borrow() {
+            return true;
+        }
+        let Some(stats) = self.stats.get(idx) else {
+            return false;
+        };
         tokio::select! {
             biased;
             changed = shutdown.changed() => {
@@ -846,7 +1043,7 @@ impl<W: Worker> CollectionSupervisor<W> {
             core_id,
             self.meter.clone(),
             self.config.clone(),
-            Arc::clone(&self.stats[idx]),
+            Arc::clone(stats),
             self.mailbox,
             Arc::clone(&self.affinity),
             self.exit_tx.clone(),
@@ -860,14 +1057,26 @@ impl<W: Worker> CollectionSupervisor<W> {
                     restart = slot.restarts,
                     "worker respawned"
                 );
+                slot.spawned_at = Instant::now();
+                // The stall watch must not read the last incarnation's
+                // final beat as this one's.
+                if let Some(beat) = W::heartbeat(stats) {
+                    beat.store(crate::mono_ms_now(), Ordering::Relaxed);
+                }
                 // Refresh the admin side FIRST: from here on, admin sends
                 // reach the new incarnation.
-                self.admin.senders[idx].store(Arc::new(worker.cmd_tx.clone()));
-                self.workers[idx] = worker;
+                if let Some(sender) = self.admin.senders.get(idx) {
+                    sender.store(Arc::new(worker.cmd_tx.clone()));
+                }
+                if let Some(thread) = self.workers.get_mut(idx) {
+                    *thread = worker;
+                }
             }
             Err(e) => {
                 slot.failed = true;
-                self.admin.failed[idx].store(true, Ordering::Relaxed);
+                if let Some(failed) = self.admin.failed.get(idx) {
+                    failed.store(true, Ordering::Relaxed);
+                }
                 self.admin.record_exit(
                     idx,
                     SlotExitKind::Error,
@@ -943,6 +1152,16 @@ impl<W: Worker> CollectionSupervisor<W> {
     }
 }
 
+/// The stall watch's next turn, or never when there is no watch.
+async fn next_watch(watch: &mut Option<tokio::time::Interval>) {
+    match watch {
+        Some(watch) => {
+            watch.tick().await;
+        }
+        None => std::future::pending().await,
+    }
+}
+
 /// Best-effort extraction of a printable message from a panic payload --
 /// the two shapes `panic!` actually produces. Anything else is opaque.
 fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
@@ -966,6 +1185,12 @@ mod tests {
     /// claims the flag), then runs until its command channel closes.
     struct TestWorker {
         cfg: TestConfig,
+        stats: Arc<TestStats>,
+    }
+    struct TestStats {
+        beat: std::sync::atomic::AtomicU64,
+        /// Whether the supervisor is shown the beat.
+        watched: bool,
     }
     #[derive(Clone)]
     struct TestConfig {
@@ -973,8 +1198,15 @@ mod tests {
         panic_once: Arc<AtomicBool>,
         /// One incarnation returns Ok immediately: the clean-exit path.
         exit_clean_once: Arc<AtomicBool>,
+        /// Every incarnation returns Err at once: a deterministic fault
+        /// that burns the restart budget.
+        fail_always: bool,
         /// Never read the command channel: mailbox fills, worker wedges.
         stall: bool,
+        /// Every incarnation runs this long, then returns Err.
+        fail_after: Option<Duration>,
+        /// Expose the heartbeat to the supervisor's stall watch.
+        watched: bool,
         /// What build() observed as ctx.core_id(): -2 = build never ran,
         /// -1 = ran unpinned (None), >= 0 = the pinned core.
         saw_core_id: Arc<std::sync::atomic::AtomicI64>,
@@ -987,29 +1219,36 @@ mod tests {
     impl Worker for TestWorker {
         type Command = ();
         type Config = TestConfig;
-        type Stats = ();
+        type Stats = TestStats;
         type Error = TestError;
         const NAME: &'static str = "test";
 
         fn build_stats(
             _worker_index: WorkerIndex,
-            _config: &TestConfig,
+            config: &TestConfig,
             _meter: &Meter,
-        ) -> Arc<()> {
-            Arc::new(())
+        ) -> Arc<TestStats> {
+            Arc::new(TestStats {
+                beat: std::sync::atomic::AtomicU64::new(0),
+                watched: config.watched,
+            })
         }
 
         fn build(
             ctx: &WorkerContext,
             config: TestConfig,
-            _stats: Arc<()>,
+            stats: Arc<TestStats>,
         ) -> Result<Self, TestError> {
             config.builds.fetch_add(1, Ordering::SeqCst);
             config.saw_core_id.store(
                 ctx.core_id().map_or(-1, |c| c.get() as i64),
                 Ordering::SeqCst,
             );
-            Ok(Self { cfg: config })
+            Ok(Self { cfg: config, stats })
+        }
+
+        fn heartbeat(stats: &TestStats) -> Option<&std::sync::atomic::AtomicU64> {
+            stats.watched.then_some(&stats.beat)
         }
 
         async fn run(self, mut cmd_rx: mpsc::Receiver<()>) -> Result<(), TestError> {
@@ -1020,10 +1259,25 @@ mod tests {
             if self.cfg.exit_clean_once.swap(false, Ordering::SeqCst) {
                 return Ok(()); // clean exit while supervised
             }
+            if self.cfg.fail_always {
+                return Err(TestError);
+            }
             if self.cfg.stall {
                 std::future::pending::<()>().await; // wedged worker
             }
-            while cmd_rx.recv().await.is_some() {}
+            if let Some(run_for) = self.cfg.fail_after {
+                tokio::time::sleep(run_for).await;
+                return Err(TestError);
+            }
+            // A healthy worker: beats while it waits for commands.
+            loop {
+                tokio::select! {
+                    cmd = cmd_rx.recv() => if cmd.is_none() { break },
+                    () = tokio::time::sleep(Duration::from_millis(5)) => {
+                        self.stats.beat.store(crate::mono_ms_now(), Ordering::Relaxed);
+                    }
+                }
+            }
             Ok(())
         }
     }
@@ -1033,7 +1287,10 @@ mod tests {
             builds: Arc::new(AtomicUsize::new(0)),
             panic_once: Arc::new(AtomicBool::new(false)),
             exit_clean_once: Arc::new(AtomicBool::new(false)),
+            fail_always: false,
             stall: false,
+            fail_after: None,
+            watched: false,
             saw_core_id: Arc::new(std::sync::atomic::AtomicI64::new(-2)),
         }
     }
@@ -1184,28 +1441,214 @@ mod tests {
         }
     }
 
-    #[test]
-    fn start_rejects_unreachable_restart_budget() {
-        let cfg = default_test_config();
-        let result = CollectionSupervisor::<TestWorker>::start(
+    fn supervisor_with_policy(
+        cfg: TestConfig,
+        workers: usize,
+        options: impl FnOnce(SupervisorOptions) -> SupervisorOptions,
+    ) -> CollectionSupervisor<TestWorker> {
+        CollectionSupervisor::<TestWorker>::start(
             cfg,
-            SupervisorOptions::new(CoreAssignment::explicit(vec![0usize]), "test-supervisor")
+            options(
+                SupervisorOptions::new(
+                    CoreAssignment::explicit(vec![0usize; workers]),
+                    "test-supervisor",
+                )
                 .with_mailbox(4)
-                .with_affinity(Arc::new(NoAffinity))
-                .with_policy(RestartPolicy::new(
-                    3,
-                    Duration::from_millis(10),
-                    Duration::from_secs(60),
-                )),
+                .with_affinity(Arc::new(NoAffinity)),
+            ),
+            opentelemetry::global::meter("test"),
+        )
+        .expect("supervisor start")
+    }
+
+    #[test]
+    fn start_rejects_a_zero_stall_timeout() {
+        let result = CollectionSupervisor::<TestWorker>::start(
+            default_test_config(),
+            SupervisorOptions::new(CoreAssignment::explicit(vec![0usize]), "test-supervisor")
+                .with_stall_timeout(Some(Duration::ZERO)),
             opentelemetry::global::meter("test"),
         );
-        match result {
-            Ok(_) => panic!("unreachable budget must be rejected"),
-            Err(err) => assert!(matches!(
-                err,
-                StartError::Policy(RestartPolicyError::UnreachableBudget { .. })
-            )),
-        }
+        assert!(matches!(result, Err(StartError::ZeroStallTimeout)));
+    }
+
+    #[tokio::test]
+    async fn a_slow_crash_loop_still_exhausts_the_budget() {
+        // Each attempt takes longer to fail than `backoff x max_restarts`
+        // would fit in `window` several times over. A budget counted per
+        // elapsed window never trips on this; one counted per unhealthy
+        // run does, on the attempt after the last allowed restart.
+        let cfg = TestConfig {
+            fail_after: Some(Duration::from_millis(60)),
+            ..default_test_config()
+        };
+        let builds = Arc::clone(&cfg.builds);
+        let mut sup = supervisor_with_policy(cfg, 1, |o| {
+            o.with_policy(RestartPolicy::new(
+                2,
+                Duration::from_secs(60),
+                Duration::from_millis(100),
+            ))
+        });
+        let (_shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let exit = tokio::time::timeout(Duration::from_secs(10), sup.supervise(&mut shutdown_rx))
+            .await
+            .expect("a crash loop must end supervision");
+        assert_eq!(
+            exit,
+            SuperviseExit::BelowMinimumWorkers {
+                live: 0,
+                minimum: 1
+            }
+        );
+        assert_eq!(
+            builds.load(Ordering::SeqCst),
+            3,
+            "the first run and 2 restarts"
+        );
+        sup.shutdown(Duration::from_secs(5)).await;
+    }
+
+    #[tokio::test]
+    async fn a_healthy_run_starts_the_restart_count_over() {
+        // Every attempt outlives `window`, so each failure is the first
+        // since a healthy run: one allowed restart is never used up.
+        let cfg = TestConfig {
+            fail_after: Some(Duration::from_millis(60)),
+            ..default_test_config()
+        };
+        let builds = Arc::clone(&cfg.builds);
+        let mut sup = supervisor_with_policy(cfg, 1, |o| {
+            o.with_policy(RestartPolicy::new(
+                1,
+                Duration::from_millis(20),
+                Duration::from_millis(5),
+            ))
+        });
+        let admin = sup.admin_handle();
+        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let supervise = tokio::spawn(async move {
+            let exit = sup.supervise(&mut shutdown_rx).await;
+            (sup, exit)
+        });
+        assert!(
+            wait_for(Duration::from_secs(10), || builds.load(Ordering::SeqCst)
+                >= 4)
+            .await,
+            "the slot must keep being restarted"
+        );
+        assert!(admin.failed_slots().is_empty());
+        let _ = shutdown_tx.send(true);
+        let (sup, exit) = supervise.await.expect("supervise task");
+        assert_eq!(exit, SuperviseExit::ShutdownRequested);
+        sup.shutdown(Duration::from_secs(5)).await;
+    }
+
+    #[tokio::test]
+    async fn a_stalled_worker_fails_its_slot_without_a_restart() {
+        // The worker is alive but wedged: its heartbeat never moves. The
+        // thread cannot be replaced, so the slot fails outright and the
+        // default minimum ends supervision.
+        let cfg = TestConfig {
+            stall: true,
+            watched: true,
+            ..default_test_config()
+        };
+        let builds = Arc::clone(&cfg.builds);
+        let mut sup = supervisor_with_policy(cfg, 1, |o| {
+            o.with_stall_timeout(Some(Duration::from_millis(100)))
+        });
+        let admin = sup.admin_handle();
+        let (_shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let exit = tokio::time::timeout(Duration::from_secs(10), sup.supervise(&mut shutdown_rx))
+            .await
+            .expect("a stalled worker must end supervision");
+        assert_eq!(
+            exit,
+            SuperviseExit::BelowMinimumWorkers {
+                live: 0,
+                minimum: 1
+            }
+        );
+        assert_eq!(admin.failed_slots(), vec![WorkerIndex::new(0)]);
+        let last = admin.last_exit(WorkerIndex::new(0)).expect("exit recorded");
+        assert_eq!(last.kind, SlotExitKind::Stalled);
+        assert_eq!(
+            builds.load(Ordering::SeqCst),
+            1,
+            "a stalled slot is not respawned"
+        );
+        sup.shutdown(Duration::from_millis(100)).await;
+    }
+
+    #[tokio::test]
+    async fn a_beating_worker_is_not_taken_as_stalled() {
+        let cfg = TestConfig {
+            watched: true,
+            ..default_test_config()
+        };
+        // Far above the 5ms beat: a thread descheduled for a while on a
+        // loaded machine must not read as a stall.
+        let mut sup = supervisor_with_policy(cfg, 2, |o| {
+            o.with_stall_timeout(Some(Duration::from_secs(2)))
+        });
+        let admin = sup.admin_handle();
+        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let supervise = tokio::spawn(async move {
+            let exit = sup.supervise(&mut shutdown_rx).await;
+            (sup, exit)
+        });
+        // Longer than the stall timeout, beating all the while.
+        tokio::time::sleep(Duration::from_millis(3000)).await;
+        assert!(admin.failed_slots().is_empty());
+        let _ = shutdown_tx.send(true);
+        let (sup, exit) = supervise.await.expect("supervise task");
+        assert_eq!(exit, SuperviseExit::ShutdownRequested);
+        sup.shutdown(Duration::from_secs(5)).await;
+    }
+
+    #[tokio::test]
+    async fn supervise_sees_a_shutdown_requested_before_it_started() {
+        let mut sup = supervisor_with_policy(default_test_config(), 1, |o| o);
+        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let _ = shutdown_tx.send(true);
+        // Mark the value seen: no change is left to wait for.
+        let _ = *shutdown_rx.borrow_and_update();
+        let exit = tokio::time::timeout(Duration::from_secs(5), sup.supervise(&mut shutdown_rx))
+            .await
+            .expect("an earlier shutdown request must not be missed");
+        assert_eq!(exit, SuperviseExit::ShutdownRequested);
+        sup.shutdown(Duration::from_secs(5)).await;
+    }
+
+    #[tokio::test]
+    async fn run_reports_a_lost_pool_as_an_error() {
+        let cfg = TestConfig {
+            fail_always: true,
+            ..default_test_config()
+        };
+        let sup = supervisor_with_policy(cfg, 1, |o| {
+            o.with_policy(RestartPolicy::new(
+                1,
+                Duration::from_secs(60),
+                Duration::from_millis(5),
+            ))
+        });
+        let (_shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let result = tokio::time::timeout(
+            Duration::from_secs(10),
+            sup.run(&mut shutdown_rx, Duration::from_secs(5)),
+        )
+        .await
+        .expect("run ends once the pool is lost");
+        assert_eq!(
+            result,
+            Err(PoolLost {
+                name: "test-supervisor".into(),
+                live: 0,
+                minimum: 1
+            })
+        );
     }
 
     #[tokio::test]
@@ -1298,5 +1741,98 @@ mod tests {
             start.elapsed() < Duration::from_secs(5),
             "shutdown did not respect its deadline"
         );
+    }
+
+    #[tokio::test]
+    async fn one_failed_slot_ends_supervision_under_the_default_policy() {
+        // Every incarnation fails. With the default minimum (every
+        // slot), the FIRST exhausted budget ends supervision, while the
+        // other slot is still live, instead of leaving the service at
+        // half capacity.
+        let cfg = TestConfig {
+            fail_always: true,
+            ..default_test_config()
+        };
+        let mut sup = CollectionSupervisor::<TestWorker>::start(
+            cfg,
+            SupervisorOptions::new(CoreAssignment::explicit(vec![0usize; 2]), "test-supervisor")
+                .with_mailbox(4)
+                .with_affinity(Arc::new(NoAffinity))
+                .with_policy(RestartPolicy::new(
+                    2,
+                    Duration::from_secs(60),
+                    Duration::from_millis(10),
+                )),
+            opentelemetry::global::meter("test"),
+        )
+        .expect("supervisor start");
+        let (_shutdown_tx, mut shutdown_rx) = watch::channel(false);
+
+        let exit = tokio::time::timeout(Duration::from_secs(5), sup.supervise(&mut shutdown_rx))
+            .await
+            .expect("supervision ends once a slot's budget is exhausted");
+
+        assert_eq!(
+            exit,
+            SuperviseExit::BelowMinimumWorkers {
+                live: 1,
+                minimum: 2
+            }
+        );
+        sup.shutdown(Duration::from_secs(5)).await;
+    }
+
+    #[tokio::test]
+    async fn a_worker_that_finishes_unasked_is_not_live() {
+        // A worker whose run returns Ok without a shutdown (its input
+        // ended: the producer behind a channel source died) does no
+        // work. It is not respawned and not failed, but it is not live
+        // either, so the default minimum ends supervision.
+        let cfg = TestConfig {
+            exit_clean_once: Arc::new(AtomicBool::new(true)),
+            ..default_test_config()
+        };
+        let (mut sup, _cfg) = test_supervisor_with(cfg, 2, 4, 3);
+        let admin = sup.admin_handle();
+        let (_shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let exit = tokio::time::timeout(Duration::from_secs(5), sup.supervise(&mut shutdown_rx))
+            .await
+            .expect("a finished worker must end supervision");
+        assert_eq!(
+            exit,
+            SuperviseExit::BelowMinimumWorkers {
+                live: 1,
+                minimum: 2
+            }
+        );
+        assert_eq!(admin.done_slots().len(), 1);
+        assert!(admin.failed_slots().is_empty());
+        sup.shutdown(Duration::from_secs(5)).await;
+    }
+
+    #[tokio::test]
+    async fn a_finished_worker_is_tolerated_when_the_minimum_allows() {
+        let cfg = TestConfig {
+            exit_clean_once: Arc::new(AtomicBool::new(true)),
+            ..default_test_config()
+        };
+        let mut sup = supervisor_with_policy(cfg, 2, |o| {
+            o.with_policy(RestartPolicy::default().with_min_live_workers(1))
+        });
+        let admin = sup.admin_handle();
+        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let supervise = tokio::spawn(async move {
+            let exit = sup.supervise(&mut shutdown_rx).await;
+            (sup, exit)
+        });
+        assert!(
+            wait_for(Duration::from_secs(5), || admin.done_slots().len() == 1).await,
+            "clean exit never became visible via done_slots()"
+        );
+        assert!(!supervise.is_finished(), "one live worker is enough here");
+        let _ = shutdown_tx.send(true);
+        let (sup, exit) = supervise.await.expect("supervise task");
+        assert_eq!(exit, SuperviseExit::ShutdownRequested);
+        sup.shutdown(Duration::from_secs(5)).await;
     }
 }

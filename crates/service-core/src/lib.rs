@@ -33,6 +33,23 @@ pub mod batch;
 pub mod supervisor;
 pub mod worker;
 
+/// Milliseconds on the process's monotonic clock, counted from the
+/// first call. What liveness beats are stamped with: a wall-clock step
+/// (an NTP correction, a VM migration) neither fakes a stall nor hides
+/// one. Never zero, so a beat that reads zero was never stamped.
+#[inline(always)]
+pub fn mono_ms_now() -> u64 {
+    static EPOCH: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    u64::try_from(
+        EPOCH
+            .get_or_init(std::time::Instant::now)
+            .elapsed()
+            .as_millis(),
+    )
+    .unwrap_or(u64::MAX)
+    .saturating_add(1)
+}
+
 #[inline(always)]
 pub(crate) fn unix_ms_now() -> u64 {
     SystemTime::now()
