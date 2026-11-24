@@ -100,7 +100,7 @@ tempfile = { version = "3.27" }
 quick-xml = { version = "0.42" }
 russh = { version = "0.65" }
 secrecy = { version = "0.10" }
-notify = { version = "8.2" }
+notify = { version = "9.0" }
 petgraph = { version = "0.8", default-features = false }
 sha2 = { version = "0.11" }
 schema-registry-client = { version = "0.4", default-features = false }
